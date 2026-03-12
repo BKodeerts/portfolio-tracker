@@ -236,7 +236,7 @@
     .footer { text-align: center; margin-top: 32px; font-size: 10px; color: #2d3748; line-height: 1.6; }
 
     /* Intraday sparklines */
-    .intraday-section { margin-top: 12px; }
+    .intraday-section { margin-bottom: 12px; }
     .intraday-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
     .intraday-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     @media (max-width: 640px) { .intraday-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -260,12 +260,10 @@
     }
     .privacy-btn:hover { background: rgba(255,255,255,0.08); color: #94a3b8; }
     .privacy-btn.on { color: #a5b4fc; border-color: rgba(99,102,241,0.3); }
-    body.privacy .metric-value,
-    body.privacy .metric-sub,
+    body.privacy .privacy-val,
     body.privacy .pos-row-val,
-    body.privacy .pos-row-pct,
-    body.privacy .pos-table td:not(:first-child):not(:nth-child(2)),
-    body.privacy .pos-table tfoot td {
+    body.privacy .pos-table td:nth-child(n+4):not(:last-child),
+    body.privacy .pos-table tfoot td:nth-child(n+2):not(:last-child) {
       filter: blur(7px); user-select: none;
     }
 
@@ -736,24 +734,35 @@ function renderApp() {
     <div class="metrics-grid">
       <div class="metric-card">
         <div class="metric-label">Geïnvesteerd</div>
-        <div class="metric-value c-neutral">${fmt(latest.totalCost)}</div>
+        <div class="metric-value c-neutral privacy-val">${fmt(latest.totalCost)}</div>
         <div class="metric-sub">kostprijs</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Portefeuille</div>
-        <div class="metric-value c-brand">${fmt(latest.total)}</div>
+        <div class="metric-value c-brand privacy-val">${fmt(latest.total)}</div>
         <div class="metric-sub">huidige waarde</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Winst / Verlies</div>
-        <div class="metric-value ${plClass}">${latest.profit >= 0 ? "+" : ""}${fmt(latest.profit)}</div>
-        ${hasPeriod ? `<div class="metric-sub ${prdClass}">Prd: ${periodProfit >= 0 ? "+" : ""}${fmt(periodProfit)}</div>` : `<div class="metric-sub">totale looptijd</div>`}
+        <div class="metric-value ${plClass} privacy-val">${latest.profit >= 0 ? "+" : ""}${fmt(latest.profit)}</div>
+        ${hasPeriod ? `<div class="metric-sub ${prdClass} privacy-val">Prd: ${periodProfit >= 0 ? "+" : ""}${fmt(periodProfit)}</div>` : `<div class="metric-sub">totale looptijd</div>`}
       </div>
       <div class="metric-card">
         <div class="metric-label">Rendement</div>
         <div class="metric-value ${plClass}">${fmtPct(latest.pctReturn)}</div>
         ${hasPeriod ? `<div class="metric-sub ${prdClass}">Prd: ${fmtPct(periodPct)}</div>` : `<div class="metric-sub">totale looptijd</div>`}
       </div>
+    </div>
+
+    <!-- Intraday section -->
+    <div class="intraday-section">
+      <div class="intraday-section-header">
+        <div class="card-title" style="margin-bottom:0">Vandaag</div>
+        <div id="marketStatus"></div>
+        <div id="intradayStatus" style="font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace;margin-left:auto"></div>
+        <button class="refresh-btn" onclick="refreshIntraday()" title="Intraday verversen">↻</button>
+      </div>
+      <div id="intradayGrid" class="intraday-grid"><div style="color:#334155;font-size:11px">laden…</div></div>
     </div>
 
     <!-- Main chart card with integrated controls -->
@@ -802,17 +811,6 @@ function renderApp() {
         <div class="card-title">Huidige posities</div>
         <div id="homePositions"></div>
       </div>
-    </div>
-
-    <!-- Intraday section -->
-    <div class="intraday-section">
-      <div class="intraday-section-header">
-        <div class="card-title" style="margin-bottom:0">Vandaag</div>
-        <div id="marketStatus"></div>
-        <div id="intradayStatus" style="font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace;margin-left:auto"></div>
-        <button class="refresh-btn" onclick="refreshIntraday()" title="Intraday verversen">↻</button>
-      </div>
-      <div id="intradayGrid" class="intraday-grid"><div style="color:#334155;font-size:11px">laden…</div></div>
     </div>
 
     <div class="footer">
@@ -880,9 +878,9 @@ function renderPortfolioChart(visibleTickers) {
           callbacks: {
             title: items => new Date(items[0].label).toLocaleDateString("nl-BE",{day:"numeric",month:"short",year:"numeric"}),
             label: item => {
-              if (privacyMode) return ` ${item.dataset.label}: ●●●`;
               const sign = item.raw >= 0 ? "+" : "";
               if (currentView === "pct") return ` ${item.dataset.label}: ${sign}${item.raw}%`;
+              if (privacyMode) return ` ${item.dataset.label}: ●●●`;
               return ` ${item.dataset.label}: ${sign}€${Math.round(item.raw).toLocaleString("nl-BE")}`;
             },
           },
@@ -894,8 +892,8 @@ function renderPortfolioChart(visibleTickers) {
         y: { grid:{ color:"rgba(255,255,255,0.03)" },
              ticks:{ color:"#475569", font:{size:10},
                callback: v => {
-                 if (privacyMode) { return "●●"; }
-                 return currentView === "pct" ? `${v}%` : `€${(v/1000).toFixed(0)}k`;
+                 if (currentView === "pct") return `${v}%`;
+                 return privacyMode ? "●●" : `€${(v/1000).toFixed(0)}k`;
                } } },
       },
     },
@@ -940,7 +938,7 @@ function renderDonutChart(latest, canvasId) {
         tooltip:{
           backgroundColor:"rgba(8,8,24,0.96)", borderColor:"rgba(255,255,255,0.08)", borderWidth:1,
           bodyColor:"#e2e8f0", bodyFont:{ family:"'JetBrains Mono'", size:11 }, padding:12, cornerRadius:10,
-          callbacks: { label: item => ` ${item.label}: ${fmt(item.raw)} (${((item.raw/total)*100).toFixed(1)}%)` },
+          callbacks: { label: item => ` ${item.label}: ${privacyMode ? "●●●" : fmt(item.raw)} (${((item.raw/total)*100).toFixed(1)}%)` },
         },
       },
     },

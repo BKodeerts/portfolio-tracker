@@ -1,6 +1,6 @@
 {
   "name": "portfolio-tracker",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Self-hosted portfolio tracker with Yahoo Finance data",
   "scripts": {
     "start": "node server.js",
