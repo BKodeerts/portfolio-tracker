@@ -324,6 +324,7 @@ let chartData     = [];
 let benchmarkData = [];
 
 let intradayData   = {};
+let intradayLoaded = false;
 let parsedCSVRows  = [];
 let currentTab     = "portefeuille";
 let currentView    = "total";
@@ -743,14 +744,13 @@ function renderApp() {
         <div class="metric-sub">huidige waarde</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Winst / Verlies</div>
-        <div class="metric-value ${plClass} privacy-val">${latest.profit >= 0 ? "+" : ""}${fmt(latest.profit)}</div>
-        ${hasPeriod ? `<div class="metric-sub ${prdClass} privacy-val">Prd: ${periodProfit >= 0 ? "+" : ""}${fmt(periodProfit)}</div>` : `<div class="metric-sub">totale looptijd</div>`}
+        <div class="metric-label">P&amp;L totaal</div>
+        <div class="metric-value ${plClass} privacy-val" style="font-size:17px">${latest.profit >= 0 ? "+" : ""}${fmt(latest.profit)}</div>
+        <div class="metric-sub ${plClass}">${fmtPct(latest.pctReturn)}</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Rendement</div>
-        <div class="metric-value ${plClass}">${fmtPct(latest.pctReturn)}</div>
-        ${hasPeriod ? `<div class="metric-sub ${prdClass}">Prd: ${fmtPct(periodPct)}</div>` : `<div class="metric-sub">totale looptijd</div>`}
+        <div class="metric-label">Vandaag</div>
+        <div id="metricToday"><div class="metric-value c-neutral" style="font-size:17px">—</div><div class="metric-sub">laden…</div></div>
       </div>
     </div>
 
@@ -762,7 +762,7 @@ function renderApp() {
         <div id="intradayStatus" style="font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace;margin-left:auto"></div>
         <button class="refresh-btn" onclick="refreshIntraday()" title="Intraday verversen">↻</button>
       </div>
-      <div id="intradayGrid" class="intraday-grid"><div style="color:#334155;font-size:11px">laden…</div></div>
+      <div id="intradayGrid" class="intraday-grid"></div>
     </div>
 
     <!-- Main chart card with integrated controls -->
@@ -794,6 +794,11 @@ function renderApp() {
         </div>
         <button class="refresh-btn" onclick="clearCache()" title="Koersen verversen">↻</button>
       </div>
+      ${hasPeriod ? `<div style="font-size:10px;color:#475569;margin-bottom:12px;display:flex;gap:8px;align-items:center">
+        <span style="text-transform:uppercase;letter-spacing:0.09em;font-weight:600;color:#334155">Periode</span>
+        <span class="${prdClass} privacy-val">${periodProfit >= 0 ? "+" : ""}${fmt(periodProfit)}</span>
+        <span class="${prdClass}">${fmtPct(periodPct)}</span>
+      </div>` : ""}
 
       <div style="height:400px">
         <canvas id="mainChart"></canvas>
@@ -822,7 +827,8 @@ function renderApp() {
   renderDonutChart(latest, "homeDonut");
   renderHomePositions(latest);
   renderMarketStatus();
-  loadIntradayData();
+  renderIntradaySection();        // instant — uses cached intradayData if available
+  if (!intradayLoaded) loadIntradayData();  // only fetch once on first load
 }
 
 function renderPortfolioChart(visibleTickers) {
@@ -1046,6 +1052,37 @@ function sparklineSVG(points, prevClose, tradingMins) {
   </svg>`;
 }
 
+function computeTodayPL() {
+  let plEur = 0, baseEur = 0;
+  const latest = chartData[chartData.length - 1];
+  CURRENT_TICKERS.forEach(ticker => {
+    const meta = TICKER_META[ticker];
+    const data = intradayData[meta?.yahoo];
+    if (!data?.previousClose || !data.points?.length) return;
+    const shares = latest?.[`${ticker}_shares`];
+    if (!shares) return;
+    const lastPrice = data.points[data.points.length - 1].close;
+    const fx = fxRateMap[data.date] || FX_FALLBACK;
+    const toEurFactor = meta.currency === "USD" ? 1 / fx : 1;
+    plEur   += shares * (lastPrice - data.previousClose) * toEurFactor;
+    baseEur += shares * data.previousClose * toEurFactor;
+  });
+  return baseEur > 0 ? { pl: plEur, pct: (plEur / baseEur) * 100 } : null;
+}
+
+function renderTodayMetric() {
+  const el = document.getElementById("metricToday");
+  if (!el) return;
+  const r = computeTodayPL();
+  if (!r) {
+    el.innerHTML = `<div class="metric-value c-neutral" style="font-size:17px">—</div><div class="metric-sub">geen data</div>`;
+    return;
+  }
+  const cls  = r.pl >= 0 ? "c-pos" : "c-neg";
+  const sign = r.pl >= 0 ? "+" : "";
+  el.innerHTML = `<div class="metric-value ${cls} privacy-val" style="font-size:17px">${sign}${fmt(r.pl)}</div><div class="metric-sub ${cls}">${sign}${r.pct.toFixed(2)}%</div>`;
+}
+
 function renderIntradaySection() {
   const gridEl   = document.getElementById("intradayGrid");
   const statusEl = document.getElementById("intradayStatus");
@@ -1056,7 +1093,8 @@ function renderIntradaySection() {
     .filter(e => e.data?.points?.length > 0);
 
   if (entries.length === 0) {
-    if (statusEl) statusEl.textContent = "geen data";
+    if (statusEl) statusEl.textContent = intradayLoaded ? "geen data" : "laden…";
+    if (!intradayLoaded) { gridEl.innerHTML = ""; return; }
     gridEl.innerHTML = `<div style="color:#334155;font-size:11px">Markt gesloten of geen intradaydata beschikbaar.</div>`;
     return;
   }
@@ -1081,6 +1119,8 @@ function renderIntradaySection() {
       <div class="metric-sub">${data.currency || ""} ${last.close.toFixed(2)}</div>
     </div>`;
   }).join("");
+
+  renderTodayMetric();
 }
 
 async function loadIntradayData(force = false) {
@@ -1094,11 +1134,12 @@ async function loadIntradayData(force = false) {
     const json = await res.json();
     if (json.status !== "ok") throw new Error(json.message);
     intradayData = json.data;
-    renderIntradaySection();
   } catch (e) {
     if (statusEl) statusEl.textContent = "laden mislukt";
     console.warn("Intraday load failed:", e.message);
   }
+  intradayLoaded = true;
+  renderIntradaySection();
 }
 
 function refreshIntraday() { loadIntradayData(true); }
