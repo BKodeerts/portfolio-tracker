@@ -1,0 +1,11 @@
+services:
+  portfolio-tracker:
+    build: .
+    container_name: portfolio-tracker
+    restart: unless-stopped
+    ports:
+      - "3069:3069"
+    volumes:
+      - ./cache:/app/cache
+    environment:
+      - PORT=3069
