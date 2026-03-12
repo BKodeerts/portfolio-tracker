@@ -261,6 +261,58 @@
       filter: blur(7px); user-select: none;
     }
 
+    /* ── Theme: dark (warm neutral dark) ── */
+    body.theme-dark {
+      background: linear-gradient(145deg, #111111 0%, #1a1a1a 50%, #131313 100%);
+      color: #d4d4d4;
+    }
+    body.theme-dark .app-nav { background: rgba(255,255,255,0.05); }
+    body.theme-dark .nav-btn { color: #666; }
+    body.theme-dark .nav-btn:hover { color: #aaa; }
+    body.theme-dark .nav-btn.active { background: rgba(255,255,255,0.1); color: #d4d4d4; }
+    body.theme-dark .metric-card,
+    body.theme-dark .intraday-card { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
+    body.theme-dark .metric-label { color: #595959; }
+    body.theme-dark .metric-sub   { color: #595959; }
+    body.theme-dark .c-neutral    { color: #888; }
+    body.theme-dark .c-brand      { color: #aaa; }
+    body.theme-dark .chart-card   { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.07); }
+    body.theme-dark .seg          { background: rgba(255,255,255,0.07); }
+    body.theme-dark .seg-btn      { color: #595959; }
+    body.theme-dark .seg-btn:hover { color: #aaa; }
+    body.theme-dark .seg-btn.on   { background: rgba(255,255,255,0.12); color: #d4d4d4; }
+    body.theme-dark .pill         { color: #4d4d4d; }
+    body.theme-dark .pill:hover   { color: #888; }
+    body.theme-dark .pill.on      { background: rgba(255,255,255,0.1); color: #aaa; }
+    body.theme-dark .card-title   { color: #4d4d4d; }
+    body.theme-dark .legend-item  { color: #666; }
+    body.theme-dark .pos-row      { border-bottom-color: rgba(255,255,255,0.04); }
+    body.theme-dark .pos-row.total-row { border-top-color: rgba(255,255,255,0.08); }
+    body.theme-dark .pos-row.total-row .pos-row-ticker { color: #888; }
+    body.theme-dark .pos-row-val  { color: #666; }
+    body.theme-dark .market-badge { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.07); color: #888; }
+    body.theme-dark .refresh-btn  { background: rgba(255,255,255,0.04); color: #4d4d4d; }
+    body.theme-dark .refresh-btn:hover { background: rgba(255,255,255,0.09); color: #888; }
+    body.theme-dark .privacy-btn  { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); color: #4d4d4d; }
+    body.theme-dark .privacy-btn:hover { background: rgba(255,255,255,0.09); color: #888; }
+    body.theme-dark .privacy-btn.on { color: #aaa; border-color: rgba(255,255,255,0.2); }
+    body.theme-dark .toggle-track  { background: rgba(255,255,255,0.08); }
+    body.theme-dark .toggle-track.on { background: rgba(255,255,255,0.2); }
+    body.theme-dark .toggle-track::after { background: #666; }
+    body.theme-dark .toggle-track.on::after { background: #aaa; }
+    body.theme-dark .closed-toggle { color: #4d4d4d; }
+    body.theme-dark .pos-table th { color: #4d4d4d; border-bottom-color: rgba(255,255,255,0.06); }
+    body.theme-dark .pos-table td { border-bottom-color: rgba(255,255,255,0.03); }
+    body.theme-dark .pos-table td:nth-child(2) { color: #666; }
+    body.theme-dark .pos-table tfoot td { border-top-color: rgba(255,255,255,0.08); }
+    body.theme-dark .drop-zone    { border-color: rgba(255,255,255,0.08); }
+    body.theme-dark .import-info  { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.06); color: #777; }
+    body.theme-dark .import-info strong { color: #d4d4d4; }
+    body.theme-dark .btn          { border-color: rgba(255,255,255,0.07); color: #595959; }
+    body.theme-dark .btn:hover    { border-color: rgba(255,255,255,0.15); color: #aaa; }
+    body.theme-dark .footer       { color: #2d2d2d; }
+    body.theme-dark .progress-bar { background: rgba(255,255,255,0.07); }
+
     /* Responsive */
     @media (max-width: 640px) {
       .metrics-grid { grid-template-columns: 1fr 1fr; }
@@ -310,6 +362,11 @@ let TICKER_META      = {};
 let CURRENT_TICKERS  = [];
 let COLORS           = {};
 let privacyMode      = localStorage.getItem("privacy") === "1";
+let currentTheme     = localStorage.getItem("theme") || "default";
+
+function applyTheme() {
+  document.body.classList.toggle("theme-dark", currentTheme === "dark");
+}
 
 let fxRateMap     = {};
 let priceMaps     = {};
@@ -696,7 +753,8 @@ function renderAppHeader() {
       <button class="nav-btn ${tab==="analyse"?"active":""}"      onclick="setTab('analyse')">Analyse</button>
       <button class="nav-btn ${tab==="import"?"active":""}"       onclick="setTab('import')">Import</button>
     </nav>
-    <button class="privacy-btn ${privacyMode?"on":""}" onclick="togglePrivacy()" title="Privacy mode" style="margin-left:auto">👁</button>
+    <button class="privacy-btn ${currentTheme==="dark"?"on":""}" onclick="toggleTheme()" title="Thema wisselen" style="margin-left:auto">◑</button>
+    <button class="privacy-btn ${privacyMode?"on":""}" onclick="togglePrivacy()" title="Privacy mode">👁</button>
   </header>`;
 }
 
@@ -823,6 +881,22 @@ function renderApp() {
   if (!intradayLoaded) loadIntradayData();  // only fetch once on first load
 }
 
+function chartTheme() {
+  const dark = document.body.classList.contains("theme-dark");
+  return {
+    tooltipBg:     dark ? "rgba(28,28,28,0.97)"       : "rgba(8,8,24,0.96)",
+    tooltipBorder: dark ? "rgba(255,255,255,0.1)"      : "rgba(255,255,255,0.08)",
+    titleColor:    dark ? "#888"                       : "#94a3b8",
+    bodyColor:     dark ? "#d4d4d4"                    : "#e2e8f0",
+    gridColor:     dark ? "rgba(255,255,255,0.04)"     : "rgba(255,255,255,0.03)",
+    tickColor:     dark ? "#666"                       : "#475569",
+    costLine:      dark ? "#444"                       : "#334155",
+    costFill:      dark ? "rgba(68,68,68,0.05)"        : "rgba(51,65,85,0.05)",
+    donutBorder:   dark ? "rgba(26,26,26,0.9)"         : "rgba(8,8,24,0.8)",
+    benchmarkLine: dark ? "#666"                       : "#475569",
+  };
+}
+
 function renderPortfolioChart(visibleTickers) {
   const ctx      = document.getElementById("mainChart").getContext("2d");
   const filtered = getFilteredData();
@@ -835,7 +909,7 @@ function renderPortfolioChart(visibleTickers) {
         borderColor:"#818cf8", backgroundColor:"rgba(99,102,241,0.1)",
         fill:true, borderWidth:2, pointRadius:0, tension:0, cubicInterpolationMode:"monotone" },
       { label:"Kostprijs",    data: filtered.map(d => d.totalCost),
-        borderColor:"#334155", backgroundColor:"rgba(51,65,85,0.05)",
+        borderColor:chartTheme().costLine, backgroundColor:chartTheme().costFill,
         fill:true, borderWidth:1, borderDash:[4,4], pointRadius:0, tension:0, cubicInterpolationMode:"monotone" },
     ];
   } else if (currentView === "individual") {
@@ -868,8 +942,8 @@ function renderPortfolioChart(visibleTickers) {
       plugins: {
         legend: { display:false },
         tooltip: {
-          backgroundColor:"rgba(8,8,24,0.96)", borderColor:"rgba(255,255,255,0.08)", borderWidth:1,
-          titleColor:"#94a3b8", bodyColor:"#e2e8f0",
+          backgroundColor:chartTheme().tooltipBg, borderColor:chartTheme().tooltipBorder, borderWidth:1,
+          titleColor:chartTheme().titleColor, bodyColor:chartTheme().bodyColor,
           titleFont:{ family:"'DM Sans'", size:11, weight:700 },
           bodyFont:{ family:"'JetBrains Mono'", size:11 },
           padding:14, cornerRadius:10,
@@ -886,9 +960,9 @@ function renderPortfolioChart(visibleTickers) {
       },
       scales: {
         x: { type:"time", time:{ unit:"month", tooltipFormat:"dd MMM yyyy" },
-             grid:{ color:"rgba(255,255,255,0.03)" }, ticks:{ color:"#475569", font:{size:10} } },
-        y: { grid:{ color:"rgba(255,255,255,0.03)" },
-             ticks:{ color:"#475569", font:{size:10},
+             grid:{ color:chartTheme().gridColor }, ticks:{ color:chartTheme().tickColor, font:{size:10} } },
+        y: { grid:{ color:chartTheme().gridColor },
+             ticks:{ color:chartTheme().tickColor, font:{size:10},
                callback: v => {
                  if (currentView === "pct") return `${v}%`;
                  return privacyMode ? "●●" : `€${(v/1000).toFixed(0)}k`;
@@ -927,15 +1001,15 @@ function renderDonutChart(latest, canvasId) {
     type: "doughnut",
     data: {
       labels: tickers,
-      datasets: [{ data: values, backgroundColor: tickers.map(t => getColor(t)), borderColor:"rgba(8,8,24,0.8)", borderWidth:2, hoverOffset:5 }],
+      datasets: [{ data: values, backgroundColor: tickers.map(t => getColor(t)), borderColor:chartTheme().donutBorder, borderWidth:2, hoverOffset:5 }],
     },
     options: {
       responsive:true, maintainAspectRatio:false, cutout:"68%",
       plugins: {
         legend:{ display:false },
         tooltip:{
-          backgroundColor:"rgba(8,8,24,0.96)", borderColor:"rgba(255,255,255,0.08)", borderWidth:1,
-          bodyColor:"#e2e8f0", bodyFont:{ family:"'JetBrains Mono'", size:11 }, padding:12, cornerRadius:10,
+          backgroundColor:chartTheme().tooltipBg, borderColor:chartTheme().tooltipBorder, borderWidth:1,
+          bodyColor:chartTheme().bodyColor, bodyFont:{ family:"'JetBrains Mono'", size:11 }, padding:12, cornerRadius:10,
           callbacks: { label: item => ` ${item.label}: ${privacyMode ? "●●●" : fmt(item.raw)} (${((item.raw/total)*100).toFixed(1)}%)` },
         },
       },
@@ -1205,16 +1279,16 @@ function renderBarChart(latest) {
       plugins: {
         legend:{ display:false },
         tooltip:{
-          backgroundColor:"rgba(8,8,24,0.96)", borderColor:"rgba(255,255,255,0.08)", borderWidth:1,
-          titleColor:"#94a3b8", bodyColor:"#e2e8f0",
+          backgroundColor:chartTheme().tooltipBg, borderColor:chartTheme().tooltipBorder, borderWidth:1,
+          titleColor:chartTheme().titleColor, bodyColor:chartTheme().bodyColor,
           titleFont:{ family:"'DM Sans'", size:11, weight:700 }, bodyFont:{ family:"'JetBrains Mono'", size:11 },
           padding:12, cornerRadius:10,
           callbacks:{ label: item => privacyMode ? ` ${item.dataset.label}: ●●●` : ` ${item.dataset.label}: ${fmt(item.raw)}` },
         },
       },
       scales: {
-        x:{ grid:{ color:"rgba(255,255,255,0.03)" }, ticks:{ color:"#475569", font:{size:10}, callback: v => privacyMode ? "●●" : `€${(v/1000).toFixed(0)}k` } },
-        y:{ grid:{ display:false }, ticks:{ color:"#94a3b8", font:{size:11} } },
+        x:{ grid:{ color:chartTheme().gridColor }, ticks:{ color:chartTheme().tickColor, font:{size:10}, callback: v => privacyMode ? "●●" : `€${(v/1000).toFixed(0)}k` } },
+        y:{ grid:{ display:false }, ticks:{ color:chartTheme().tickColor, font:{size:11} } },
       },
     },
   });
@@ -1235,8 +1309,8 @@ function renderDrawdownChart() {
       plugins:{
         legend:{ display:false },
         tooltip:{
-          backgroundColor:"rgba(8,8,24,0.96)", borderColor:"rgba(255,255,255,0.08)", borderWidth:1,
-          bodyColor:"#e2e8f0", bodyFont:{ family:"'JetBrains Mono'", size:11 }, padding:12, cornerRadius:10,
+          backgroundColor:chartTheme().tooltipBg, borderColor:chartTheme().tooltipBorder, borderWidth:1,
+          bodyColor:chartTheme().bodyColor, bodyFont:{ family:"'JetBrains Mono'", size:11 }, padding:12, cornerRadius:10,
           callbacks:{
             title: items => new Date(items[0].parsed.x).toLocaleDateString("nl-BE",{day:"numeric",month:"short",year:"numeric"}),
             label: item => ` Drawdown: ${item.raw.y.toFixed(1)}%`,
@@ -1244,8 +1318,8 @@ function renderDrawdownChart() {
         },
       },
       scales:{
-        x:{ type:"time", time:{ unit:"month" }, grid:{ color:"rgba(255,255,255,0.03)" }, ticks:{ color:"#475569", font:{size:10} } },
-        y:{ suggestedMax:0, grid:{ color:"rgba(255,255,255,0.03)" }, ticks:{ color:"#475569", font:{size:10}, callback: v => `${v}%` } },
+        x:{ type:"time", time:{ unit:"month" }, grid:{ color:chartTheme().gridColor }, ticks:{ color:chartTheme().tickColor, font:{size:10} } },
+        y:{ suggestedMax:0, grid:{ color:chartTheme().gridColor }, ticks:{ color:chartTheme().tickColor, font:{size:10}, callback: v => `${v}%` } },
       },
     },
   });
@@ -1264,7 +1338,7 @@ function renderBenchmarkChart() {
     type:"line",
     data: { datasets: [
       { label:"Portefeuille", data: portfolioSeries, borderColor:"#818cf8", fill:false, borderWidth:2, pointRadius:0, tension:0, cubicInterpolationMode:"monotone", spanGaps:true },
-      { label:BENCHMARK_LBL, data: benchSeries,     borderColor:"#475569", fill:false, borderWidth:1.5, borderDash:[4,4], pointRadius:0, tension:0, cubicInterpolationMode:"monotone", spanGaps:true },
+      { label:BENCHMARK_LBL, data: benchSeries,     borderColor:chartTheme().benchmarkLine, fill:false, borderWidth:1.5, borderDash:[4,4], pointRadius:0, tension:0, cubicInterpolationMode:"monotone", spanGaps:true },
     ]},
     options: {
       responsive:true, maintainAspectRatio:false,
@@ -1272,8 +1346,8 @@ function renderBenchmarkChart() {
       plugins:{
         legend:{ display:false },
         tooltip:{
-          backgroundColor:"rgba(8,8,24,0.96)", borderColor:"rgba(255,255,255,0.08)", borderWidth:1,
-          titleColor:"#94a3b8", bodyColor:"#e2e8f0",
+          backgroundColor:chartTheme().tooltipBg, borderColor:chartTheme().tooltipBorder, borderWidth:1,
+          titleColor:chartTheme().titleColor, bodyColor:chartTheme().bodyColor,
           titleFont:{ family:"'DM Sans'", size:11, weight:700 }, bodyFont:{ family:"'JetBrains Mono'", size:11 },
           padding:12, cornerRadius:10,
           callbacks:{
@@ -1283,8 +1357,8 @@ function renderBenchmarkChart() {
         },
       },
       scales:{
-        x:{ type:"time", time:{ unit:"month" }, grid:{ color:"rgba(255,255,255,0.03)" }, ticks:{ color:"#475569", font:{size:10} } },
-        y:{ grid:{ color:"rgba(255,255,255,0.03)" }, ticks:{ color:"#475569", font:{size:10}, callback: v => `${v}` } },
+        x:{ type:"time", time:{ unit:"month" }, grid:{ color:chartTheme().gridColor }, ticks:{ color:chartTheme().tickColor, font:{size:10} } },
+        y:{ grid:{ color:chartTheme().gridColor }, ticks:{ color:chartTheme().tickColor, font:{size:10}, callback: v => `${v}` } },
       },
     },
   });
@@ -1506,6 +1580,15 @@ function setPeriod(p)        { currentPeriod = p; renderApp(); }
 function setPeriodAnalyse(p) { currentPeriod = p; renderAnalyse(); }
 function toggleClosed()      { showClosed = !showClosed; renderApp(); }
 
+function toggleTheme() {
+  currentTheme = currentTheme === "dark" ? "default" : "dark";
+  localStorage.setItem("theme", currentTheme);
+  applyTheme();
+  if      (currentTab === "portefeuille") renderApp();
+  else if (currentTab === "analyse")      renderAnalyse();
+  else if (currentTab === "import")       renderImport();
+}
+
 async function clearCache() {
   try { await fetch(`${SERVER_BASE}/api/cache/clear`, { method:"POST" }); await init(); }
   catch (e) { alert("Cache clear mislukt: " + e.message); }
@@ -1551,6 +1634,7 @@ async function init() {
 }
 
 document.body.classList.toggle("privacy", privacyMode);
+applyTheme();
 init();
   </script>
 </body>
