@@ -267,51 +267,53 @@
       color: #d4d4d4;
     }
     body.theme-dark .app-nav { background: rgba(255,255,255,0.05); }
-    body.theme-dark .nav-btn { color: #666; }
-    body.theme-dark .nav-btn:hover { color: #aaa; }
-    body.theme-dark .nav-btn.active { background: rgba(255,255,255,0.1); color: #d4d4d4; }
+    /* inactive → #777, hover → #bbb, active → #d4d4d4 */
+    body.theme-dark .nav-btn                  { color: #777; }
+    body.theme-dark .nav-btn:hover            { color: #bbb; }
+    body.theme-dark .nav-btn.active           { background: rgba(255,255,255,0.1); color: #d4d4d4; }
     body.theme-dark .metric-card,
-    body.theme-dark .intraday-card { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
-    body.theme-dark .metric-label { color: #595959; }
-    body.theme-dark .metric-sub   { color: #595959; }
-    body.theme-dark .c-neutral    { color: #888; }
-    body.theme-dark .c-brand      { color: #aaa; }
-    body.theme-dark .chart-card   { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.07); }
-    body.theme-dark .seg          { background: rgba(255,255,255,0.07); }
-    body.theme-dark .seg-btn      { color: #595959; }
-    body.theme-dark .seg-btn:hover { color: #aaa; }
-    body.theme-dark .seg-btn.on   { background: rgba(255,255,255,0.12); color: #d4d4d4; }
-    body.theme-dark .pill         { color: #4d4d4d; }
-    body.theme-dark .pill:hover   { color: #888; }
-    body.theme-dark .pill.on      { background: rgba(255,255,255,0.1); color: #aaa; }
-    body.theme-dark .card-title   { color: #4d4d4d; }
-    body.theme-dark .legend-item  { color: #666; }
-    body.theme-dark .pos-row      { border-bottom-color: rgba(255,255,255,0.04); }
-    body.theme-dark .pos-row.total-row { border-top-color: rgba(255,255,255,0.08); }
-    body.theme-dark .pos-row.total-row .pos-row-ticker { color: #888; }
-    body.theme-dark .pos-row-val  { color: #666; }
-    body.theme-dark .market-badge { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.07); color: #888; }
-    body.theme-dark .refresh-btn  { background: rgba(255,255,255,0.04); color: #4d4d4d; }
-    body.theme-dark .refresh-btn:hover { background: rgba(255,255,255,0.09); color: #888; }
-    body.theme-dark .privacy-btn  { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); color: #4d4d4d; }
-    body.theme-dark .privacy-btn:hover { background: rgba(255,255,255,0.09); color: #888; }
-    body.theme-dark .privacy-btn.on { color: #aaa; border-color: rgba(255,255,255,0.2); }
-    body.theme-dark .toggle-track  { background: rgba(255,255,255,0.08); }
-    body.theme-dark .toggle-track.on { background: rgba(255,255,255,0.2); }
-    body.theme-dark .toggle-track::after { background: #666; }
-    body.theme-dark .toggle-track.on::after { background: #aaa; }
-    body.theme-dark .closed-toggle { color: #4d4d4d; }
-    body.theme-dark .pos-table th { color: #4d4d4d; border-bottom-color: rgba(255,255,255,0.06); }
-    body.theme-dark .pos-table td { border-bottom-color: rgba(255,255,255,0.03); }
-    body.theme-dark .pos-table td:nth-child(2) { color: #666; }
-    body.theme-dark .pos-table tfoot td { border-top-color: rgba(255,255,255,0.08); }
-    body.theme-dark .drop-zone    { border-color: rgba(255,255,255,0.08); }
-    body.theme-dark .import-info  { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.06); color: #777; }
-    body.theme-dark .import-info strong { color: #d4d4d4; }
-    body.theme-dark .btn          { border-color: rgba(255,255,255,0.07); color: #595959; }
-    body.theme-dark .btn:hover    { border-color: rgba(255,255,255,0.15); color: #aaa; }
-    body.theme-dark .footer       { color: #2d2d2d; }
-    body.theme-dark .progress-bar { background: rgba(255,255,255,0.07); }
+    body.theme-dark .intraday-card            { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); }
+    body.theme-dark .metric-label             { color: #888; }
+    body.theme-dark .metric-sub               { color: #888; }
+    body.theme-dark .c-neutral                { color: #999; }
+    body.theme-dark .c-brand                  { color: #bbb; }
+    body.theme-dark .chart-card               { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.07); }
+    body.theme-dark .seg                      { background: rgba(255,255,255,0.07); }
+    body.theme-dark .seg-btn                  { color: #777; }
+    body.theme-dark .seg-btn:hover            { color: #bbb; }
+    body.theme-dark .seg-btn.on               { background: rgba(255,255,255,0.12); color: #d4d4d4; }
+    body.theme-dark .period-pills             { gap: 2px; }
+    body.theme-dark .pill                     { color: #777; }
+    body.theme-dark .pill:hover               { color: #bbb; }
+    body.theme-dark .pill.on                  { background: rgba(255,255,255,0.1); color: #d4d4d4; }
+    body.theme-dark .card-title               { color: #888; }
+    body.theme-dark .legend-item              { color: #888; }
+    body.theme-dark .pos-row                  { border-bottom-color: rgba(255,255,255,0.04); }
+    body.theme-dark .pos-row.total-row        { border-top-color: rgba(255,255,255,0.08); }
+    body.theme-dark .pos-row.total-row .pos-row-ticker { color: #999; }
+    body.theme-dark .pos-row-val              { color: #888; }
+    body.theme-dark .market-badge             { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.07); color: #999; }
+    body.theme-dark .refresh-btn              { background: rgba(255,255,255,0.04); color: #888; }
+    body.theme-dark .refresh-btn:hover        { background: rgba(255,255,255,0.09); color: #bbb; }
+    body.theme-dark .privacy-btn              { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); color: #888; }
+    body.theme-dark .privacy-btn:hover        { background: rgba(255,255,255,0.09); color: #bbb; }
+    body.theme-dark .privacy-btn.on           { color: #d4d4d4; border-color: rgba(255,255,255,0.2); }
+    body.theme-dark .toggle-track             { background: rgba(255,255,255,0.08); }
+    body.theme-dark .toggle-track.on          { background: rgba(255,255,255,0.2); }
+    body.theme-dark .toggle-track::after      { background: #888; }
+    body.theme-dark .toggle-track.on::after   { background: #bbb; }
+    body.theme-dark .closed-toggle            { color: #777; }
+    body.theme-dark .pos-table th             { color: #888; border-bottom-color: rgba(255,255,255,0.06); }
+    body.theme-dark .pos-table td             { border-bottom-color: rgba(255,255,255,0.03); }
+    body.theme-dark .pos-table td:nth-child(2){ color: #888; }
+    body.theme-dark .pos-table tfoot td       { border-top-color: rgba(255,255,255,0.08); }
+    body.theme-dark .drop-zone                { border-color: rgba(255,255,255,0.08); }
+    body.theme-dark .import-info              { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.06); color: #888; }
+    body.theme-dark .import-info strong       { color: #d4d4d4; }
+    body.theme-dark .btn                      { border-color: rgba(255,255,255,0.07); color: #777; }
+    body.theme-dark .btn:hover                { border-color: rgba(255,255,255,0.15); color: #bbb; }
+    body.theme-dark .footer                   { color: #4a4a4a; }
+    body.theme-dark .progress-bar             { background: rgba(255,255,255,0.07); }
 
     /* Responsive */
     @media (max-width: 640px) {
