@@ -21,6 +21,7 @@ const CACHE_DIR = process.env.CACHE_DIR || path.join(__dirname, "cache");
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 const QUOTES_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 const FETCH_DELAY = 100; // minimal delay between Yahoo requests
+const INTRADAY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
 
@@ -137,6 +138,31 @@ async function fetchDailyQuote(yahooSymbol) {
     }
   }
   return null;
+}
+
+async function fetchIntraday(yahooSymbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=5m&range=1d&includePrePost=false`;
+  const text = await fetchYahoo(url);
+  const json = JSON.parse(text);
+  const result = json?.chart?.result?.[0];
+  if (!result) return null;
+
+  const timestamps = result.timestamp || [];
+  const closes = result.indicators?.quote?.[0]?.close || [];
+  const meta = result.meta || {};
+
+  const points = timestamps
+    .map((ts, i) => ({ ts, close: closes[i] ?? null }))
+    .filter(d => d.close !== null);
+
+  if (points.length === 0) return null;
+
+  return {
+    date: new Date(points[0].ts * 1000).toISOString().slice(0, 10),
+    previousClose: meta.chartPreviousClose ?? meta.regularMarketPreviousClose ?? null,
+    currency: meta.currency || null,
+    points,
+  };
 }
 
 // ============================================================
@@ -280,6 +306,45 @@ app.get("/api/quotes", async (req, res) => {
 
   const successCount = Object.values(results).filter(Boolean).length;
   console.log(`[QUOTES] ${successCount}/${symbols.length} quotes loaded`);
+  res.json({ status: "ok", data: results });
+});
+
+// Intraday 5-min candles for today
+app.get("/api/intraday", async (req, res) => {
+  const symbols = (req.query.symbols || "").split(",").filter(Boolean);
+  const force = req.query.force === "1";
+  if (symbols.length === 0) {
+    return res.status(400).json({ status: "error", message: "No symbols provided" });
+  }
+
+  const results = {};
+  const toFetch = [];
+
+  for (const symbol of symbols) {
+    const cacheKey = `intraday_${symbol}`;
+    const cached = !force && readCache(cacheKey, INTRADAY_CACHE_TTL);
+    if (cached) {
+      console.log(`[INTRADAY CACHE HIT] ${symbol}`);
+      results[symbol] = cached;
+    } else {
+      toFetch.push(symbol);
+    }
+  }
+
+  for (let i = 0; i < toFetch.length; i++) {
+    const symbol = toFetch[i];
+    try {
+      console.log(`[INTRADAY FETCH] ${symbol}`);
+      const data = await fetchIntraday(symbol);
+      writeCache(`intraday_${symbol}`, data);
+      results[symbol] = data;
+    } catch (e) {
+      console.error(`[INTRADAY ERROR] ${symbol}: ${e.message}`);
+      results[symbol] = readStaleCache(`intraday_${symbol}`) || null;
+    }
+    if (i < toFetch.length - 1) await sleep(FETCH_DELAY);
+  }
+
   res.json({ status: "ok", data: results });
 });
 

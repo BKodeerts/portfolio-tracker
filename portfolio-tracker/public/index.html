@@ -235,6 +235,20 @@
     }
     .footer { text-align: center; margin-top: 32px; font-size: 10px; color: #2d3748; line-height: 1.6; }
 
+    /* Intraday sparklines */
+    .intraday-section { margin-top: 12px; }
+    .intraday-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .intraday-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+    .intraday-card {
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px; padding: 10px 12px; overflow: hidden;
+    }
+    .intraday-card-header { display: flex; justify-content: space-between; align-items: center; }
+    .intraday-ticker-label { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #94a3b8; }
+    .intraday-pct { font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .intraday-price { font-size: 10px; color: #334155; font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
+    @media (max-width: 640px) { .intraday-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); } }
+
     /* Privacy mode */
     .privacy-btn {
       background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
@@ -308,6 +322,7 @@ let sortedDates   = [];
 let chartData     = [];
 let benchmarkData = [];
 
+let intradayData   = {};
 let parsedCSVRows  = [];
 let currentTab     = "portefeuille";
 let currentView    = "total";
@@ -786,6 +801,16 @@ function renderApp() {
       </div>
     </div>
 
+    <!-- Intraday section -->
+    <div class="intraday-section">
+      <div class="intraday-section-header">
+        <div class="card-title" style="margin-bottom:0">Vandaag</div>
+        <div id="intradayStatus" style="font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace"></div>
+        <button class="refresh-btn" onclick="refreshIntraday()" title="Intraday verversen" style="margin-left:auto">↻</button>
+      </div>
+      <div id="intradayGrid"><div style="color:#334155;font-size:11px">laden…</div></div>
+    </div>
+
     <div class="footer">
       Actief: ${CURRENT_TICKERS.join(", ")} · Geen financieel advies · Zelf gehosted
     </div>`;
@@ -794,6 +819,7 @@ function renderApp() {
   renderLegend(visibleTickers);
   renderDonutChart(latest, "homeDonut");
   renderHomePositions(latest);
+  loadIntradayData();
 }
 
 function renderPortfolioChart(visibleTickers) {
@@ -953,6 +979,97 @@ function renderHomePositions(latest) {
     </div>
   </div>`;
 }
+
+// ============================================================
+// INTRADAY (VANDAAG)
+// ============================================================
+function sparklineSVG(points, prevClose) {
+  if (!points || points.length < 2 || !prevClose) return '';
+  const pcts = points.map(p => (p.close - prevClose) / prevClose * 100);
+  const min = Math.min(0, ...pcts);
+  const max = Math.max(0, ...pcts);
+  const range = max - min || 0.1;
+  const W = 200, H = 38;
+  const n = points.length;
+  const xs = points.map((_, i) => (i / (n - 1)) * W);
+  const ys = pcts.map(v => (H - 3) - ((v - min) / range) * (H - 6));
+  const polyPts = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+  const fillPath = `M${xs[0].toFixed(1)},${ys[0].toFixed(1)} ` +
+    xs.slice(1).map((x, i) => `L${x.toFixed(1)},${ys[i + 1].toFixed(1)}`).join(' ') +
+    ` L${W},${H} L0,${H} Z`;
+  const zeroY = ((H - 3) - ((-min) / range) * (H - 6)).toFixed(1);
+  const clr = pcts[pcts.length - 1] >= 0 ? '#4ade80' : '#f87171';
+  const uid = `sp${Math.random().toString(36).slice(2, 7)}`;
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;margin-top:6px">
+    <defs><linearGradient id="${uid}" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="${clr}" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="${clr}" stop-opacity="0.02"/>
+    </linearGradient></defs>
+    <line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+    <path d="${fillPath}" fill="url(#${uid})"/>
+    <polyline points="${polyPts}" fill="none" stroke="${clr}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+function renderIntradaySection() {
+  const gridEl   = document.getElementById("intradayGrid");
+  const statusEl = document.getElementById("intradayStatus");
+  if (!gridEl) return;
+
+  const entries = CURRENT_TICKERS
+    .map(t => ({ ticker: t, data: intradayData[TICKER_META[t]?.yahoo] }))
+    .filter(e => e.data?.points?.length > 0);
+
+  if (entries.length === 0) {
+    if (statusEl) statusEl.textContent = "geen handelsdata";
+    gridEl.innerHTML = `<div style="color:#334155;font-size:11px">Markt gesloten of geen intradaydata beschikbaar.</div>`;
+    return;
+  }
+
+  if (statusEl) {
+    const lastTs   = Math.max(...entries.map(e => e.data.points[e.data.points.length - 1].ts));
+    const lastTime = new Date(lastTs * 1000).toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" });
+    statusEl.textContent = `bijgewerkt ${lastTime}`;
+  }
+
+  gridEl.innerHTML = entries.map(({ ticker, data }) => {
+    const prev = data.previousClose;
+    const last = data.points[data.points.length - 1];
+    const pct  = prev ? ((last.close - prev) / prev * 100) : 0;
+    const cls  = pct >= 0 ? "c-pos" : "c-neg";
+    return `<div class="intraday-card">
+      <div class="intraday-card-header">
+        <div class="intraday-ticker-label">
+          <div class="pos-dot" style="background:${getColor(ticker)}"></div>
+          ${ticker}
+        </div>
+        <div class="intraday-pct ${cls}">${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%</div>
+      </div>
+      ${sparklineSVG(data.points, prev)}
+      <div class="intraday-price">${data.currency || ""} ${last.close.toFixed(2)}</div>
+    </div>`;
+  }).join("");
+}
+
+async function loadIntradayData(force = false) {
+  const yahooSymbols = [...new Set(CURRENT_TICKERS.map(t => TICKER_META[t]?.yahoo).filter(Boolean))];
+  if (yahooSymbols.length === 0) return;
+  const statusEl = document.getElementById("intradayStatus");
+  if (statusEl) statusEl.textContent = "laden…";
+  try {
+    const url  = `${SERVER_BASE}/api/intraday?symbols=${yahooSymbols.join(",")}${force ? "&force=1" : ""}`;
+    const res  = await fetch(url);
+    const json = await res.json();
+    if (json.status !== "ok") throw new Error(json.message);
+    intradayData = json.data;
+    renderIntradaySection();
+  } catch (e) {
+    if (statusEl) statusEl.textContent = "laden mislukt";
+    console.warn("Intraday load failed:", e.message);
+  }
+}
+
+function refreshIntraday() { loadIntradayData(true); }
 
 // ============================================================
 // ANALYSE TAB
