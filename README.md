@@ -61,3 +61,4 @@ location /portfolio/ {
 - **Port**: 3069 (configureerbaar via PORT env var)
 - **Yahoo rate limit**: 1.2s delay tussen requests, ~100 requests/uur
 # portfolio-tracker
+# portfolio-tracker
