@@ -237,17 +237,19 @@
 
     /* Intraday sparklines */
     .intraday-section { margin-top: 12px; }
-    .intraday-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-    .intraday-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+    .intraday-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .intraday-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
     .intraday-card {
-      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
-      border-radius: 12px; padding: 10px 12px; overflow: hidden;
+      background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px; padding: 14px 16px; overflow: hidden; min-width: 0;
     }
-    .intraday-card-header { display: flex; justify-content: space-between; align-items: center; }
-    .intraday-ticker-label { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #94a3b8; }
-    .intraday-pct { font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
-    .intraday-price { font-size: 10px; color: #334155; font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
-    @media (max-width: 640px) { .intraday-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); } }
+    .market-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-family: 'JetBrains Mono', monospace;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 6px; padding: 3px 7px; white-space: nowrap;
+    }
+    .market-badge .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
 
     /* Privacy mode */
     .privacy-btn {
@@ -805,8 +807,9 @@ function renderApp() {
     <div class="intraday-section">
       <div class="intraday-section-header">
         <div class="card-title" style="margin-bottom:0">Vandaag</div>
-        <div id="intradayStatus" style="font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace"></div>
-        <button class="refresh-btn" onclick="refreshIntraday()" title="Intraday verversen" style="margin-left:auto">↻</button>
+        <div id="marketStatus"></div>
+        <div id="intradayStatus" style="font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace;margin-left:auto"></div>
+        <button class="refresh-btn" onclick="refreshIntraday()" title="Intraday verversen">↻</button>
       </div>
       <div id="intradayGrid"><div style="color:#334155;font-size:11px">laden…</div></div>
     </div>
@@ -819,6 +822,7 @@ function renderApp() {
   renderLegend(visibleTickers);
   renderDonutChart(latest, "homeDonut");
   renderHomePositions(latest);
+  renderMarketStatus();
   loadIntradayData();
 }
 
@@ -983,29 +987,61 @@ function renderHomePositions(latest) {
 // ============================================================
 // INTRADAY (VANDAAG)
 // ============================================================
-function sparklineSVG(points, prevClose) {
+
+// US: 9:30–16:00 ET = 390 min; EU (XETRA/Euronext/LSE): 9:00–17:30 CET = 510 min
+function getTradingMins(yahooSymbol) {
+  return /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i.test(yahooSymbol || "") ? 510 : 390;
+}
+
+// Simple open/closed badges (no countdown)
+function getMarketStatus() {
+  const now = new Date();
+  function isOpen(tz, openH, openM, closeH, closeM) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, weekday: "short", hour: "numeric", minute: "numeric", hour12: false
+    }).formatToParts(now);
+    const get = t => parts.find(p => p.type === t)?.value;
+    if (["Sat", "Sun"].includes(get("weekday"))) return false;
+    const cur = (parseInt(get("hour")) % 24) * 60 + parseInt(get("minute"));
+    return cur >= openH * 60 + openM && cur < closeH * 60 + closeM;
+  }
+  const badge = (label, open) =>
+    `<span class="market-badge"><span class="dot" style="background:${open ? "#4ade80" : "#334155"}"></span>${label}</span>`;
+  return badge("NYSE", isOpen("America/New_York", 9, 30, 16, 0)) +
+         badge("XETRA", isOpen("Europe/Amsterdam", 9, 0, 17, 30));
+}
+
+function renderMarketStatus() {
+  const el = document.getElementById("marketStatus");
+  if (el) el.innerHTML = getMarketStatus();
+}
+
+// X axis maps to full trading session (open=left, close=right)
+// Elapsed data fills left portion; remaining time is empty space on the right
+function sparklineSVG(points, prevClose, tradingMins) {
   if (!points || points.length < 2 || !prevClose) return '';
   const pcts = points.map(p => (p.close - prevClose) / prevClose * 100);
   const min = Math.min(0, ...pcts);
   const max = Math.max(0, ...pcts);
   const range = max - min || 0.1;
   const W = 200, H = 38;
-  const n = points.length;
-  const xs = points.map((_, i) => (i / (n - 1)) * W);
+  const firstTs   = points[0].ts;
+  const totalSecs = (tradingMins || 390) * 60;
+  const xs = points.map(p => Math.min(W, Math.max(0, ((p.ts - firstTs) / totalSecs) * W)));
   const ys = pcts.map(v => (H - 3) - ((v - min) / range) * (H - 6));
   const polyPts = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
   const fillPath = `M${xs[0].toFixed(1)},${ys[0].toFixed(1)} ` +
     xs.slice(1).map((x, i) => `L${x.toFixed(1)},${ys[i + 1].toFixed(1)}`).join(' ') +
-    ` L${W},${H} L0,${H} Z`;
+    ` L${xs[xs.length - 1].toFixed(1)},${H} L${xs[0].toFixed(1)},${H} Z`;
   const zeroY = ((H - 3) - ((-min) / range) * (H - 6)).toFixed(1);
   const clr = pcts[pcts.length - 1] >= 0 ? '#4ade80' : '#f87171';
   const uid = `sp${Math.random().toString(36).slice(2, 7)}`;
-  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;margin-top:6px">
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;margin-top:8px">
     <defs><linearGradient id="${uid}" x1="0" x2="0" y1="0" y2="1">
       <stop offset="0%" stop-color="${clr}" stop-opacity="0.2"/>
       <stop offset="100%" stop-color="${clr}" stop-opacity="0.02"/>
     </linearGradient></defs>
-    <line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+    <line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
     <path d="${fillPath}" fill="url(#${uid})"/>
     <polyline points="${polyPts}" fill="none" stroke="${clr}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
@@ -1017,11 +1053,11 @@ function renderIntradaySection() {
   if (!gridEl) return;
 
   const entries = CURRENT_TICKERS
-    .map(t => ({ ticker: t, data: intradayData[TICKER_META[t]?.yahoo] }))
+    .map(t => ({ ticker: t, yahoo: TICKER_META[t]?.yahoo, data: intradayData[TICKER_META[t]?.yahoo] }))
     .filter(e => e.data?.points?.length > 0);
 
   if (entries.length === 0) {
-    if (statusEl) statusEl.textContent = "geen handelsdata";
+    if (statusEl) statusEl.textContent = "geen data";
     gridEl.innerHTML = `<div style="color:#334155;font-size:11px">Markt gesloten of geen intradaydata beschikbaar.</div>`;
     return;
   }
@@ -1032,21 +1068,18 @@ function renderIntradaySection() {
     statusEl.textContent = `bijgewerkt ${lastTime}`;
   }
 
-  gridEl.innerHTML = entries.map(({ ticker, data }) => {
+  gridEl.innerHTML = entries.map(({ ticker, yahoo, data }) => {
     const prev = data.previousClose;
     const last = data.points[data.points.length - 1];
     const pct  = prev ? ((last.close - prev) / prev * 100) : 0;
     const cls  = pct >= 0 ? "c-pos" : "c-neg";
     return `<div class="intraday-card">
-      <div class="intraday-card-header">
-        <div class="intraday-ticker-label">
-          <div class="pos-dot" style="background:${getColor(ticker)}"></div>
-          ${ticker}
-        </div>
-        <div class="intraday-pct ${cls}">${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%</div>
+      <div class="metric-label" style="margin-bottom:0;display:flex;align-items:center;gap:5px">
+        <span class="pos-dot" style="background:${getColor(ticker)}"></span>${ticker}
       </div>
-      ${sparklineSVG(data.points, prev)}
-      <div class="intraday-price">${data.currency || ""} ${last.close.toFixed(2)}</div>
+      <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%</div>
+      ${sparklineSVG(data.points, prev, getTradingMins(yahoo))}
+      <div class="metric-sub">${data.currency || ""} ${last.close.toFixed(2)}</div>
     </div>`;
   }).join("");
 }
