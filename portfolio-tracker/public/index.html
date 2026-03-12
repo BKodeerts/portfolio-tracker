@@ -18,14 +18,8 @@
 
     /* ── App header ── */
     .app-header {
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items: center;
       margin-bottom: 24px; gap: 12px;
-    }
-    .app-brand {
-      font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
-      background: linear-gradient(135deg, #818cf8, #06b6d4);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      white-space: nowrap;
     }
     .app-nav {
       display: flex; gap: 2px;
@@ -328,7 +322,7 @@ let intradayLoaded = false;
 let parsedCSVRows  = [];
 let currentTab     = "portefeuille";
 let currentView    = "total";
-let currentPeriod  = "total";
+let currentPeriod  = "3m";
 let showClosed     = false;
 let chartInstances = {};
 
@@ -697,13 +691,12 @@ function togglePrivacy() {
 function renderAppHeader() {
   const tab = currentTab;
   return `<header class="app-header">
-    <div class="app-brand">Portfolio Tracker</div>
     <nav class="app-nav">
       <button class="nav-btn ${tab==="portefeuille"?"active":""}" onclick="setTab('portefeuille')">Overzicht</button>
       <button class="nav-btn ${tab==="analyse"?"active":""}"      onclick="setTab('analyse')">Analyse</button>
       <button class="nav-btn ${tab==="import"?"active":""}"       onclick="setTab('import')">Import</button>
     </nav>
-    <button class="privacy-btn ${privacyMode?"on":""}" onclick="togglePrivacy()" title="Privacy mode">👁</button>
+    <button class="privacy-btn ${privacyMode?"on":""}" onclick="togglePrivacy()" title="Privacy mode" style="margin-left:auto">👁</button>
   </header>`;
 }
 
@@ -792,13 +785,12 @@ function renderApp() {
           <button class="pill ${currentPeriod==="3y"?"on":""}"    onclick="setPeriod('3y')">3Y</button>
           <button class="pill ${currentPeriod==="total"?"on":""}" onclick="setPeriod('total')">Max</button>
         </div>
+        ${hasPeriod ? `<div style="font-family:'JetBrains Mono',monospace;font-size:12px;display:flex;gap:5px;align-items:center;white-space:nowrap">
+          <span class="${prdClass} privacy-val">${periodProfit >= 0 ? "+" : ""}${fmt(periodProfit)}</span>
+          <span class="${prdClass}" style="opacity:0.7">${fmtPct(periodPct)}</span>
+        </div>` : ""}
         <button class="refresh-btn" onclick="clearCache()" title="Koersen verversen">↻</button>
       </div>
-      ${hasPeriod ? `<div style="font-size:10px;color:#475569;margin-bottom:12px;display:flex;gap:8px;align-items:center">
-        <span style="text-transform:uppercase;letter-spacing:0.09em;font-weight:600;color:#334155">Periode</span>
-        <span class="${prdClass} privacy-val">${periodProfit >= 0 ? "+" : ""}${fmt(periodProfit)}</span>
-        <span class="${prdClass}">${fmtPct(periodPct)}</span>
-      </div>` : ""}
 
       <div style="height:400px">
         <canvas id="mainChart"></canvas>
@@ -1111,7 +1103,7 @@ function renderIntradaySection() {
     const pct  = prev ? ((last.close - prev) / prev * 100) : 0;
     const cls  = pct >= 0 ? "c-pos" : "c-neg";
     return `<div class="intraday-card">
-      <div class="metric-label" style="margin-bottom:0;display:flex;align-items:center;gap:5px">
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#94a3b8;margin-bottom:2px">
         <span class="pos-dot" style="background:${getColor(ticker)}"></span>${ticker}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%</div>
