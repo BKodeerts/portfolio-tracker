@@ -25,7 +25,7 @@ export function renderImport() {
         ondrop="event.preventDefault();this.classList.remove('drag-over');window._handleCSVFile(event.dataTransfer.files[0])">
         <strong>Sleep CSV-bestand hierheen</strong>
         <p>of <label for="csvInput">klik om te bladeren</label></p>
-        <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="window._handleCSVFile(this.files[0])">
+        <input type="file" id="csvInput" accept=".csv,text/csv,text/plain" style="display:none" onchange="window._handleCSVFile(this.files[0])">
       </div>
       <div id="mappingSection" style="display:none"></div>
     </div>`;
