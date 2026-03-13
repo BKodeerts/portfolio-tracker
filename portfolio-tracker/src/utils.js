@@ -39,15 +39,15 @@ export function destroyAllCharts() {
 export function chartTheme() {
   const dark = document.body.classList.contains('theme-dark');
   return {
-    tooltipBg:     dark ? 'rgba(28,28,28,0.97)'    : 'rgba(8,8,24,0.96)',
-    tooltipBorder: dark ? 'rgba(255,255,255,0.1)'  : 'rgba(255,255,255,0.08)',
-    titleColor:    dark ? '#888'                   : '#94a3b8',
-    bodyColor:     dark ? '#d4d4d4'                : '#e2e8f0',
-    gridColor:     dark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.03)',
-    tickColor:     dark ? '#666'                   : '#475569',
-    costLine:      dark ? '#444'                   : '#334155',
-    costFill:      dark ? 'rgba(68,68,68,0.05)'    : 'rgba(51,65,85,0.05)',
-    donutBorder:   dark ? 'rgba(26,26,26,0.9)'     : 'rgba(8,8,24,0.8)',
-    benchmarkLine: dark ? '#666'                   : '#475569',
+    tooltipBg:     dark ? 'rgba(28,28,28,0.97)' : 'rgba(20,20,20,0.97)',
+    tooltipBorder: 'rgba(255,255,255,0.1)',
+    titleColor:    '#888',
+    bodyColor:     dark ? '#d4d4d4' : '#d8d8d8',
+    gridColor:     'rgba(255,255,255,0.04)',
+    tickColor:     '#666',
+    costLine:      dark ? '#444' : '#484848',
+    costFill:      dark ? 'rgba(68,68,68,0.05)' : 'rgba(72,72,72,0.06)',
+    donutBorder:   'rgba(26,26,26,0.9)',
+    benchmarkLine: '#666',
   };
 }
