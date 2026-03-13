@@ -91,16 +91,26 @@ export function renderBenchmarkChart() {
     txCheckpoints.push({ date: tx.date, shares: cumVwceShares, cost: cumVwceCost });
   }
 
+  // Compute starting offsets so both series are anchored at 0% on filtered[0]
+  const startPortfolioPct = parseFloat(filtered[0].pctReturn);
+  const startVwcePrice = state.priceMaps[BENCHMARK_SYM]?.[filtered[0].date];
+  let startVwceShares = 0, startVwceCost = 0;
+  for (const cp of txCheckpoints) { if (cp.date <= filtered[0].date) { startVwceShares = cp.shares; startVwceCost = cp.cost; } else break; }
+  const startVwcePct = (startVwcePrice != null && startVwceCost > 0)
+    ? (startVwceShares * startVwcePrice - startVwceCost) / startVwceCost * 100
+    : 0;
+
   const portfolioSeries = [];
   const benchSeries = [];
   for (const row of filtered) {
-    portfolioSeries.push({ x: row.date, y: parseFloat(row.pctReturn) });
+    portfolioSeries.push({ x: row.date, y: parseFloat((parseFloat(row.pctReturn) - startPortfolioPct).toFixed(2)) });
 
     const vwcePrice = state.priceMaps[BENCHMARK_SYM]?.[row.date];
     if (vwcePrice != null) {
       let shares = 0, cost = 0;
       for (const cp of txCheckpoints) { if (cp.date <= row.date) { shares = cp.shares; cost = cp.cost; } else break; }
-      benchSeries.push({ x: row.date, y: cost > 0 ? parseFloat(((shares * vwcePrice - cost) / cost * 100).toFixed(2)) : null });
+      const vwcePct = cost > 0 ? (shares * vwcePrice - cost) / cost * 100 : 0;
+      benchSeries.push({ x: row.date, y: parseFloat((vwcePct - startVwcePct).toFixed(2)) });
     } else {
       benchSeries.push({ x: row.date, y: null });
     }
