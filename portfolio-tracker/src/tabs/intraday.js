@@ -134,7 +134,23 @@ export function renderIntradaySection() {
     statusEl.textContent = `bijgewerkt ${lastTime}`;
   }
 
-  gridEl.innerHTML = entries.map(({ ticker, yahoo, data }) => {
+  const fxData = state.intradayData[FX_SYMBOL];
+  const fxCard = fxData?.points?.length ? (() => {
+    const prev = fxData.previousClose;
+    const last = fxData.points[fxData.points.length - 1];
+    const pct  = prev ? ((last.close - prev) / prev * 100) : 0;
+    const cls  = pct >= 0 ? 'c-pos' : 'c-neg';
+    return `<div class="intraday-card">
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
+        <span class="pos-dot" style="background:#94a3b8"></span>EUR/USD
+      </div>
+      <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
+      ${sparklineSVG(fxData.points, prev, 24 * 60)}
+      <div class="metric-sub">${last.close.toFixed(4)}</div>
+    </div>`;
+  })() : '';
+
+  gridEl.innerHTML = fxCard + entries.map(({ ticker, yahoo, data }) => {
     const hasData = data?.points?.length > 0;
     if (!hasData) {
       return `<div class="intraday-card" style="opacity:0.45">
@@ -145,12 +161,18 @@ export function renderIntradaySection() {
         <div class="metric-sub" style="margin-top:8px">geen data</div>
       </div>`;
     }
+    const meta    = state.TICKER_META[ticker];
     const prev    = data.previousClose;
     const last    = data.points[data.points.length - 1];
     const pct     = prev ? ((last.close - prev) / prev * 100) : 0;
     const cls     = pct >= 0 ? 'c-pos' : 'c-neg';
     const todayStr = new Date().toISOString().slice(0, 10);
     const isStale  = data.date !== todayStr;
+    // Show price in the stock's native currency (from TICKER_META), converting if Yahoo returns a different currency
+    const nativeCcy    = meta?.currency || data.currency || '';
+    const displayPrice = (nativeCcy === 'USD' && data.currency === 'EUR')
+      ? last.close * (state.liveEurUsd || FX_FALLBACK)
+      : last.close;
     return `<div class="intraday-card" style="${isStale ? 'opacity:0.5' : ''}">
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
         <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
@@ -158,7 +180,7 @@ export function renderIntradaySection() {
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
       ${sparklineSVG(data.points, prev, getTradingMins(yahoo))}
-      <div class="metric-sub">${data.currency || ''} ${last.close.toFixed(2)}</div>
+      <div class="metric-sub">${nativeCcy} ${displayPrice.toFixed(2)}</div>
     </div>`;
   }).join('');
 
