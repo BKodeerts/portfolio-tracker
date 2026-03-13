@@ -72,12 +72,40 @@ export function renderDrawdownChart() {
 export function renderBenchmarkChart() {
   const filtered = getFilteredData();
   if (filtered.length < 2) return;
-  const startP = filtered[0].total;
-  const startB = state.priceMaps[BENCHMARK_SYM]?.[filtered[0].date];
-  const portfolioSeries = filtered.map(row => ({ x: row.date, y: parseFloat(((row.total / startP) * 100).toFixed(2)) }));
-  const benchSeries = startB
-    ? filtered.map(row => { const p = state.priceMaps[BENCHMARK_SYM]?.[row.date]; return { x: row.date, y: p != null ? parseFloat(((p / startB) * 100).toFixed(2)) : null }; })
-    : [];
+
+  // Find nearest VWCE price on or before a given date
+  const vwceDates = Object.keys(state.priceMaps[BENCHMARK_SYM] || {}).sort();
+  function nearestVwcePrice(dateStr) {
+    let best = null;
+    for (const d of vwceDates) { if (d <= dateStr) best = d; else break; }
+    return best ? state.priceMaps[BENCHMARK_SYM][best] : null;
+  }
+
+  // Build hypothetical VWCE portfolio: same buy cash flows → how many VWCE shares
+  const buyTxs = [...state.RAW_TRANSACTIONS].filter(tx => tx.shares > 0).sort((a, b) => a.date.localeCompare(b.date));
+  const txCheckpoints = [];
+  let cumVwceShares = 0, cumVwceCost = 0;
+  for (const tx of buyTxs) {
+    const price = nearestVwcePrice(tx.date);
+    if (price) { cumVwceShares += tx.costEur / price; cumVwceCost += tx.costEur; }
+    txCheckpoints.push({ date: tx.date, shares: cumVwceShares, cost: cumVwceCost });
+  }
+
+  const portfolioSeries = [];
+  const benchSeries = [];
+  for (const row of filtered) {
+    portfolioSeries.push({ x: row.date, y: parseFloat(row.pctReturn) });
+
+    const vwcePrice = state.priceMaps[BENCHMARK_SYM]?.[row.date];
+    if (vwcePrice != null) {
+      let shares = 0, cost = 0;
+      for (const cp of txCheckpoints) { if (cp.date <= row.date) { shares = cp.shares; cost = cp.cost; } else break; }
+      benchSeries.push({ x: row.date, y: cost > 0 ? parseFloat(((shares * vwcePrice - cost) / cost * 100).toFixed(2)) : null });
+    } else {
+      benchSeries.push({ x: row.date, y: null });
+    }
+  }
+
   state.chartInstances.benchmark = new Chart(document.getElementById('chartBenchmark').getContext('2d'), {
     type: 'line',
     data: { datasets: [
@@ -96,13 +124,13 @@ export function renderBenchmarkChart() {
           padding: 12, cornerRadius: 10,
           callbacks: {
             title: items => new Date(items[0].parsed.x).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }),
-            label: item => ` ${item.dataset.label}: ${item.raw.y != null ? item.raw.y.toFixed(1) : '—'}`,
+            label: item => ` ${item.dataset.label}: ${item.raw.y != null ? item.raw.y.toFixed(1) + '%' : '—'}`,
           },
         },
       },
       scales: {
         x: { type: 'time', time: { unit: 'month' }, grid: { color: chartTheme().gridColor }, ticks: { color: chartTheme().tickColor, font: { size: 10 } } },
-        y: { grid: { color: chartTheme().gridColor }, ticks: { color: chartTheme().tickColor, font: { size: 10 }, callback: v => `${v}` } },
+        y: { grid: { color: chartTheme().gridColor }, ticks: { color: chartTheme().tickColor, font: { size: 10 }, callback: v => `${v}%` } },
       },
     },
   });
