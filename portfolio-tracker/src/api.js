@@ -39,6 +39,16 @@ export async function clearCacheApi() {
   return fetch(`${SERVER_BASE}/api/cache/clear`, { method: 'POST' });
 }
 
+export async function fetchCacheStatus() {
+  const res = await fetch(`${SERVER_BASE}/api/cache/status`);
+  return res.json();
+}
+
+export async function clearCacheGroup(group) {
+  const res = await fetch(`${SERVER_BASE}/api/cache/clear?group=${group}`, { method: 'POST' });
+  return res.json();
+}
+
 export async function fetchPortfolio() {
   const res = await fetch(`${SERVER_BASE}/api/portfolio`);
   return res.json();

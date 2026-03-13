@@ -46,6 +46,44 @@ function clearAll() {
   return files.length;
 }
 
+function clearByPrefix(prefix) {
+  const files = fs.readdirSync(CACHE_DIR).filter(f => f.startsWith(prefix));
+  files.forEach(f => fs.unlinkSync(path.join(CACHE_DIR, f)));
+  return files.length;
+}
+
+const GROUPS = {
+  historical: f => f.startsWith('candles_') && !f.startsWith('candles_bonus_'),
+  quotes:     f => f.startsWith('quotes_'),
+  intraday:   f => f.startsWith('intraday_'),
+  bonus:      f => f.startsWith('candles_bonus_') || f.startsWith('quote_bonus_'),
+};
+
+function clearGroup(group) {
+  const match = GROUPS[group];
+  if (!match) throw new Error(`Unknown cache group: ${group}`);
+  const files = fs.readdirSync(CACHE_DIR).filter(match);
+  files.forEach(f => fs.unlinkSync(path.join(CACHE_DIR, f)));
+  return files.length;
+}
+
+const GROUP_META = [
+  { key: 'historical', label: 'Historisch (koersen)', ttl: CACHE_TTL },
+  { key: 'quotes',     label: 'Dagelijkse quotes',    ttl: QUOTES_CACHE_TTL },
+  { key: 'intraday',   label: 'Intraday (5 min)',     ttl: INTRADAY_CACHE_TTL },
+  { key: 'bonus',      label: 'Bonus',                ttl: CACHE_TTL },
+];
+
+function statusByGroup() {
+  const files = fs.readdirSync(CACHE_DIR);
+  return GROUP_META.map(g => ({
+    key:         g.key,
+    label:       g.label,
+    count:       files.filter(GROUPS[g.key]).length,
+    ttl_minutes: Math.round(g.ttl / 60000),
+  }));
+}
+
 function status() {
   return fs.readdirSync(CACHE_DIR).map(f => {
     const raw = JSON.parse(fs.readFileSync(path.join(CACHE_DIR, f), 'utf8'));
@@ -54,4 +92,4 @@ function status() {
   });
 }
 
-module.exports = { CACHE_DIR, CACHE_TTL, QUOTES_CACHE_TTL, INTRADAY_CACHE_TTL, readCache, readStaleCache, writeCache, clearAll, status };
+module.exports = { CACHE_DIR, CACHE_TTL, QUOTES_CACHE_TTL, INTRADAY_CACHE_TTL, readCache, readStaleCache, writeCache, clearAll, clearByPrefix, clearGroup, statusByGroup };

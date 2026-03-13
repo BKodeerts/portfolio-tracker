@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { fetchSettings, saveSettings } from '../api.js';
+import { fetchSettings, saveSettings, fetchCacheStatus, clearCacheGroup, clearCacheApi } from '../api.js';
 import { renderAppHeader } from '../components/header.js';
 import { destroyAllCharts } from '../utils.js';
 import { SUPPORTED_CURRENCIES } from '../constants.js';
@@ -227,6 +227,12 @@ ${field('Positie sensors',
           `<div id="pushPositionsSection"></div>`)}
       </section>
 
+      <section style="margin-bottom:32px">
+        <h3 style="font-size:13px;font-weight:600;margin:0 0 2px">Cache</h3>
+        <p class="c-neutral" style="font-size:12px;margin:0 0 12px">Gecachede Yahoo Finance data per type. Wissen forceert een nieuwe ophaling.</p>
+        <div id="cacheStatus"><div class="c-neutral" style="font-size:12px">Laden…</div></div>
+      </section>
+
       <div class="import-actions">
         <button class="btn success" id="settingsSaveBtn" onclick="globalThis._saveSettings()">Opslaan</button>
       </div>
@@ -234,6 +240,40 @@ ${field('Positie sensors',
 
   renderWatchlistItems();
   renderPushPositions();
+  renderCacheSection();
+}
+
+async function renderCacheSection() {
+  const el = document.getElementById('cacheStatus');
+  if (!el) return;
+  try {
+    const res = await fetchCacheStatus();
+    if (res.status !== 'ok') throw new Error('Cache status mislukt');
+    el.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:0">
+        ${res.groups.map(g => `
+          <div style="display:grid;grid-template-columns:180px 1fr auto;align-items:center;gap:8px 16px;padding:8px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:12px;color:var(--text-muted)">${g.label}</span>
+            <span style="font-size:12px;font-family:'JetBrains Mono',monospace">${g.count} entr${g.count === 1 ? 'y' : 'ies'} · TTL ${g.ttl_minutes >= 60 ? (g.ttl_minutes / 60) + 'u' : g.ttl_minutes + 'min'}</span>
+            <button class="btn" style="padding:3px 10px;font-size:11px" onclick="globalThis._clearCacheGroup('${g.key}')">Wissen</button>
+          </div>`).join('')}
+        <div style="padding:10px 0;display:flex;justify-content:flex-end">
+          <button class="btn" style="font-size:11px;color:#ef4444" onclick="globalThis._clearAllCache()">Alles wissen</button>
+        </div>
+      </div>`;
+  } catch {
+    el.innerHTML = `<div class="c-neutral" style="font-size:12px">Kon cache status niet laden.</div>`;
+  }
+}
+
+async function doClearCacheGroup(group) {
+  await clearCacheGroup(group);
+  renderCacheSection();
+}
+
+async function doClearAllCache() {
+  await clearCacheApi();
+  renderCacheSection();
 }
 
 // ── Expose handlers ────────────────────────────────────────────────────────────
@@ -245,3 +285,5 @@ globalThis._onPushIntervalChange = v => { _pushInterval = Math.max(1, Math.min(6
 globalThis._setPpMode           = setPpMode;
 globalThis._togglePushTicker    = togglePushTicker;
 globalThis._saveSettings        = doSaveSettings;
+globalThis._clearCacheGroup     = doClearCacheGroup;
+globalThis._clearAllCache       = doClearAllCache;

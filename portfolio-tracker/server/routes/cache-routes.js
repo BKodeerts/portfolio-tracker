@@ -1,13 +1,14 @@
 const express = require('express');
 const router  = express.Router();
-const { CACHE_TTL, clearAll, status } = require('../cache.js');
+const { clearAll, clearGroup, statusByGroup } = require('../cache.js');
 const { invalidatePortfolioCache } = require('./portfolio.js');
 
 router.post('/cache/clear', (req, res) => {
   try {
-    const count = clearAll();
-    invalidatePortfolioCache();
-    console.log(`[CACHE] Cleared ${count} files`);
+    const { group } = req.query;
+    const count = group ? clearGroup(group) : clearAll();
+    if (!group) invalidatePortfolioCache();
+    console.log(`[CACHE] Cleared ${count} files${group ? ` (group: ${group})` : ''}`);
     res.json({ status: 'ok', cleared: count });
   } catch (e) {
     res.status(500).json({ status: 'error', message: e.message });
@@ -16,7 +17,7 @@ router.post('/cache/clear', (req, res) => {
 
 router.get('/cache/status', (req, res) => {
   try {
-    res.json({ status: 'ok', ttl_hours: CACHE_TTL / 3600000, entries: status() });
+    res.json({ status: 'ok', groups: statusByGroup() });
   } catch (e) {
     res.status(500).json({ status: 'error', message: e.message });
   }
