@@ -270,8 +270,7 @@ function openBonusEdit(existing = null) {
 
   document.getElementById('bSave').onclick = async () => {
     const type = dlg._bonusType;
-    const strike = Number(document.getElementById('bStrike')?.value);
-    if (type === 'call_option' && !strike) { alert('Vul de uitoefenprijs in.'); return; }
+    const strike = Number(document.getElementById('bStrike')?.value) || undefined;
     const entry = {
       ...(id ? { id } : {}),
       label:      document.getElementById('bLabel').value.trim() || document.getElementById('bSymbol').value.trim(),
@@ -336,7 +335,7 @@ function bonusCard(item) {
 
   const isCall = item.type === 'call_option';
   const tag    = isCall ? 'call optie' : 'bonus';
-  const valueHtml = isCall && item.isOutOfMoney
+  const valueHtml = isCall && item.isOutOfMoney && item.strikePrice
     ? `<div style="display:flex;align-items:center;gap:6px;margin-top:5px">
         <span class="metric-value c-neg privacy-val" style="font-size:16px">${fmt(0)}</span>
         <span style="font-size:9px;color:#f87171;font-family:'JetBrains Mono',monospace;font-weight:700">OTM</span>

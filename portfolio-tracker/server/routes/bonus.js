@@ -30,10 +30,10 @@ async function getPriceAtDate(symbol, date) {
     await sleep(FETCH_DELAY);
   }
   if (!candles?.length) return null;
-  // Find closest candle on or after the grant date
+  // Use the last trading day close before the grant date (platforms typically use prev-day close)
   const sorted = [...candles].sort((a, b) => a.date.localeCompare(b.date));
-  const exact  = sorted.find(c => c.date >= date);
-  return exact?.close ?? sorted[0]?.close ?? null;
+  const prev   = [...sorted].reverse().find(c => c.date < date);
+  return prev?.close ?? sorted[0]?.close ?? null;
 }
 
 async function getCurrentPrice(symbol) {
@@ -56,7 +56,7 @@ router.get('/bonus', async (req, res) => {
 
     let currentWarrantPrice, totalValue, changeSinceGrantPct, isOutOfMoney;
 
-    if (item.type === 'call_option') {
+    if (item.type === 'call_option' && item.strikePrice) {
       const intrinsic = Math.max(0, (currentIndexPrice ?? 0) - item.strikePrice);
       currentWarrantPrice = intrinsic * (item.ratio || 1);
       isOutOfMoney = !currentIndexPrice || currentIndexPrice <= item.strikePrice;
@@ -92,9 +92,6 @@ router.post('/bonus', (req, res) => {
   const { id, label, symbol, quantity, grantDate, grantPrice, type, strikePrice, ratio, expiryDate } = req.body;
   if (!symbol || !quantity || !grantDate || !grantPrice) {
     return res.status(400).json({ error: 'symbol, quantity, grantDate en grantPrice zijn verplicht' });
-  }
-  if (type === 'call_option' && !strikePrice) {
-    return res.status(400).json({ error: 'strikePrice is verplicht voor call opties' });
   }
   const entry = {
     id: id || crypto.randomUUID(),
