@@ -779,12 +779,6 @@ function renderApp() {
   const plClass  = latest.profit >= 0 ? "c-pos" : "c-neg";
   const prdClass = periodProfit  >= 0 ? "c-pos" : "c-neg";
 
-  const todayStr     = new Date().toISOString().slice(0, 10);
-  const isStaleData  = latest.date < todayStr;
-  const staleLabel   = isStaleData
-    ? `<span title="Koersen van ${latest.date}" style="font-size:10px;font-family:'JetBrains Mono',monospace;color:#f59e0b;opacity:0.65;white-space:nowrap;letter-spacing:0.02em">⏱ ${latest.date.slice(8,10)}-${latest.date.slice(5,7)}</span>`
-    : "";
-
   const visibleTickers = showClosed ? Object.keys(TICKER_META) : CURRENT_TICKERS;
 
   document.getElementById("root").innerHTML = `
@@ -855,7 +849,6 @@ function renderApp() {
           <span class="${prdClass} privacy-val">${periodProfit >= 0 ? "+" : ""}${fmt(periodProfit)}</span>
           <span class="${prdClass}" style="opacity:0.7">${fmtPct(periodPct)}</span>
         </div>` : ""}
-        ${staleLabel}
         <button class="refresh-btn" onclick="clearCache()" title="Koersen verversen">↻</button>
       </div>
 
