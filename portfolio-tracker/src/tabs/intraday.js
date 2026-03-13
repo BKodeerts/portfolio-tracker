@@ -128,13 +128,16 @@ export function renderIntradaySection() {
         <div class="metric-sub" style="margin-top:8px">geen data</div>
       </div>`;
     }
-    const prev = data.previousClose;
-    const last = data.points[data.points.length - 1];
-    const pct  = prev ? ((last.close - prev) / prev * 100) : 0;
-    const cls  = pct >= 0 ? 'c-pos' : 'c-neg';
-    return `<div class="intraday-card">
+    const prev    = data.previousClose;
+    const last    = data.points[data.points.length - 1];
+    const pct     = prev ? ((last.close - prev) / prev * 100) : 0;
+    const cls     = pct >= 0 ? 'c-pos' : 'c-neg';
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const isStale  = data.date !== todayStr;
+    return `<div class="intraday-card" style="${isStale ? 'opacity:0.5' : ''}">
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
         <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
+        ${isStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">gisteren</span>` : ''}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
       ${sparklineSVG(data.points, prev, getTradingMins(yahoo))}
