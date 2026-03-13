@@ -213,6 +213,13 @@ export async function loadData(onSuccess) {
       }
     } catch (e) { console.warn('Daily quotes failed:', e.message); }
 
+    // Recompute with split-adjusted share counts so fully-sold positions are excluded
+    const latestRow = state.chartData[state.chartData.length - 1];
+    if (latestRow) {
+      state.CURRENT_TICKERS = Object.keys(state.TICKER_META)
+        .filter(t => (latestRow[`${t}_shares`] || 0) > 0);
+    }
+
     onSuccess();
   } catch (e) {
     document.getElementById('root').innerHTML = `
