@@ -136,17 +136,21 @@ export function renderIntradaySection() {
 
   const fxData = state.intradayData[FX_SYMBOL];
   const fxCard = fxData?.points?.length ? (() => {
-    const prev = fxData.previousClose;
-    const last = fxData.points[fxData.points.length - 1];
-    const pct  = prev ? ((last.close - prev) / prev * 100) : 0;
-    const cls  = pct >= 0 ? 'c-pos' : 'c-neg';
+    const prev      = fxData.previousClose;
+    const last      = fxData.points[fxData.points.length - 1];
+    // Invert to USD/EUR so a stronger USD shows as a gain (matches portfolio impact)
+    const prevInv   = prev ? 1 / prev : null;
+    const lastInv   = 1 / last.close;
+    const invPoints = fxData.points.map(p => ({ ...p, close: 1 / p.close }));
+    const pct       = prevInv ? ((lastInv - prevInv) / prevInv * 100) : 0;
+    const cls       = pct >= 0 ? 'c-pos' : 'c-neg';
     return `<div class="intraday-card">
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
-        <span class="pos-dot" style="background:#94a3b8"></span>EUR/USD
+        <span class="pos-dot" style="background:#94a3b8"></span>USD/EUR
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
-      ${sparklineSVG(fxData.points, prev, 24 * 60)}
-      <div class="metric-sub">${last.close.toFixed(4)}</div>
+      ${sparklineSVG(invPoints, prevInv, 24 * 60)}
+      <div class="metric-sub">${lastInv.toFixed(4)}</div>
     </div>`;
   })() : '';
 
