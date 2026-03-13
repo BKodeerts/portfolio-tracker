@@ -73,47 +73,53 @@ export function renderBenchmarkChart() {
   const filtered = getFilteredData();
   if (filtered.length < 2) return;
 
-  // Find nearest VWCE price on or before a given date
-  const vwceDates = Object.keys(state.priceMaps[BENCHMARK_SYM] || {}).sort();
-  function nearestVwcePrice(dateStr) {
-    let best = null;
-    for (const d of vwceDates) { if (d <= dateStr) best = d; else break; }
-    return best ? state.priceMaps[BENCHMARK_SYM][best] : null;
-  }
-
-  // Build hypothetical VWCE portfolio: same buy cash flows → how many VWCE shares
-  const buyTxs = [...state.RAW_TRANSACTIONS].filter(tx => tx.shares > 0).sort((a, b) => a.date.localeCompare(b.date));
-  const txCheckpoints = [];
-  let cumVwceShares = 0, cumVwceCost = 0;
-  for (const tx of buyTxs) {
-    const price = nearestVwcePrice(tx.date);
-    if (price) { cumVwceShares += tx.costEur / price; cumVwceCost += tx.costEur; }
-    txCheckpoints.push({ date: tx.date, shares: cumVwceShares, cost: cumVwceCost });
-  }
-
-  // Compute starting offsets so both series are anchored at 0% on filtered[0]
-  const startPortfolioPct = parseFloat(filtered[0].pctReturn);
   const startVwcePrice = state.priceMaps[BENCHMARK_SYM]?.[filtered[0].date];
-  let startVwceShares = 0, startVwceCost = 0;
-  for (const cp of txCheckpoints) { if (cp.date <= filtered[0].date) { startVwceShares = cp.shares; startVwceCost = cp.cost; } else break; }
-  const startVwcePct = (startVwcePrice != null && startVwceCost > 0)
-    ? (startVwceShares * startVwcePrice - startVwceCost) / startVwceCost * 100
-    : 0;
+  if (!startVwcePrice) return;
 
-  const portfolioSeries = [];
-  const benchSeries = [];
-  for (const row of filtered) {
-    portfolioSeries.push({ x: row.date, y: parseFloat((parseFloat(row.pctReturn) - startPortfolioPct).toFixed(2)) });
+  // Group transactions by date to detect cash flows
+  const txByDate = {};
+  for (const tx of state.RAW_TRANSACTIONS) {
+    if (!txByDate[tx.date]) txByDate[tx.date] = [];
+    txByDate[tx.date].push(tx);
+  }
 
+  // Time-Weighted Return (TWR): sub-periods are broken at transaction dates.
+  // At each cash flow: close sub-period using value BEFORE the flow, then open new sub-period.
+  // This eliminates distortion from capital additions/withdrawals.
+  let portfolioTwrFactor = 1.0;
+  let vwceTwrFactor = 1.0;
+  let portfolioSubStart = filtered[0].total;
+  let vwceSubStart = startVwcePrice;
+
+  const portfolioSeries = [{ x: filtered[0].date, y: 0 }];
+  const benchSeries     = [{ x: filtered[0].date, y: 0 }];
+
+  for (let i = 1; i < filtered.length; i++) {
+    const row = filtered[i];
     const vwcePrice = state.priceMaps[BENCHMARK_SYM]?.[row.date];
-    if (vwcePrice != null) {
-      let shares = 0, cost = 0;
-      for (const cp of txCheckpoints) { if (cp.date <= row.date) { shares = cp.shares; cost = cp.cost; } else break; }
-      const vwcePct = cost > 0 ? (shares * vwcePrice - cost) / cost * 100 : 0;
-      benchSeries.push({ x: row.date, y: parseFloat((vwcePct - startVwcePct).toFixed(2)) });
-    } else {
-      benchSeries.push({ x: row.date, y: null });
+    const txsToday  = txByDate[row.date];
+
+    if (txsToday?.length) {
+      // net_CF > 0 = money added (buys), net_CF < 0 = money removed (sells)
+      const netCF = txsToday.reduce((s, tx) => s + (tx.shares > 0 ? tx.costEur : -tx.costEur), 0);
+      const valueBeforeCF = row.total - netCF;
+      // Close current sub-period
+      if (portfolioSubStart > 0) portfolioTwrFactor *= valueBeforeCF / portfolioSubStart;
+      if (vwcePrice != null && vwceSubStart > 0) vwceTwrFactor *= vwcePrice / vwceSubStart;
+      // Open new sub-period after cash flow
+      portfolioSubStart = row.total;
+      vwceSubStart = vwcePrice ?? vwceSubStart;
     }
+
+    const portfolioY = portfolioSubStart > 0
+      ? (portfolioTwrFactor * row.total / portfolioSubStart - 1) * 100
+      : (portfolioTwrFactor - 1) * 100;
+    const vwceY = vwcePrice != null && vwceSubStart > 0
+      ? (vwceTwrFactor * vwcePrice / vwceSubStart - 1) * 100
+      : null;
+
+    portfolioSeries.push({ x: row.date, y: parseFloat(portfolioY.toFixed(2)) });
+    benchSeries.push({ x: row.date, y: vwceY != null ? parseFloat(vwceY.toFixed(2)) : null });
   }
 
   state.chartInstances.benchmark = new Chart(document.getElementById('chartBenchmark').getContext('2d'), {
