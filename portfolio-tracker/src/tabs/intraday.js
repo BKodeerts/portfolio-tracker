@@ -1,6 +1,6 @@
 import { state } from '../state.js';
 import { fetchIntraday } from '../api.js';
-import { FX_FALLBACK } from '../constants.js';
+import { FX_FALLBACK, FX_SYMBOL } from '../constants.js';
 import { fmt } from '../utils.js';
 
 export function getTradingMins(yahooSymbol) {
@@ -59,16 +59,20 @@ export function sparklineSVG(points, prevClose, tradingMins) {
 }
 
 export function computeTodayPL() {
+  const today = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
   let plEur = 0, baseEur = 0;
   const latest = state.chartData[state.chartData.length - 1];
   state.CURRENT_TICKERS.forEach(ticker => {
     const meta = state.TICKER_META[ticker];
     const data = state.intradayData[meta?.yahoo];
     if (!data?.previousClose || !data.points?.length) return;
+    if (data.date !== today) return; // skip stale data from a previous day
     const shares = latest?.[`${ticker}_shares`];
     if (!shares) return;
     const lastPrice = data.points[data.points.length - 1].close;
-    const fx = state.fxRateMap[data.date] || FX_FALLBACK;
+    const fx = meta.currency === 'USD'
+      ? (state.liveEurUsd || state.fxRateMap[data.date] || FX_FALLBACK)
+      : 1;
     const toEurFactor = meta.currency === 'USD' ? 1 / fx : 1;
     plEur   += shares * (lastPrice - data.previousClose) * toEurFactor;
     baseEur += shares * data.previousClose * toEurFactor;
@@ -95,29 +99,41 @@ export function renderIntradaySection() {
   if (!gridEl) return;
 
   const entries = state.CURRENT_TICKERS
-    .map(t => ({ ticker: t, yahoo: state.TICKER_META[t]?.yahoo, data: state.intradayData[state.TICKER_META[t]?.yahoo] }))
-    .filter(e => e.data?.points?.length > 0);
+    .map(t => ({ ticker: t, yahoo: state.TICKER_META[t]?.yahoo, data: state.intradayData[state.TICKER_META[t]?.yahoo] }));
 
-  if (entries.length === 0) {
-    if (statusEl) statusEl.textContent = state.intradayLoaded ? 'geen data' : 'laden…';
-    if (!state.intradayLoaded) { gridEl.innerHTML = ''; return; }
-    gridEl.innerHTML = `<div style="color:#334155;font-size:11px">Markt gesloten of geen intradaydata beschikbaar.</div>`;
+  const withData = entries.filter(e => e.data?.points?.length > 0);
+
+  if (!state.intradayLoaded) { gridEl.innerHTML = ''; return; }
+
+  if (withData.length === 0 && entries.every(e => !e.data)) {
+    if (statusEl) statusEl.textContent = 'geen data';
+    gridEl.innerHTML = `<div style="color:#888;font-size:11px">Markt gesloten of geen intradaydata beschikbaar.</div>`;
     return;
   }
 
-  if (statusEl) {
-    const lastTs   = Math.max(...entries.map(e => e.data.points[e.data.points.length - 1].ts));
+  if (withData.length > 0 && statusEl) {
+    const lastTs   = Math.max(...withData.map(e => e.data.points[e.data.points.length - 1].ts));
     const lastTime = new Date(lastTs * 1000).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' });
     statusEl.textContent = `bijgewerkt ${lastTime}`;
   }
 
   gridEl.innerHTML = entries.map(({ ticker, yahoo, data }) => {
+    const hasData = data?.points?.length > 0;
+    if (!hasData) {
+      return `<div class="intraday-card" style="opacity:0.45">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
+          <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
+        </div>
+        <div class="metric-value c-neutral" style="font-size:16px;margin-top:5px">—</div>
+        <div class="metric-sub" style="margin-top:8px">geen data</div>
+      </div>`;
+    }
     const prev = data.previousClose;
     const last = data.points[data.points.length - 1];
     const pct  = prev ? ((last.close - prev) / prev * 100) : 0;
     const cls  = pct >= 0 ? 'c-pos' : 'c-neg';
     return `<div class="intraday-card">
-      <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#94a3b8;margin-bottom:2px">
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
         <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
@@ -135,9 +151,14 @@ export async function loadIntradayData(force = false) {
   const statusEl = document.getElementById('intradayStatus');
   if (statusEl) statusEl.textContent = 'laden…';
   try {
-    const json = await fetchIntraday(yahooSymbols, force);
+    const allSymbols = [...new Set([...yahooSymbols, FX_SYMBOL])];
+    const json = await fetchIntraday(allSymbols, force);
     if (json.status !== 'ok') throw new Error(json.message);
     state.intradayData = json.data;
+    const fxData = json.data[FX_SYMBOL];
+    if (fxData?.points?.length) {
+      state.liveEurUsd = fxData.points[fxData.points.length - 1].close;
+    }
   } catch (e) {
     if (statusEl) statusEl.textContent = 'laden mislukt';
     console.warn('Intraday load failed:', e.message);

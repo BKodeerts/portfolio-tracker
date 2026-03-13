@@ -12,6 +12,7 @@ export const state = {
 
   intradayData: {},
   intradayLoaded: false,
+  liveEurUsd: null,
   parsedCSVRows: [],
 
   currentTab: 'portefeuille',
