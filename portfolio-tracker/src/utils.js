@@ -39,15 +39,15 @@ export function destroyAllCharts() {
 export function chartTheme() {
   const dark = document.body.classList.contains('theme-dark');
   return {
-    tooltipBg:     dark ? 'rgba(28,28,28,0.97)' : 'rgba(20,20,20,0.97)',
-    tooltipBorder: 'rgba(255,255,255,0.1)',
+    tooltipBg:     dark ? 'rgba(28,28,28,0.97)'    : 'rgba(255,255,255,0.97)',
+    tooltipBorder: dark ? 'rgba(255,255,255,0.1)'  : 'rgba(0,0,0,0.08)',
     titleColor:    '#888',
-    bodyColor:     dark ? '#d4d4d4' : '#d8d8d8',
-    gridColor:     'rgba(255,255,255,0.04)',
-    tickColor:     '#666',
-    costLine:      dark ? '#444' : '#484848',
-    costFill:      dark ? 'rgba(68,68,68,0.05)' : 'rgba(72,72,72,0.06)',
-    donutBorder:   'rgba(26,26,26,0.9)',
-    benchmarkLine: '#666',
+    bodyColor:     dark ? '#d8d8d8'                : '#1c1c1c',
+    gridColor:     dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)',
+    tickColor:     dark ? '#666'                   : '#999',
+    costLine:      dark ? '#555'                   : '#ccc',
+    costFill:      dark ? 'rgba(68,68,68,0.05)'    : 'rgba(0,0,0,0.03)',
+    donutBorder:   dark ? 'rgba(26,26,26,0.9)'     : 'rgba(243,245,248,0.9)',
+    benchmarkLine: dark ? '#666'                   : '#bbb',
   };
 }
