@@ -62,20 +62,37 @@ export function computeTodayPL() {
   const today = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
   let plEur = 0, baseEur = 0;
   const latest = state.chartData[state.chartData.length - 1];
+  if (!latest) return null;
+
+  // Current live FX rate (EUR/USD), and the rate at the previous close
+  const currentFx = state.liveEurUsd || FX_FALLBACK;
+  const prevDate  = state.sortedDates?.[state.sortedDates.length - 1];
+  const prevFx    = (prevDate && state.fxRateMap?.[prevDate]) || currentFx;
+
   state.CURRENT_TICKERS.forEach(ticker => {
     const meta = state.TICKER_META[ticker];
     const data = state.intradayData[meta?.yahoo];
-    if (!data?.previousClose || !data.points?.length) return;
-    if (data.date !== today) return; // skip stale data from a previous day
+    if (!data?.previousClose) return;
     const shares = latest?.[`${ticker}_shares`];
     if (!shares) return;
-    const lastPrice = data.points[data.points.length - 1].close;
-    const fx = meta.currency === 'USD'
-      ? (state.liveEurUsd || state.fxRateMap[data.date] || FX_FALLBACK)
-      : 1;
-    const toEurFactor = meta.currency === 'USD' ? 1 / fx : 1;
-    plEur   += shares * (lastPrice - data.previousClose) * toEurFactor;
-    baseEur += shares * data.previousClose * toEurFactor;
+
+    if (meta.currency === 'USD') {
+      // For USD positions: apply FX impact even when markets are closed.
+      // Use today's intraday price if available, otherwise previousClose (stock unchanged).
+      const todayPrice = (data.date === today && data.points?.length)
+        ? data.points[data.points.length - 1].close
+        : data.previousClose;
+      const prevEur  = data.previousClose / prevFx;
+      const todayEur = todayPrice / currentFx;
+      plEur   += shares * (todayEur - prevEur);
+      baseEur += shares * prevEur;
+    } else {
+      // EUR positions: only price change, only when today's data is available
+      if (data.date !== today || !data.points?.length) return;
+      const lastPrice = data.points[data.points.length - 1].close;
+      plEur   += shares * (lastPrice - data.previousClose);
+      baseEur += shares * data.previousClose;
+    }
   });
   return baseEur > 0 ? { pl: plEur, pct: (plEur / baseEur) * 100 } : null;
 }
