@@ -8,12 +8,27 @@ import 'chartjs-adapter-date-fns';
 // ── Detail modal (reuses #posModal + pos-modal-inner styling) ─────────────────
 
 async function showBonusDetail(item) {
-  const pct   = item.changeSinceGrantPct ?? 0;
-  const cls   = pct >= 0 ? 'c-pos' : 'c-neg';
-  const sign  = pct >= 0 ? '+' : '';
+  const isCall = item.type === 'call_option';
+  const pct    = item.changeSinceGrantPct ?? 0;
+  const cls    = pct >= 0 ? 'c-pos' : 'c-neg';
+  const sign   = pct >= 0 ? '+' : '';
   const priceChange = (item.currentWarrantPrice ?? item.grantPrice) - item.grantPrice;
   const priceCls  = priceChange >= 0 ? 'c-pos' : 'c-neg';
   const priceSign = priceChange >= 0 ? '+' : '';
+
+  const callExtraStats = isCall ? `
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Uitoefenprijs</div>
+        <div class="pos-modal-stat-val">€${item.strikePrice?.toFixed(2) ?? '—'}${(item.ratio && item.ratio !== 1) ? `<span style="font-size:10px;color:#888"> ×${item.ratio}</span>` : ''}</div>
+      </div>
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Status</div>
+        <div class="pos-modal-stat-val ${item.isOutOfMoney ? 'c-neg' : 'c-pos'}">${item.isOutOfMoney ? 'Out of the money' : 'In the money ✓'}</div>
+      </div>
+      ${item.expiryDate ? `<div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Vervaldatum</div>
+        <div class="pos-modal-stat-val">${item.expiryDate}</div>
+      </div>` : ''}` : '';
 
   const modal = document.getElementById('posModal');
   modal.innerHTML = `<div class="pos-modal-inner">
@@ -26,7 +41,7 @@ async function showBonusDetail(item) {
     </div>
     <div class="pos-modal-stats">
       <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Aantal warrants</div>
+        <div class="pos-modal-stat-label">${isCall ? 'Aantal opties' : 'Aantal warrants'}</div>
         <div class="pos-modal-stat-val privacy-val">${item.quantity}</div>
       </div>
       <div class="pos-modal-stat">
@@ -44,13 +59,14 @@ async function showBonusDetail(item) {
         <div class="pos-modal-stat-val privacy-val">${fmt(item.totalValue ?? 0)}</div>
         <div class="pos-modal-stat-sub ${cls}">${sign}${pct.toFixed(2)}%</div>
       </div>
+      ${callExtraStats}
       <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Index bij toekenning</div>
-        <div class="pos-modal-stat-val">${item.grantIndexPrice?.toFixed(0) ?? '—'}</div>
+        <div class="pos-modal-stat-label">${isCall ? 'Onderliggende bij toekenning' : 'Index bij toekenning'}</div>
+        <div class="pos-modal-stat-val">${item.grantIndexPrice?.toFixed(2) ?? '—'}</div>
       </div>
       <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Index nu</div>
-        <div class="pos-modal-stat-val">${item.currentIndexPrice?.toFixed(0) ?? '—'}</div>
+        <div class="pos-modal-stat-label">${isCall ? 'Onderliggende nu' : 'Index nu'}</div>
+        <div class="pos-modal-stat-val">${item.currentIndexPrice?.toFixed(2) ?? '—'}</div>
       </div>
     </div>
     <div class="pos-modal-chart-wrap"><canvas id="posModalChart"></canvas></div>
@@ -85,12 +101,16 @@ async function showBonusDetail(item) {
     const priorFirst   = priorOverlap[0];
     if (!currentFirst) return; // need at least current data to draw anything
 
-    const currentStartY = item.quantity * item.grantPrice * (currentFirst.close / item.grantIndexPrice);
+    const valueOf = (close) => isCall
+      ? item.quantity * Math.max(0, close - item.strikePrice) * (item.ratio || 1)
+      : item.quantity * item.grantPrice * (close / item.grantIndexPrice);
+
+    const currentStartY = valueOf(currentFirst.close);
 
     const toPoint = (c, shiftYears = 0) => {
       const d = new Date(c.date);
       if (shiftYears) d.setFullYear(d.getFullYear() + shiftYears);
-      return { x: d, y: item.quantity * item.grantPrice * (c.close / item.grantIndexPrice) };
+      return { x: d, y: valueOf(c.close) };
     };
     const toPriorPoint = c => {
       const d = new Date(c.date);
@@ -150,12 +170,19 @@ function openBonusEdit(existing = null) {
   const posModal = document.getElementById('posModal');
   if (posModal?.open) posModal.close();
 
-  const id         = existing?.id         || '';
-  const label      = existing?.label      || '';
-  const symbol     = existing?.symbol     || '^STOXX50E';
-  const quantity   = existing?.quantity   || '';
-  const grantDate  = existing?.grantDate  || '';
-  const grantPrice = existing?.grantPrice || 10;
+  const id          = existing?.id          || '';
+  const label       = existing?.label       || '';
+  const symbol      = existing?.symbol      || '^STOXX50E';
+  const quantity    = existing?.quantity    || '';
+  const grantDate   = existing?.grantDate   || '';
+  const grantPrice  = existing?.grantPrice  || 10;
+  const isCall      = existing?.type === 'call_option';
+  const strikePrice = existing?.strikePrice || '';
+  const ratio       = existing?.ratio       || 1;
+  const expiryDate  = existing?.expiryDate  || '';
+
+  const LBL = 'font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.06em';
+  const INP = 'display:block;width:100%;margin-top:4px;box-sizing:border-box';
 
   let dlg = document.getElementById('bonusEditDlg');
   if (!dlg) {
@@ -170,23 +197,45 @@ function openBonusEdit(existing = null) {
       <button class="pos-modal-close" onclick="document.getElementById('bonusEditDlg').close()">✕</button>
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
-      <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Naam
-        <input id="bLabel" value="${label}" placeholder="Warrants EuroStoxx" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
+      <div>
+        <div style="${LBL};margin-bottom:6px">Type</div>
+        <div style="display:flex;gap:0;border:1px solid #334155;border-radius:6px;overflow:hidden;width:fit-content">
+          <button id="bTypeWarrant" onclick="window._setBonusType('warrant')"
+            style="padding:5px 14px;font-size:11px;font-weight:600;border:none;cursor:pointer;background:${!isCall?'#334155':'transparent'};color:${!isCall?'#fff':'#888'}">Gewoon warrant</button>
+          <button id="bTypeCall" onclick="window._setBonusType('call_option')"
+            style="padding:5px 14px;font-size:11px;font-weight:600;border:none;cursor:pointer;background:${isCall?'#a78bfa':'transparent'};color:${isCall?'#fff':'#888'}">Call optie</button>
+        </div>
+      </div>
+      <label style="${LBL}">Naam
+        <input id="bLabel" value="${label}" placeholder="Warrants EuroStoxx" style="${INP}">
       </label>
-      <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Yahoo volgindex
-        <input id="bSymbol" value="${symbol}" placeholder="^STOXX50E" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
+      <label style="${LBL}">Yahoo volgindex / onderliggend
+        <input id="bSymbol" value="${symbol}" placeholder="^STOXX50E" style="${INP}">
       </label>
       <div style="display:flex;gap:10px">
-        <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.06em;flex:1">Aantal
-          <input id="bQty" type="number" value="${quantity}" placeholder="250" step="1" min="1" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
+        <label style="${LBL};flex:1">Aantal
+          <input id="bQty" type="number" value="${quantity}" placeholder="250" step="1" min="1" style="${INP}">
         </label>
-        <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.06em;flex:1">Prijs bij toekenning
-          <input id="bPrice" type="number" value="${grantPrice}" placeholder="10" step="0.01" min="0.01" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
+        <label style="${LBL};flex:1">Prijs bij toekenning
+          <input id="bPrice" type="number" value="${grantPrice}" placeholder="10" step="0.01" min="0" style="${INP}">
         </label>
       </div>
-      <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Toekenningsdatum
-        <input id="bDate" type="date" value="${grantDate}" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
+      <label style="${LBL}">Toekenningsdatum
+        <input id="bDate" type="date" value="${grantDate}" style="${INP}">
       </label>
+      <div id="bCallFields" style="display:${isCall?'flex':'none'};flex-direction:column;gap:12px;padding-top:4px;border-top:1px solid #1e293b">
+        <div style="display:flex;gap:10px">
+          <label style="${LBL};flex:2">Uitoefenprijs (strike)
+            <input id="bStrike" type="number" value="${strikePrice}" placeholder="45.00" step="0.01" min="0" style="${INP}">
+          </label>
+          <label style="${LBL};flex:1">Ratio
+            <input id="bRatio" type="number" value="${ratio}" placeholder="1" step="0.01" min="0.01" style="${INP}">
+          </label>
+        </div>
+        <label style="${LBL}">Vervaldatum (optioneel)
+          <input id="bExpiry" type="date" value="${expiryDate}" style="${INP}">
+        </label>
+      </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       ${existing ? `<button class="btn" id="bDelete" style="margin-right:auto;color:#ef4444">Verwijderen</button>` : ''}
@@ -198,6 +247,19 @@ function openBonusEdit(existing = null) {
   dlg.showModal();
   dlg.onclick = e => { if (e.target === dlg) dlg.close(); };
 
+  window._setBonusType = (t) => {
+    const callFields = document.getElementById('bCallFields');
+    const wBtn = document.getElementById('bTypeWarrant');
+    const cBtn = document.getElementById('bTypeCall');
+    callFields.style.display = t === 'call_option' ? 'flex' : 'none';
+    wBtn.style.background = t === 'warrant' ? '#334155' : 'transparent';
+    wBtn.style.color      = t === 'warrant' ? '#fff' : '#888';
+    cBtn.style.background = t === 'call_option' ? '#a78bfa' : 'transparent';
+    cBtn.style.color      = t === 'call_option' ? '#fff' : '#888';
+    dlg._bonusType = t;
+  };
+  dlg._bonusType = isCall ? 'call_option' : 'warrant';
+
   if (existing) {
     document.getElementById('bDelete').onclick = async () => {
       await deleteBonus(existing.id);
@@ -207,6 +269,9 @@ function openBonusEdit(existing = null) {
   }
 
   document.getElementById('bSave').onclick = async () => {
+    const type = dlg._bonusType;
+    const strike = Number(document.getElementById('bStrike')?.value);
+    if (type === 'call_option' && !strike) { alert('Vul de uitoefenprijs in.'); return; }
     const entry = {
       ...(id ? { id } : {}),
       label:      document.getElementById('bLabel').value.trim() || document.getElementById('bSymbol').value.trim(),
@@ -214,9 +279,15 @@ function openBonusEdit(existing = null) {
       quantity:   Number(document.getElementById('bQty').value),
       grantDate:  document.getElementById('bDate').value,
       grantPrice: Number(document.getElementById('bPrice').value),
+      ...(type === 'call_option' && {
+        type,
+        strikePrice: strike,
+        ratio: Number(document.getElementById('bRatio').value) || 1,
+        expiryDate: document.getElementById('bExpiry').value || undefined,
+      }),
     };
-    if (!entry.symbol || !entry.quantity || !entry.grantDate || !entry.grantPrice) {
-      alert('Vul alle velden in.'); return;
+    if (!entry.symbol || !entry.quantity || !entry.grantDate) {
+      alert('Vul alle verplichte velden in.'); return;
     }
     const btn = document.getElementById('bSave');
     btn.textContent = 'Opslaan…'; btn.disabled = true;
@@ -237,7 +308,19 @@ function bonusCard(item) {
 
   const hasToday  = data?.points?.length > 0 && data.previousClose && data.date === todayStr;
   const last      = hasToday ? data.points[data.points.length - 1].close : null;
-  const todayPct  = hasToday ? (last - data.previousClose) / data.previousClose * 100 : null;
+  let todayPct;
+  if (!hasToday) {
+    todayPct = null;
+  } else if (item.type === 'call_option') {
+    // Show change in intrinsic value, not underlying % move
+    const prevIntrinsic = Math.max(0, data.previousClose - item.strikePrice) * (item.ratio || 1);
+    const currIntrinsic = Math.max(0, last - item.strikePrice) * (item.ratio || 1);
+    todayPct = prevIntrinsic > 0
+      ? (currIntrinsic - prevIntrinsic) / prevIntrinsic * 100
+      : null; // was OTM at open — can't express as %
+  } else {
+    todayPct = (last - data.previousClose) / data.previousClose * 100;
+  }
   let todaySub;
   if (todayPct === null) {
     todaySub = `<span>${sign}${pct.toFixed(2)}% v.a. toekenning</span>`;
@@ -251,12 +334,21 @@ function bonusCard(item) {
     ? sparklineSVG(data.points, data.previousClose, 510)
     : '';
 
+  const isCall = item.type === 'call_option';
+  const tag    = isCall ? 'call optie' : 'bonus';
+  const valueHtml = isCall && item.isOutOfMoney
+    ? `<div style="display:flex;align-items:center;gap:6px;margin-top:5px">
+        <span class="metric-value c-neg privacy-val" style="font-size:16px">${fmt(0)}</span>
+        <span style="font-size:9px;color:#f87171;font-family:'JetBrains Mono',monospace;font-weight:700">OTM</span>
+      </div>`
+    : `<div class="metric-value ${cls} privacy-val" style="font-size:16px;margin-top:5px">${fmt(item.totalValue ?? 0)}</div>`;
+
   return `<div class="intraday-card" style="cursor:pointer" onclick="globalThis._showBonusDetail('${item.id}')">
     <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
       <span class="pos-dot" style="background:#a78bfa"></span>${item.label}
-      <span style="font-size:9px;color:#a78bfa;font-family:'JetBrains Mono',monospace;margin-left:auto">bonus</span>
+      <span style="font-size:9px;color:#a78bfa;font-family:'JetBrains Mono',monospace;margin-left:auto">${tag}</span>
     </div>
-    <div class="metric-value ${cls} privacy-val" style="font-size:16px;margin-top:5px">${fmt(item.totalValue ?? 0)}</div>
+    ${valueHtml}
     ${sparkline}
     <div class="metric-sub">${todaySub}</div>
   </div>`;

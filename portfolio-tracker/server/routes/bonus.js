@@ -53,13 +53,27 @@ router.get('/bonus', async (req, res) => {
   for (const item of items) {
     const grantIndexPrice   = await getPriceAtDate(item.symbol, item.grantDate);
     const currentIndexPrice = await getCurrentPrice(item.symbol);
-    const currentWarrantPrice = (grantIndexPrice && currentIndexPrice)
-      ? item.grantPrice * (currentIndexPrice / grantIndexPrice)
-      : item.grantPrice;
-    const totalValue         = item.quantity * currentWarrantPrice;
-    const changeSinceGrantPct = grantIndexPrice && currentIndexPrice
-      ? (currentIndexPrice - grantIndexPrice) / grantIndexPrice * 100
-      : 0;
+
+    let currentWarrantPrice, totalValue, changeSinceGrantPct, isOutOfMoney;
+
+    if (item.type === 'call_option') {
+      const intrinsic = Math.max(0, (currentIndexPrice ?? 0) - item.strikePrice);
+      currentWarrantPrice = intrinsic * (item.ratio || 1);
+      isOutOfMoney = !currentIndexPrice || currentIndexPrice <= item.strikePrice;
+      totalValue = item.quantity * currentWarrantPrice;
+      changeSinceGrantPct = grantIndexPrice && currentIndexPrice
+        ? (currentIndexPrice - grantIndexPrice) / grantIndexPrice * 100
+        : 0;
+    } else {
+      currentWarrantPrice = (grantIndexPrice && currentIndexPrice)
+        ? item.grantPrice * (currentIndexPrice / grantIndexPrice)
+        : item.grantPrice;
+      totalValue = item.quantity * currentWarrantPrice;
+      changeSinceGrantPct = grantIndexPrice && currentIndexPrice
+        ? (currentIndexPrice - grantIndexPrice) / grantIndexPrice * 100
+        : 0;
+    }
+
     result.push({
       ...item,
       grantIndexPrice,
@@ -67,6 +81,7 @@ router.get('/bonus', async (req, res) => {
       currentWarrantPrice: Math.round(currentWarrantPrice * 100) / 100,
       totalValue:          Math.round(totalValue * 100) / 100,
       changeSinceGrantPct: Math.round(changeSinceGrantPct * 100) / 100,
+      ...(item.type === 'call_option' && { isOutOfMoney }),
     });
   }
   res.json({ status: 'ok', data: result });
@@ -74,12 +89,28 @@ router.get('/bonus', async (req, res) => {
 
 // POST /api/bonus — add or update a bonus entry
 router.post('/bonus', (req, res) => {
-  const { id, label, symbol, quantity, grantDate, grantPrice } = req.body;
+  const { id, label, symbol, quantity, grantDate, grantPrice, type, strikePrice, ratio, expiryDate } = req.body;
   if (!symbol || !quantity || !grantDate || !grantPrice) {
     return res.status(400).json({ error: 'symbol, quantity, grantDate en grantPrice zijn verplicht' });
   }
+  if (type === 'call_option' && !strikePrice) {
+    return res.status(400).json({ error: 'strikePrice is verplicht voor call opties' });
+  }
+  const entry = {
+    id: id || crypto.randomUUID(),
+    label: label || symbol,
+    symbol,
+    quantity: Number(quantity),
+    grantDate,
+    grantPrice: Number(grantPrice),
+    ...(type === 'call_option' && {
+      type,
+      strikePrice: Number(strikePrice),
+      ratio: Number(ratio) || 1,
+      ...(expiryDate && { expiryDate }),
+    }),
+  };
   const items = loadBonus();
-  const entry = { id: id || crypto.randomUUID(), label: label || symbol, symbol, quantity: Number(quantity), grantDate, grantPrice: Number(grantPrice) };
   const idx = items.findIndex(i => i.id === entry.id);
   if (idx >= 0) items[idx] = entry; else items.push(entry);
   saveBonus(items);
