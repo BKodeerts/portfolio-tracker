@@ -1,0 +1,9 @@
+@media (max-width: 640px) {
+  .metrics-grid  { grid-template-columns: 1fr 1fr; }
+  .home-grid     { grid-template-columns: 1fr; }
+  .analyse-grid  { grid-template-columns: 1fr; }
+  .analyse-full  { grid-column: 1; }
+  .chart-header  { gap: 8px; }
+  .metric-value  { font-size: 16px; }
+  .intraday-grid { grid-template-columns: repeat(2, 1fr); }
+}
