@@ -1182,14 +1182,14 @@ function renderIntradaySection() {
   }
   gridEl.style.opacity = "";
 
-  const todayStr = new Date().toDateString();
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   gridEl.innerHTML = entries.map(({ ticker, yahoo, data }) => {
     const prev    = data.previousClose;
     const last    = data.points[data.points.length - 1];
     const pct     = prev ? ((last.close - prev) / prev * 100) : 0;
     const cls     = pct >= 0 ? "c-pos" : "c-neg";
-    const isStale = new Date(last.ts * 1000).toDateString() !== todayStr;
+    const isStale = data.date !== todayStr;
     return `<div class="intraday-card" style="${isStale ? "opacity:0.5" : ""}">
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#94a3b8;margin-bottom:2px">
         <span class="pos-dot" style="background:${getColor(ticker)}"></span>${ticker}
