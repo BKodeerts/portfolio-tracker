@@ -1,6 +1,6 @@
 import { state } from '../state.js';
 import { saveTransactions, lookupIsin } from '../api.js';
-import { parseDeGiroCSV, aggregateOrders, buildIsinLookup, guessYahooSuffix } from '../csv.js';
+import { parseDeGiroCSV, parseBoleroXLSX, aggregateOrders, buildIsinLookup, guessYahooSuffix } from '../csv.js';
 import { renderAppHeader } from '../components/header.js';
 import { destroyAllCharts } from '../utils.js';
 
@@ -17,15 +17,15 @@ export function renderImport() {
     <div class="import-wrap">
       <div class="import-info">
         <strong>${txCount} transacties opgeslagen</strong>${txCount > 0 ? ` · ${dateRange}` : ''}<br>
-        Upload een DeGiro <em>Transacties.csv</em>. Bestaande data kun je behouden of vervangen.
+        Upload een DeGiro <em>Transacties.csv</em> of Bolero <em>portfolio_…xlsx</em>. Bestaande data kun je behouden of vervangen.
       </div>
       <div class="drop-zone" id="dropZone"
         ondragover="event.preventDefault();this.classList.add('drag-over')"
         ondragleave="this.classList.remove('drag-over')"
         ondrop="event.preventDefault();this.classList.remove('drag-over');window._handleCSVFile(event.dataTransfer.files[0])">
-        <strong>Sleep CSV-bestand hierheen</strong>
+        <strong>Sleep bestand hierheen</strong>
         <p>of <label for="csvInput">klik om te bladeren</label></p>
-        <input type="file" id="csvInput" accept=".csv,text/csv,text/plain" style="display:none" onchange="window._handleCSVFile(this.files[0])">
+        <input type="file" id="csvInput" accept=".csv,.xlsx,text/csv,text/plain" style="display:none" onchange="window._handleCSVFile(this.files[0])">
       </div>
       <div id="mappingSection" style="display:none"></div>
     </div>`;
@@ -33,40 +33,49 @@ export function renderImport() {
 
 export async function handleCSVFile(file) {
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async e => {
-    try {
-      const rawRows = parseDeGiroCSV(e.target.result);
-      if (rawRows.length === 0) { alert('Geen geldige transacties gevonden.'); return; }
-      state.parsedCSVRows = aggregateOrders(rawRows);
+  const isBolero = file.name.endsWith('.xlsx') || file.name.startsWith('portfolio_');
 
-      const isinLookup = buildIsinLookup(state.RAW_TRANSACTIONS);
-      const isinMeta = {};
-      state.parsedCSVRows.forEach(r => { if (!isinMeta[r.isin]) isinMeta[r.isin] = { beurs: r.beurs }; });
-      const unknowns = Object.entries(isinMeta).filter(([isin]) => !isinLookup[isin]);
+  const parseAndRender = async rows => {
+    if (rows.length === 0) { alert('Geen geldige transacties gevonden.'); return; }
+    state.parsedCSVRows = isBolero ? rows : aggregateOrders(rows);
 
-      const sec = document.getElementById('mappingSection');
-      sec.style.display = 'block';
-      if (unknowns.length > 0) {
-        sec.innerHTML = `<div style="color:#94a3b8;font-size:13px;margin-top:16px">Symbolen opzoeken (${unknowns.length})…</div>`;
-      }
+    const isinLookup = buildIsinLookup(state.RAW_TRANSACTIONS);
+    const isinMeta = {};
+    state.parsedCSVRows.forEach(r => { if (!isinMeta[r.isin]) isinMeta[r.isin] = { beurs: r.beurs }; });
+    const unknowns = Object.entries(isinMeta).filter(([isin]) => !isinLookup[isin]);
 
-      const resolved = {};
-      await Promise.all(unknowns.map(async ([isin, meta]) => {
-        try {
-          const j = await lookupIsin(isin, meta.beurs);
-          if (j.status === 'ok' && j.symbol) {
-            const sfx    = guessYahooSuffix(meta.beurs);
-            const ticker = sfx ? j.symbol.slice(0, j.symbol.length - sfx.length) : j.symbol;
-            resolved[isin] = { ticker, yahoo: j.symbol };
-          }
-        } catch {}
-      }));
+    const sec = document.getElementById('mappingSection');
+    sec.style.display = 'block';
+    if (unknowns.length > 0) {
+      sec.innerHTML = `<div style="color:#94a3b8;font-size:13px;margin-top:16px">Symbolen opzoeken (${unknowns.length})…</div>`;
+    }
 
-      renderMappingTable(state.parsedCSVRows, resolved);
-    } catch (err) { alert('CSV-fout: ' + err.message); }
+    const resolved = {};
+    await Promise.all(unknowns.map(async ([isin, meta]) => {
+      try {
+        const j = await lookupIsin(isin, meta.beurs);
+        if (j.status === 'ok' && j.symbol) {
+          const sfx    = guessYahooSuffix(meta.beurs);
+          const ticker = sfx ? j.symbol.slice(0, j.symbol.length - sfx.length) : j.symbol;
+          resolved[isin] = { ticker, yahoo: j.symbol };
+        }
+      } catch {}
+    }));
+
+    renderMappingTable(state.parsedCSVRows, resolved);
   };
-  reader.readAsText(file, 'utf-8');
+
+  if (isBolero) {
+    try { await parseAndRender(parseBoleroXLSX(await file.arrayBuffer())); }
+    catch (err) { alert('XLSX-fout: ' + err.message); }
+  } else {
+    const reader = new FileReader();
+    reader.onload = async e => {
+      try { await parseAndRender(parseDeGiroCSV(e.target.result)); }
+      catch (err) { alert('CSV-fout: ' + err.message); }
+    };
+    reader.readAsText(file, 'utf-8');
+  }
 }
 
 export function renderMappingTable(rows, resolved = {}) {

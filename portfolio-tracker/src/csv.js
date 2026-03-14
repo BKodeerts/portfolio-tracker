@@ -1,3 +1,11 @@
+import * as XLSX from 'xlsx';
+
+// Bolero "Markt" codes mapped to exchange keys used by EXCHANGE_SUFFIXES
+const BOLERO_MARKET_MAP = {
+  USA: 'NYSE', BEL: 'XBRU', GER: 'GER', NED: 'XAMS',
+  FRA: 'XPAR', UK:  'XLON', ITA: 'XMIL', SWI: 'XSWX',
+};
+
 export const EXCHANGE_SUFFIXES = {
   XETRA:'.DE', XET:'.DE', GER:'.DE', XAMS:'.AS', AMS:'.AS',
   XPAR:'.PA', EPA:'.PA', XLON:'.L', LSE:'.L', XMIL:'.MI', MIL:'.MI',
@@ -84,4 +92,49 @@ export function buildIsinLookup(rawTransactions) {
     if (t.isin && !map[t.isin]) map[t.isin] = { ticker: t.ticker, yahoo: t.yahoo };
   });
   return map;
+}
+
+export function parseBoleroXLSX(arrayBuffer) {
+  const wb   = XLSX.read(arrayBuffer, { type: 'array' });
+  const ws   = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  // Row 2, col 3 contains the print date as an Excel serial number
+  const serial    = rows[2]?.[3];
+  const printDate = serial
+    ? new Date(Math.round((serial - 25569) * 86400000)).toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+
+  const result = [];
+  for (let i = 9; i < rows.length; i++) {
+    const r    = rows[i];
+    const type = r[1];
+    if (!type || type === '') break;
+    if (type !== 'Aandelen') continue;
+
+    const currency           = String(r[3] || 'EUR').trim();
+    const shares             = Number(r[5])  || 0;
+    const product            = String(r[9]  || '').trim();
+    const totaleAankoopwaarde = Number(r[17]) || 0;
+    const huidigeWaarde      = Number(r[25]) || 0;
+    const waardeInEUR        = Number(r[27]) || 0;
+    const markt              = String(r[31] || '').trim().toUpperCase();
+    const isin               = String(r[35] || '').trim();
+
+    if (!isin || shares <= 0) continue;
+
+    // Convert purchase cost to EUR using the current FX rate embedded in the snapshot
+    let totaalEur;
+    if (currency === 'EUR') {
+      totaalEur = totaleAankoopwaarde;
+    } else if (huidigeWaarde > 0 && waardeInEUR > 0) {
+      totaalEur = totaleAankoopwaarde * (waardeInEUR / huidigeWaarde);
+    } else {
+      totaalEur = totaleAankoopwaarde / 1.09; // fallback
+    }
+
+    const beurs = BOLERO_MARKET_MAP[markt] || markt;
+    result.push({ date: printDate, product, isin, beurs, shares, totaalEur, currency });
+  }
+  return result;
 }
