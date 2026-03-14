@@ -50,7 +50,8 @@ async function fetchDailyQuote(yahooSymbol) {
 }
 
 async function fetchIntraday(yahooSymbol) {
-  const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=5m&range=1d&includePrePost=false`;
+  const isFx = yahooSymbol.endsWith('=X');
+  const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=5m&range=1d&includePrePost=${isFx}`;
   const text = await fetchYahoo(url);
   const result = JSON.parse(text)?.chart?.result?.[0];
   if (!result) return null;

@@ -3,6 +3,14 @@ import { fetchIntraday } from '../api.js';
 import { FX_FALLBACK, FX_SYMBOL } from '../constants.js';
 import { fmt } from '../utils.js';
 
+function staleDayLabel(dateStr) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = new Date(dateStr + 'T00:00:00');
+  const diffDays = Math.round((today - d) / 86400000);
+  if (diffDays === 1) return 'gisteren';
+  return d.toLocaleDateString('nl-BE', { weekday: 'long' });
+}
+
 export function getTradingMins(yahooSymbol) {
   return /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i.test(yahooSymbol || '') ? 510 : 390;
 }
@@ -130,8 +138,10 @@ export function renderIntradaySection() {
 
   if (withData.length > 0 && statusEl) {
     const lastTs   = Math.max(...withData.map(e => e.data.points[e.data.points.length - 1].ts));
+    const lastDate = new Date(lastTs * 1000).toISOString().slice(0, 10);
     const lastTime = new Date(lastTs * 1000).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' });
-    statusEl.textContent = `bijgewerkt ${lastTime}`;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    statusEl.textContent = lastDate !== todayStr ? `${staleDayLabel(lastDate)} ${lastTime}` : `bijgewerkt ${lastTime}`;
   }
 
   const fxData = state.intradayData[FX_SYMBOL];
@@ -144,9 +154,12 @@ export function renderIntradaySection() {
     const invPoints = fxData.points.map(p => ({ ...p, close: 1 / p.close }));
     const pct       = prevInv ? ((lastInv - prevInv) / prevInv * 100) : 0;
     const cls       = pct >= 0 ? 'c-pos' : 'c-neg';
-    return `<div class="intraday-card">
+    const todayStr  = new Date().toISOString().slice(0, 10);
+    const fxIsStale = fxData.date !== todayStr;
+    return `<div class="intraday-card" style="${fxIsStale ? 'opacity:0.5' : ''}">
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
         <span class="pos-dot" style="background:#94a3b8"></span>USD/EUR
+        ${fxIsStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(fxData.date)}</span>` : ''}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
       ${sparklineSVG(invPoints, prevInv, 24 * 60)}
@@ -180,7 +193,7 @@ export function renderIntradaySection() {
     return `<div class="intraday-card" style="${isStale ? 'opacity:0.5' : ''}">
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
         <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
-        ${isStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">gisteren</span>` : ''}
+        ${isStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(data.date)}</span>` : ''}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
       ${sparklineSVG(data.points, prev, getTradingMins(yahoo))}
