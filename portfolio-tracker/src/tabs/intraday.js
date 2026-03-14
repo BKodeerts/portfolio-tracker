@@ -45,7 +45,7 @@ export function sparklineSVG(points, prevClose, tradingMins) {
   const range = max - min || 0.1;
   const W = 200, H = 38;
   const firstTs   = points[0].ts;
-  const totalSecs = (tradingMins || 390) * 60;
+  const totalSecs = tradingMins ? tradingMins * 60 : points[points.length - 1].ts - firstTs;
   const xs = points.map(p => Math.min(W, Math.max(0, ((p.ts - firstTs) / totalSecs) * W)));
   const ys = pcts.map(v => (H - 3) - ((v - min) / range) * (H - 6));
   const polyPts  = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
@@ -162,7 +162,7 @@ export function renderIntradaySection() {
         ${fxIsStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(fxData.date)}</span>` : ''}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
-      ${sparklineSVG(invPoints, prevInv, 24 * 60)}
+      ${sparklineSVG(invPoints, prevInv, null)}
       <div class="metric-sub">${lastInv.toFixed(4)}</div>
     </div>`;
   })() : '';
