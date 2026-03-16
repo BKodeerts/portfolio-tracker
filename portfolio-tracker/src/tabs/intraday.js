@@ -79,9 +79,12 @@ export function computeTodayPL() {
   const latest = state.chartData[state.chartData.length - 1];
   if (!latest) return null;
 
-  // Current live FX rate (EUR/USD), and the rate at the previous close
+  // Current live FX rate (EUR/USD), and the rate at the previous close.
+  // Use the intraday endpoint's previousClose for EURUSD — it's the actual last
+  // trading day close, whereas state.latestFxRate comes from historical chart data
+  // and may be stale (causing artificial FX P&L).
   const currentFx = state.liveEurUsd || FX_FALLBACK;
-  const prevFx    = state.latestFxRate || currentFx;
+  const prevFx    = state.intradayData[FX_SYMBOL]?.previousClose || state.latestFxRate || currentFx;
 
   state.CURRENT_TICKERS.forEach(ticker => {
     const meta = state.TICKER_META[ticker];
