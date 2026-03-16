@@ -20,6 +20,8 @@ export const state = {
   currentPeriod: '3m',
   showClosed: false,
   chartInstances: {},
+  posSort: { col: 'value', dir: 'desc' },
+  lastLatest: {},
 
   privacyMode: localStorage.getItem('privacy') === '1',
   currentTheme: localStorage.getItem('theme') || 'default',

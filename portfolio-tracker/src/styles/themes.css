@@ -63,3 +63,24 @@ body.theme-dark .btn.success                           { border-color: rgba(74,2
 body.theme-dark .privacy-btn                           { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); color: #707070; }
 body.theme-dark .privacy-btn:hover                     { background: rgba(255,255,255,0.09); color: #aaa; }
 body.theme-dark .privacy-btn.on                        { color: #d8d8d8; border-color: rgba(255,255,255,0.2); }
+body.theme-dark .pos-table th:hover                    { color: #aaa; }
+body.theme-dark .pos-table th.sort-active              { color: #d8d8d8; }
+body.theme-dark .pos-table tbody tr:hover td           { background: rgba(255,255,255,0.03); }
+body.theme-dark .pos-modal-inner                       { background: rgba(28,28,28,0.98); border-color: rgba(255,255,255,0.08); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+body.theme-dark .pos-modal-close                       { color: #666; }
+body.theme-dark .pos-modal-close:hover                 { color: #aaa; background: rgba(255,255,255,0.06); }
+body.theme-dark .pos-modal-stat                        { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.07); }
+body.theme-dark .pos-modal-stat-label                  { color: #707070; }
+body.theme-dark .pos-modal-tx-table th                 { color: #707070; border-bottom-color: rgba(255,255,255,0.06); }
+body.theme-dark .pos-modal-tx-table td                 { border-bottom-color: rgba(255,255,255,0.03); }
+body.theme-dark .tx-search                             { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #d8d8d8; }
+body.theme-dark .tx-search:focus                       { border-color: rgba(255,255,255,0.25); }
+body.theme-dark .tx-table th                           { color: #707070; border-bottom-color: rgba(255,255,255,0.06); }
+body.theme-dark .tx-table td                           { border-bottom-color: rgba(255,255,255,0.03); }
+body.theme-dark .tx-table tbody tr:hover               { background: rgba(255,255,255,0.03); }
+body.theme-dark .tx-cell[contenteditable="true"]:hover { background: rgba(255,255,255,0.07); }
+body.theme-dark .tx-cell[contenteditable="true"]:focus { background: rgba(255,255,255,0.1); outline-color: rgba(255,255,255,0.2); }
+body.theme-dark .tx-ccy                               { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #d8d8d8; }
+body.theme-dark .tx-del-btn                            { color: #555; }
+body.theme-dark .tx-del-btn:hover                      { color: #f87171; background: rgba(248,113,113,0.1); }
+body.theme-dark .tx-save-bar                           { border-top-color: rgba(255,255,255,0.06); }

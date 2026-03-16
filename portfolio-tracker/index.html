@@ -9,6 +9,8 @@
 </head>
 <body>
   <div id="root"></div>
+  <!-- Position detail modal (static overlay, filled by showPosModal) -->
+  <div id="posModal" onclick="if(event.target===this)window._closePosModal()" onkeydown="if(event.key==='Escape')window._closePosModal()"></div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

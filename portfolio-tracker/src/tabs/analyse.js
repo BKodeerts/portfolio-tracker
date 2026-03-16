@@ -6,6 +6,97 @@ import { fmt, fmtPct, getColor, getFilteredData, destroyAllCharts, chartTheme } 
 import { renderAppHeader } from '../components/header.js';
 import { renderDonutChart } from '../components/donut.js';
 
+export function sortPos(col) {
+  if (state.posSort.col === col) state.posSort.dir = state.posSort.dir === 'desc' ? 'asc' : 'desc';
+  else { state.posSort.col = col; state.posSort.dir = 'desc'; }
+  renderPositionsTable(state.lastLatest);
+}
+
+export function closePosModal() {
+  const el = document.getElementById('posModal');
+  if (el) el.style.display = 'none';
+  if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
+}
+
+export function showPosModal(ticker) {
+  const meta  = state.TICKER_META[ticker] || {};
+  const color = getColor(ticker);
+  const txs   = state.RAW_TRANSACTIONS.filter(t => t.ticker === ticker).slice().sort((a, b) => b.date.localeCompare(a.date));
+  const latest = state.lastLatest;
+
+  const val  = latest[ticker] || 0;
+  const cost = latest[`${ticker}_cost`] || 0;
+  const pl   = val - cost;
+  const pct  = cost > 0 ? (pl / cost * 100) : 0;
+  const sh   = latest[`${ticker}_shares`] || 0;
+  const cls  = pl >= 0 ? 'c-pos' : 'c-neg';
+  const sign = pl >= 0 ? '+' : '';
+
+  const txRows = txs.map(t => {
+    const isSale = t.shares < 0;
+    const price  = Math.abs(t.costEur / t.shares);
+    return `<tr>
+      <td>${t.date}</td>
+      <td style="color:${isSale ? '#ef4444' : '#16a34a'}">${isSale ? 'Verkoop' : 'Koop'}</td>
+      <td>${Math.abs(t.shares).toLocaleString('nl-BE', { maximumFractionDigits: 4 })}</td>
+      <td>${fmt(Math.abs(t.costEur))}</td>
+      <td>€${price.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+
+  const modal = document.getElementById('posModal');
+  modal.innerHTML = `<div class="pos-modal-inner">
+    <div class="pos-modal-header">
+      <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color}"></span>
+      <span style="font-size:16px;font-weight:700">${ticker}</span>
+      <span style="font-size:13px;color:#888">${meta.label || ''}</span>
+      <button class="pos-modal-close" onclick="window._closePosModal()">✕</button>
+    </div>
+    <div class="pos-modal-stats">
+      <div class="pos-modal-stat"><div class="pos-modal-stat-label">Aandelen</div><div class="pos-modal-stat-val">${sh.toLocaleString('nl-BE', { maximumFractionDigits: 4 })}</div></div>
+      <div class="pos-modal-stat"><div class="pos-modal-stat-label">Geïnvesteerd</div><div class="pos-modal-stat-val privacy-val">${fmt(cost)}</div></div>
+      <div class="pos-modal-stat"><div class="pos-modal-stat-label">Huidig</div><div class="pos-modal-stat-val privacy-val">${fmt(val)}</div></div>
+      <div class="pos-modal-stat"><div class="pos-modal-stat-label">P&amp;L</div><div class="pos-modal-stat-val ${cls} privacy-val">${sign}${fmt(pl)} (${sign}${pct.toFixed(1)}%)</div></div>
+    </div>
+    <div class="pos-modal-chart-wrap"><canvas id="posModalChart"></canvas></div>
+    <table class="pos-modal-tx-table">
+      <thead><tr><th>Datum</th><th>Type</th><th>Aandelen</th><th>Kosten €</th><th>Prijs/stuk</th></tr></thead>
+      <tbody>${txRows}</tbody>
+    </table>
+  </div>`;
+
+  modal.style.display = 'block';
+
+  if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
+
+  const points = state.chartData.filter(row => row[ticker] != null).map(row => ({ x: row.date, y: row[ticker] }));
+  const ct = chartTheme();
+  state.chartInstances.__posModal = new Chart(document.getElementById('posModalChart').getContext('2d'), {
+    type: 'line',
+    data: { datasets: [{ data: points, borderColor: color, borderWidth: 2, fill: true, backgroundColor: color + '22', tension: 0.3, pointRadius: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
+          titleColor: ct.titleColor, bodyColor: ct.bodyColor,
+          titleFont: { family: "'DM Sans'", size: 11, weight: 700 }, bodyFont: { family: "'JetBrains Mono'", size: 11 },
+          padding: 10, cornerRadius: 8,
+          callbacks: {
+            title: items => new Date(items[0].parsed.x).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }),
+            label: item => ` ${fmt(item.raw.y)}`,
+          },
+        },
+      },
+      scales: {
+        x: { type: 'time', time: { unit: 'month' }, grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 } } },
+        y: { grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 }, callback: v => '€' + Math.round(v).toLocaleString('nl-BE') } },
+      },
+    },
+  });
+}
+
 export function renderBarChart(latest) {
   const tickers = [...state.CURRENT_TICKERS].sort((a, b) => (latest[b] || 0) - (latest[a] || 0));
   state.chartInstances.bar = new Chart(document.getElementById('chartBar').getContext('2d'), {
@@ -153,18 +244,39 @@ export function renderBenchmarkChart() {
 }
 
 export function renderPositionsTable(latest) {
-  const tickers = [...state.CURRENT_TICKERS].sort((a, b) => (latest[b] || 0) - (latest[a] || 0));
-  let totalCost = 0, totalVal = 0;
-  const rows = tickers.map(ticker => {
+  state.lastLatest = latest;
+
+  const rowData = [...state.CURRENT_TICKERS].map(ticker => {
     const val  = latest[ticker] || 0;
     const cost = latest[`${ticker}_cost`] || 0;
     const pl   = val - cost;
     const pct  = cost > 0 ? (pl / cost * 100) : 0;
     const sh   = latest[`${ticker}_shares`] || 0;
     const avg  = sh > 0 && cost > 0 ? cost / sh : 0;
+    return { ticker, val, cost, pl, pct, sh, avg };
+  });
+
+  rowData.sort((a, b) => {
+    let av, bv;
+    switch (state.posSort.col) {
+      case 'ticker':  av = a.ticker; bv = b.ticker; break;
+      case 'label':   av = state.TICKER_META[a.ticker]?.label || ''; bv = state.TICKER_META[b.ticker]?.label || ''; break;
+      case 'shares':  av = a.sh;   bv = b.sh;   break;
+      case 'avgcost': av = a.avg;  bv = b.avg;  break;
+      case 'cost':    av = a.cost; bv = b.cost; break;
+      case 'pl':      av = a.pl;   bv = b.pl;   break;
+      case 'pct':     av = a.pct;  bv = b.pct;  break;
+      default:        av = a.val;  bv = b.val;
+    }
+    if (typeof av === 'string') return state.posSort.dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    return state.posSort.dir === 'asc' ? av - bv : bv - av;
+  });
+
+  let totalCost = 0, totalVal = 0;
+  const rows = rowData.map(({ ticker, val, cost, pl, pct, sh, avg }) => {
     totalCost += cost; totalVal += val;
     const cls = pl >= 0 ? 'c-pos' : 'c-neg';
-    return `<tr>
+    return `<tr onclick="window._showPosModal('${ticker}')">
       <td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${getColor(ticker)};margin-right:7px"></span>${ticker}</td>
       <td>${state.TICKER_META[ticker]?.label || ''}</td>
       <td>${sh.toLocaleString('nl-BE')}</td>
@@ -180,11 +292,19 @@ export function renderPositionsTable(latest) {
   const totalPct = totalCost > 0 ? (totalPl / totalCost * 100) : 0;
   const tc = totalPl >= 0 ? 'c-pos' : 'c-neg';
 
+  const th = (col, label, align) => {
+    const active = state.posSort.col === col;
+    let arrow = '';
+    if (active) arrow = state.posSort.dir === 'asc' ? ' ▲' : ' ▼';
+    const styleAttr = align ? `style="text-align:${align}"` : '';
+    return `<th onclick="window._sortPos('${col}')" class="${active ? 'sort-active' : ''}" ${styleAttr}>${label}${arrow}</th>`;
+  };
+
   document.getElementById('positionsTableWrap').innerHTML = `
     <table class="pos-table">
       <thead><tr>
-        <th>Ticker</th><th>Naam</th><th>Aandelen</th><th>Gem. kostprijs</th>
-        <th>Geïnvesteerd</th><th>Huidig</th><th>P&amp;L €</th><th>P&amp;L %</th>
+        ${th('ticker','Ticker','left')}${th('label','Naam','left')}${th('shares','Aandelen')}${th('avgcost','Gem. kostprijs')}
+        ${th('cost','Geïnvesteerd')}${th('value','Huidig')}${th('pl','P&amp;L €')}${th('pct','P&amp;L %')}
       </tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr>

@@ -16,6 +16,7 @@ const PORT = process.env.PORT || 3069;
 app.use('/api', require('./routes/candles.js'));
 app.use('/api', require('./routes/transactions.js'));
 app.use('/api', require('./routes/cache-routes.js'));
+app.use('/api', require('./routes/ha.js'));
 
 // Serve built frontend
 const distDir = path.join(__dirname, '..', 'dist');
