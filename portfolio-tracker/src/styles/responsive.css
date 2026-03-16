@@ -15,9 +15,16 @@
   .desktop-only          { display: none !important; }
   .chart-controls-mobile { display: flex; gap: 6px; flex: 1; }
 
+  /* Tighter root padding on mobile */
+  #root { padding: 16px 12px 48px; }
+
   /* Positions table: scrollable + tighter padding */
   #positionsTableWrap       { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .pos-table                { font-size: 11px; }
   .pos-table th,
   .pos-table td             { padding: 8px 8px; }
+
+  /* Ensure charts stay within bounds */
+  .chart-card               { overflow: hidden; }
+  canvas                    { max-width: 100% !important; }
 }

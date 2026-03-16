@@ -314,7 +314,7 @@ export function renderAnalyse() {
 <div class="chart-card analyse-full">
         <div class="chart-header" style="margin-bottom:12px">
           <div class="card-title" style="margin-bottom:0">Rendement vs ${BENCHMARK_LBL}</div>
-          <div class="period-pills">
+          <div class="period-pills desktop-only">
             <button class="pill ${state.currentPeriod === '1m'    ? 'on' : ''}" onclick="window._setPeriodAnalyse('1m')">1M</button>
             <button class="pill ${state.currentPeriod === '3m'    ? 'on' : ''}" onclick="window._setPeriodAnalyse('3m')">3M</button>
             <button class="pill ${state.currentPeriod === '6m'    ? 'on' : ''}" onclick="window._setPeriodAnalyse('6m')">6M</button>
@@ -323,6 +323,18 @@ export function renderAnalyse() {
             <button class="pill ${state.currentPeriod === '2y'    ? 'on' : ''}" onclick="window._setPeriodAnalyse('2y')">2Y</button>
             <button class="pill ${state.currentPeriod === '3y'    ? 'on' : ''}" onclick="window._setPeriodAnalyse('3y')">3Y</button>
             <button class="pill ${state.currentPeriod === 'total' ? 'on' : ''}" onclick="window._setPeriodAnalyse('total')">Max</button>
+          </div>
+          <div class="chart-controls-mobile">
+            <select class="mobile-select" onchange="window._setPeriodAnalyse(this.value)">
+              <option value="1m"    ${state.currentPeriod === '1m'    ? 'selected' : ''}>1M</option>
+              <option value="3m"    ${state.currentPeriod === '3m'    ? 'selected' : ''}>3M</option>
+              <option value="6m"    ${state.currentPeriod === '6m'    ? 'selected' : ''}>6M</option>
+              <option value="ytd"   ${state.currentPeriod === 'ytd'   ? 'selected' : ''}>YTD</option>
+              <option value="1y"    ${state.currentPeriod === '1y'    ? 'selected' : ''}>1Y</option>
+              <option value="2y"    ${state.currentPeriod === '2y'    ? 'selected' : ''}>2Y</option>
+              <option value="3y"    ${state.currentPeriod === '3y'    ? 'selected' : ''}>3Y</option>
+              <option value="total" ${state.currentPeriod === 'total' ? 'selected' : ''}>Max</option>
+            </select>
           </div>
         </div>
         <div style="height:200px"><canvas id="chartBenchmark"></canvas></div>
