@@ -318,18 +318,25 @@ export function renderApp() {
   renderLegend(visibleTickers);
   renderMarketStatus();
   renderIntradaySection();
-  if (!state.intradayLoaded) loadIntradayData(false, () => {
-    if (state.currentPeriod === '1d' && state.currentTab === 'portefeuille') {
-      if (state.chartInstances.main) { state.chartInstances.main.destroy(); delete state.chartInstances.main; }
-      renderPortfolioChart(visibleTickers);
-      renderLegend(visibleTickers);
-      const r = computeTodayPL();
-      const el = document.getElementById('periodChange');
-      if (el && r) {
-        const cls  = r.pl >= 0 ? 'c-pos' : 'c-neg';
-        const sign = r.pl >= 0 ? '+' : '';
-        el.innerHTML = `<span class="${cls} privacy-val">${sign}${fmt(r.pl)}</span><span class="${cls}" style="opacity:0.7">${sign}${r.pct.toFixed(2)}%</span>`;
+  if (!state.intradayLoaded) {
+    loadIntradayData(false, () => {
+      if (state.currentPeriod === '1d' && state.currentTab === 'portefeuille') {
+        if (state.chartInstances.main) { state.chartInstances.main.destroy(); delete state.chartInstances.main; }
+        renderPortfolioChart(visibleTickers);
+        renderLegend(visibleTickers);
+        updatePeriodChange();
       }
-    }
-  });
+    });
+  } else if (state.currentPeriod === '1d') {
+    updatePeriodChange();
+  }
+}
+
+function updatePeriodChange() {
+  const r  = computeTodayPL();
+  const el = document.getElementById('periodChange');
+  if (!el || !r) return;
+  const cls  = r.pl >= 0 ? 'c-pos' : 'c-neg';
+  const sign = r.pl >= 0 ? '+' : '';
+  el.innerHTML = `<span class="${cls} privacy-val">${sign}${fmt(r.pl)}</span><span class="${cls}" style="opacity:0.7">${sign}${r.pct.toFixed(2)}%</span>`;
 }
