@@ -55,6 +55,7 @@ async function init() {
 
 function setTab(t) {
   state.currentTab = t;
+  if (t === 'analyse' && state.currentPeriod === '1d') state.currentPeriod = 'total';
   if      (t === 'portefeuille') renderApp();
   else if (t === 'analyse')      renderAnalyse();
   else if (t === 'transacties')  renderTransacties();
