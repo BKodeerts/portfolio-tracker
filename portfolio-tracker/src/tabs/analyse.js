@@ -129,36 +129,6 @@ export function renderBarChart(latest) {
   });
 }
 
-export function renderDrawdownChart() {
-  let peak = 0;
-  const series = state.chartData.map(row => {
-    if (row.total > peak) peak = row.total;
-    return { x: row.date, y: peak > 0 ? parseFloat(((row.total - peak) / peak * 100).toFixed(2)) : 0 };
-  });
-  state.chartInstances.drawdown = new Chart(document.getElementById('chartDrawdown').getContext('2d'), {
-    type: 'line',
-    data: { datasets: [{ data: series, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.12)', fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone' }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: chartTheme().tooltipBg, borderColor: chartTheme().tooltipBorder, borderWidth: 1,
-          bodyColor: chartTheme().bodyColor, bodyFont: { family: "'JetBrains Mono'", size: 11 }, padding: 12, cornerRadius: 10,
-          callbacks: {
-            title: items => new Date(items[0].parsed.x).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }),
-            label: item => ` Drawdown: ${item.raw.y.toFixed(1)}%`,
-          },
-        },
-      },
-      scales: {
-        x: { type: 'time', time: { unit: 'month' }, grid: { color: chartTheme().gridColor }, ticks: { color: chartTheme().tickColor, font: { size: 10 } } },
-        y: { suggestedMax: 0, grid: { color: chartTheme().gridColor }, ticks: { color: chartTheme().tickColor, font: { size: 10 }, callback: v => `${v}%` } },
-      },
-    },
-  });
-}
 
 export function renderBenchmarkChart() {
   const filtered = getFilteredData();
@@ -321,7 +291,6 @@ export function renderAnalyseCharts() {
   const latest = state.chartData[state.chartData.length - 1];
   renderDonutChart(latest, 'chartDonut');
   renderBarChart(latest);
-  renderDrawdownChart();
   renderBenchmarkChart();
   renderPositionsTable(latest);
 }
@@ -342,11 +311,7 @@ export function renderAnalyse() {
         <div class="card-title">Kostprijs vs Waarde</div>
         <div style="height:240px"><canvas id="chartBar"></canvas></div>
       </div>
-      <div class="chart-card analyse-full">
-        <div class="card-title">Drawdown vanaf piek (volledige looptijd)</div>
-        <div style="height:180px"><canvas id="chartDrawdown"></canvas></div>
-      </div>
-      <div class="chart-card analyse-full">
+<div class="chart-card analyse-full">
         <div class="chart-header" style="margin-bottom:12px">
           <div class="card-title" style="margin-bottom:0">Rendement vs ${BENCHMARK_LBL}</div>
           <div class="period-pills">

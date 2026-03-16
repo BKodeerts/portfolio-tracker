@@ -62,16 +62,17 @@ function setTab(t) {
   else if (t === 'import')       renderImport();
 }
 
-function setView(v)          { state.currentView = v; renderApp(); }
-function setPeriod(p)        { state.currentPeriod = p; renderApp(); }
+function renderAppKeepScroll() { const y = window.scrollY; renderApp(); window.scrollTo(0, y); }
+function setView(v)          { state.currentView = v; renderAppKeepScroll(); }
+function setPeriod(p)        { state.currentPeriod = p; renderAppKeepScroll(); }
 function setPeriodAnalyse(p) { state.currentPeriod = p; renderAnalyse(); }
-function toggleClosed()      { state.showClosed = !state.showClosed; renderApp(); }
+function toggleClosed()      { state.showClosed = !state.showClosed; renderAppKeepScroll(); }
 
 function toggleTheme() {
   state.currentTheme = state.currentTheme === 'dark' ? 'default' : 'dark';
   localStorage.setItem('theme', state.currentTheme);
   applyTheme();
-  if      (state.currentTab === 'portefeuille') renderApp();
+  if      (state.currentTab === 'portefeuille') renderAppKeepScroll();
   else if (state.currentTab === 'analyse')      renderAnalyse();
   else if (state.currentTab === 'transacties')  renderTransacties();
   else if (state.currentTab === 'import')       renderImport();

@@ -277,18 +277,18 @@ export function renderApp() {
 
     <div class="chart-card">
       <div class="chart-header">
-        <div class="seg">
+        <div class="seg desktop-only">
           <button class="seg-btn ${state.currentView === 'total'      ? 'on' : ''}" onclick="window._setView('total')">Totaal</button>
           <button class="seg-btn ${state.currentView === 'individual' ? 'on' : ''}" onclick="window._setView('individual')">Per positie</button>
           <button class="seg-btn ${state.currentView === 'pct'        ? 'on' : ''}" onclick="window._setView('pct')">Rendement %</button>
           <button class="seg-btn ${state.currentView === 'pl'         ? 'on' : ''}" onclick="window._setView('pl')">Winst €</button>
         </div>
         ${state.currentView !== 'total' ? `
-        <label class="closed-toggle" onclick="window._toggleClosed()" title="Gesloten posities tonen">
+        <label class="closed-toggle desktop-only" onclick="window._toggleClosed()" title="Gesloten posities tonen">
           <div class="toggle-track ${state.showClosed ? 'on' : ''}"></div>
           <span>Gesloten</span>
         </label>` : ''}
-        <div class="period-pills">
+        <div class="period-pills desktop-only">
           <button class="pill ${state.currentPeriod === '1d'    ? 'on' : ''}" onclick="window._setPeriod('1d')">1D</button>
           <button class="pill ${state.currentPeriod === '1m'    ? 'on' : ''}" onclick="window._setPeriod('1m')">1M</button>
           <button class="pill ${state.currentPeriod === '3m'    ? 'on' : ''}" onclick="window._setPeriod('3m')">3M</button>
@@ -298,6 +298,25 @@ export function renderApp() {
           <button class="pill ${state.currentPeriod === '2y'    ? 'on' : ''}" onclick="window._setPeriod('2y')">2Y</button>
           <button class="pill ${state.currentPeriod === '3y'    ? 'on' : ''}" onclick="window._setPeriod('3y')">3Y</button>
           <button class="pill ${state.currentPeriod === 'total' ? 'on' : ''}" onclick="window._setPeriod('total')">Max</button>
+        </div>
+        <div class="chart-controls-mobile">
+          <select class="mobile-select" onchange="window._setView(this.value)">
+            <option value="total"      ${state.currentView === 'total'      ? 'selected' : ''}>Totaal</option>
+            <option value="individual" ${state.currentView === 'individual' ? 'selected' : ''}>Per positie</option>
+            <option value="pct"        ${state.currentView === 'pct'        ? 'selected' : ''}>Rendement %</option>
+            <option value="pl"         ${state.currentView === 'pl'         ? 'selected' : ''}>Winst €</option>
+          </select>
+          <select class="mobile-select" onchange="window._setPeriod(this.value)">
+            <option value="1d"    ${state.currentPeriod === '1d'    ? 'selected' : ''}>1D</option>
+            <option value="1m"    ${state.currentPeriod === '1m'    ? 'selected' : ''}>1M</option>
+            <option value="3m"    ${state.currentPeriod === '3m'    ? 'selected' : ''}>3M</option>
+            <option value="6m"    ${state.currentPeriod === '6m'    ? 'selected' : ''}>6M</option>
+            <option value="ytd"   ${state.currentPeriod === 'ytd'   ? 'selected' : ''}>YTD</option>
+            <option value="1y"    ${state.currentPeriod === '1y'    ? 'selected' : ''}>1Y</option>
+            <option value="2y"    ${state.currentPeriod === '2y'    ? 'selected' : ''}>2Y</option>
+            <option value="3y"    ${state.currentPeriod === '3y'    ? 'selected' : ''}>3Y</option>
+            <option value="total" ${state.currentPeriod === 'total' ? 'selected' : ''}>Max</option>
+          </select>
         </div>
         ${hasPeriod ? `<div id="periodChange" style="font-family:'JetBrains Mono',monospace;font-size:12px;display:flex;gap:5px;align-items:center;white-space:nowrap">
           ${state.currentPeriod === '1d'

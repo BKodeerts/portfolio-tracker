@@ -49,6 +49,13 @@
 .pill:hover { color: #555; }
 .pill.on { background: rgba(0,0,0,0.08); color: #333; }
 
+/* Mobile chart dropdowns */
+.mobile-select {
+  flex: 1; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.1);
+  background: rgba(0,0,0,0.05); color: inherit; font-size: 12px; font-weight: 600;
+  font-family: inherit; cursor: pointer; appearance: none; text-align: center;
+}
+
 /* Closed toggle */
 .closed-toggle { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #888; cursor: pointer; user-select: none; }
 .toggle-track { width: 26px; height: 15px; border-radius: 8px; background: rgba(0,0,0,0.12); position: relative; transition: background 0.2s; }

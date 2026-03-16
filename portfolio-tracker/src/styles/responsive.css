@@ -1,3 +1,5 @@
+.chart-controls-mobile { display: none; }
+
 @media (max-width: 640px) {
   .metrics-grid  { grid-template-columns: 1fr 1fr; }
   .home-grid     { grid-template-columns: 1fr; }
@@ -9,6 +11,9 @@
   .intraday-grid { grid-template-columns: repeat(2, 1fr); }
   .app-nav       { width: 100%; flex: none; }
   .header-actions { margin-left: auto; }
+
+  .desktop-only          { display: none !important; }
+  .chart-controls-mobile { display: flex; gap: 6px; flex: 1; }
 
   /* Positions table: scrollable + tighter padding */
   #positionsTableWrap       { overflow-x: auto; -webkit-overflow-scrolling: touch; }
