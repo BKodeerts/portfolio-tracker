@@ -157,7 +157,8 @@ export function renderPortfolioChart(visibleTickers) {
     if (allVals.length > 0) {
       const dMin = Math.min(...allVals);
       const dMax = Math.max(...allVals);
-      const pad  = Math.max((dMax - dMin) * 0.2, Math.abs(dMax) * 0.002, 50);
+      const mid  = (Math.abs(dMin) + Math.abs(dMax)) / 2;
+      const pad  = Math.max((dMax - dMin) * 0.2, mid * 0.003);
       yBounds = { min: dMin - pad, max: dMax + pad };
     }
   }
