@@ -27,7 +27,7 @@ router.post('/ha/push', async (req, res) => {
     for (const p of positions) {
       const slug = p.ticker.toLowerCase().replace(/[^a-z0-9]/g, '_');
       await pushState(`sensor.portfolio_${slug}`, (p.value || 0).toFixed(2), {
-        unit_of_measurement: '€', friendly_name: `Portfolio ${p.label || p.ticker}`,
+        unit_of_measurement: '€', friendly_name: `Portfolio ${p.ticker}`,
         pl_eur: (p.pl || 0).toFixed(2), pl_pct: (p.plPct || 0).toFixed(2),
       });
     }
