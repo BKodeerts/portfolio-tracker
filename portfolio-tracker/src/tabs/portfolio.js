@@ -148,9 +148,11 @@ export function renderPortfolioChart(visibleTickers) {
     }
   }
 
-  // Tight y-axis bounds for intraday — fill: true would otherwise force the axis to include 0
+  // Tight y-axis bounds for intraday — only for non-stacked views, since stacking makes
+  // individual dataset max != visible chart max (fill: true also forces axis to include 0)
   let yBounds = {};
-  if (useIntraday) {
+  const stackedView = state.currentView === 'individual' || state.currentView === 'pl';
+  if (useIntraday && !stackedView) {
     const allVals = datasets.flatMap(ds => ds.data).filter(v => v != null && Number.isFinite(v));
     if (allVals.length > 0) {
       const dMin = Math.min(...allVals);
@@ -301,7 +303,7 @@ export function renderApp() {
             ? '<span class="c-neutral">—</span>'
             : `<span class="${prdClass} privacy-val">${periodProfit >= 0 ? '+' : ''}${fmt(periodProfit)}</span><span class="${prdClass}" style="opacity:0.7">${fmtPct(periodPct)}</span>`}
         </div>` : ''}
-        <button class="refresh-btn" onclick="window._clearCache()" title="Koersen verversen">↻</button>
+        <button class="refresh-btn" onclick="${state.currentPeriod === '1d' ? 'window._refreshIntraday()' : 'window._clearCache()'}" title="Koersen verversen">↻</button>
       </div>
       <div style="height:400px"><canvas id="mainChart"></canvas></div>
       <div class="legend" id="legend"></div>
