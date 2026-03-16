@@ -4,7 +4,7 @@ import { state } from '../state.js';
 import { FX_FALLBACK, FX_SYMBOL } from '../constants.js';
 import { fmt, fmtPct, getColor, getFilteredData, destroyAllCharts, chartTheme } from '../utils.js';
 import { renderAppHeader } from '../components/header.js';
-import { renderMarketStatus, renderIntradaySection, loadIntradayData } from './intraday.js';
+import { renderMarketStatus, renderIntradaySection, loadIntradayData, computeTodayPL } from './intraday.js';
 
 function buildIntradayChartData(visibleTickers) {
   const latest = state.chartData.at(-1);
@@ -74,18 +74,18 @@ export function renderPortfolioChart(visibleTickers) {
   if (useIntraday) {
     labels = intra.labels;
     const { tickerVals, timestamps } = intra;
-    const latest = state.chartData.at(-1);
 
     if (state.currentView === 'total') {
       const totals = timestamps.map((_, i) =>
         visibleTickers.reduce((sum, t) => sum + (tickerVals[t]?.values[i] || 0), 0));
+      const prevCloseTotal = visibleTickers.reduce((sum, t) => sum + (tickerVals[t]?.prevValueEur || 0), 0);
       datasets = [
         { label: 'Portefeuille', data: totals,
           borderColor: '#818cf8', backgroundColor: 'rgba(99,102,241,0.1)',
           fill: true, borderWidth: 2, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone' },
-        { label: 'Kostprijs', data: timestamps.map(() => latest?.totalCost || 0),
-          borderColor: chartTheme().costLine, backgroundColor: chartTheme().costFill,
-          fill: true, borderWidth: 1, borderDash: [4, 4], pointRadius: 0, tension: 0 },
+        { label: 'Vorige slotkoers', data: timestamps.map(() => prevCloseTotal),
+          borderColor: chartTheme().costLine, backgroundColor: 'transparent',
+          fill: false, borderWidth: 1, borderDash: [4, 4], pointRadius: 0, tension: 0 },
       ];
     } else if (state.currentView === 'individual') {
       datasets = [...visibleTickers].reverse().map(t => ({
@@ -148,6 +148,18 @@ export function renderPortfolioChart(visibleTickers) {
     }
   }
 
+  // Tight y-axis bounds for intraday — fill: true would otherwise force the axis to include 0
+  let yBounds = {};
+  if (useIntraday) {
+    const allVals = datasets.flatMap(ds => ds.data).filter(v => v != null && Number.isFinite(v));
+    if (allVals.length > 0) {
+      const dMin = Math.min(...allVals);
+      const dMax = Math.max(...allVals);
+      const pad  = Math.max((dMax - dMin) * 0.2, Math.abs(dMax) * 0.002, 50);
+      yBounds = { min: dMin - pad, max: dMax + pad };
+    }
+  }
+
   state.chartInstances.main = new Chart(ctx, {
     type: 'line', data: { labels, datasets },
     options: {
@@ -178,7 +190,7 @@ export function renderPortfolioChart(visibleTickers) {
         x: { type: 'time',
              time: { unit: useIntraday ? 'hour' : 'month', tooltipFormat: useIntraday ? 'HH:mm' : 'dd MMM yyyy' },
              grid: { color: chartTheme().gridColor }, ticks: { color: chartTheme().tickColor, font: { size: 10 } } },
-        y: { grid: { color: chartTheme().gridColor },
+        y: { beginAtZero: false, ...yBounds, grid: { color: chartTheme().gridColor },
              ticks: { color: chartTheme().tickColor, font: { size: 10 },
                callback: v => {
                  if (state.currentView === 'pct') return `${v}%`;
@@ -193,9 +205,11 @@ export function renderLegend(visibleTickers) {
   const el = document.getElementById('legend');
   if (!el) return;
   if (state.currentView === 'total') {
+    const useIntraday = state.currentPeriod === '1d' && state.intradayLoaded;
+    const refLabel    = useIntraday ? 'Vorige slotkoers' : 'Kostprijs';
     el.innerHTML = `
       <div class="legend-item"><div class="legend-line" style="background:#818cf8"></div>Portefeuille</div>
-      <div class="legend-item"><div class="legend-line" style="background:#334155;border-top:2px dashed #334155;height:0;width:16px;margin-top:1px"></div>Kostprijs</div>`;
+      <div class="legend-item"><div class="legend-line" style="background:#334155;border-top:2px dashed #334155;height:0;width:16px;margin-top:1px"></div>${refLabel}</div>`;
   } else {
     el.innerHTML = visibleTickers.map(t => `
       <div class="legend-item">
@@ -282,9 +296,10 @@ export function renderApp() {
           <button class="pill ${state.currentPeriod === '3y'    ? 'on' : ''}" onclick="window._setPeriod('3y')">3Y</button>
           <button class="pill ${state.currentPeriod === 'total' ? 'on' : ''}" onclick="window._setPeriod('total')">Max</button>
         </div>
-        ${hasPeriod ? `<div style="font-family:'JetBrains Mono',monospace;font-size:12px;display:flex;gap:5px;align-items:center;white-space:nowrap">
-          <span class="${prdClass} privacy-val">${periodProfit >= 0 ? '+' : ''}${fmt(periodProfit)}</span>
-          <span class="${prdClass}" style="opacity:0.7">${fmtPct(periodPct)}</span>
+        ${hasPeriod ? `<div id="periodChange" style="font-family:'JetBrains Mono',monospace;font-size:12px;display:flex;gap:5px;align-items:center;white-space:nowrap">
+          ${state.currentPeriod === '1d'
+            ? '<span class="c-neutral">—</span>'
+            : `<span class="${prdClass} privacy-val">${periodProfit >= 0 ? '+' : ''}${fmt(periodProfit)}</span><span class="${prdClass}" style="opacity:0.7">${fmtPct(periodPct)}</span>`}
         </div>` : ''}
         <button class="refresh-btn" onclick="window._clearCache()" title="Koersen verversen">↻</button>
       </div>
@@ -304,6 +319,14 @@ export function renderApp() {
     if (state.currentPeriod === '1d' && state.currentTab === 'portefeuille') {
       if (state.chartInstances.main) { state.chartInstances.main.destroy(); delete state.chartInstances.main; }
       renderPortfolioChart(visibleTickers);
+      renderLegend(visibleTickers);
+      const r = computeTodayPL();
+      const el = document.getElementById('periodChange');
+      if (el && r) {
+        const cls  = r.pl >= 0 ? 'c-pos' : 'c-neg';
+        const sign = r.pl >= 0 ? '+' : '';
+        el.innerHTML = `<span class="${cls} privacy-val">${sign}${fmt(r.pl)}</span><span class="${cls}" style="opacity:0.7">${sign}${r.pct.toFixed(2)}%</span>`;
+      }
     }
   });
 }
