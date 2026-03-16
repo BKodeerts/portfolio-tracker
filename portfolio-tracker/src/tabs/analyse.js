@@ -47,16 +47,16 @@ export function showPosModal(ticker) {
   const modal = document.getElementById('posModal');
   modal.innerHTML = `<div class="pos-modal-inner">
     <div class="pos-modal-header">
-      <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color}"></span>
-      <span style="font-size:16px;font-weight:700">${ticker}</span>
-      <span style="font-size:13px;color:#888">${meta.label || ''}</span>
+      <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></span>
+      <span style="font-size:16px;font-weight:700;flex-shrink:0">${ticker}</span>
+      <span class="pos-modal-header-label" style="font-size:13px;color:#888">${meta.label || ''}</span>
       <button class="pos-modal-close" onclick="window._closePosModal()">✕</button>
     </div>
     <div class="pos-modal-stats">
       <div class="pos-modal-stat"><div class="pos-modal-stat-label">Aandelen</div><div class="pos-modal-stat-val">${sh.toLocaleString('nl-BE', { maximumFractionDigits: 4 })}</div></div>
       <div class="pos-modal-stat"><div class="pos-modal-stat-label">Geïnvesteerd</div><div class="pos-modal-stat-val privacy-val">${fmt(cost)}</div></div>
       <div class="pos-modal-stat"><div class="pos-modal-stat-label">Huidig</div><div class="pos-modal-stat-val privacy-val">${fmt(val)}</div></div>
-      <div class="pos-modal-stat"><div class="pos-modal-stat-label">P&amp;L</div><div class="pos-modal-stat-val ${cls} privacy-val">${sign}${fmt(pl)} (${sign}${pct.toFixed(1)}%)</div></div>
+      <div class="pos-modal-stat"><div class="pos-modal-stat-label">P&amp;L</div><div class="pos-modal-stat-val ${cls} privacy-val">${sign}${fmt(pl)}</div><div class="pos-modal-stat-sub ${cls}">${sign}${pct.toFixed(1)}%</div></div>
     </div>
     <div class="pos-modal-chart-wrap"><canvas id="posModalChart"></canvas></div>
     <table class="pos-modal-tx-table">

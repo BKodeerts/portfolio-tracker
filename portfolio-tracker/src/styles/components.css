@@ -134,6 +134,7 @@
 .pos-modal-stat { background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; padding: 10px 12px; }
 .pos-modal-stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 4px; font-weight: 600; }
 .pos-modal-stat-val   { font-size: 13px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.pos-modal-stat-sub   { font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; margin-top: 2px; opacity: 0.8; }
 .pos-modal-chart-wrap { height: 180px; margin-bottom: 20px; }
 .pos-modal-tx-table   { width: 100%; border-collapse: collapse; font-size: 11px; }
 .pos-modal-tx-table th { color: #888; text-align: right; padding: 6px 10px; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid rgba(0,0,0,0.07); }
