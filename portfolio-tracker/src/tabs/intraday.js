@@ -81,8 +81,7 @@ export function computeTodayPL() {
 
   // Current live FX rate (EUR/USD), and the rate at the previous close
   const currentFx = state.liveEurUsd || FX_FALLBACK;
-  const prevDate  = state.sortedDates?.[state.sortedDates.length - 1];
-  const prevFx    = (prevDate && state.fxRateMap?.[prevDate]) || currentFx;
+  const prevFx    = state.latestFxRate || currentFx;
 
   state.CURRENT_TICKERS.forEach(ticker => {
     const meta = state.TICKER_META[ticker];

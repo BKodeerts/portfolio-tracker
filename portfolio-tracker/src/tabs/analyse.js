@@ -1,7 +1,7 @@
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import { state } from '../state.js';
-import { BENCHMARK_SYM, BENCHMARK_LBL } from '../constants.js';
+import { BENCHMARK_LBL } from '../constants.js';
 import { fmt, fmtPct, getColor, getFilteredData, destroyAllCharts, chartTheme } from '../utils.js';
 import { renderAppHeader } from '../components/header.js';
 import { renderDonutChart } from '../components/donut.js';
@@ -164,7 +164,8 @@ export function renderBenchmarkChart() {
   const filtered = getFilteredData();
   if (filtered.length < 2) return;
 
-  const startVwcePrice = state.priceMaps[BENCHMARK_SYM]?.[filtered[0].date];
+  const benchMap = Object.fromEntries(state.benchmarkData.map(b => [b.date, b.value]));
+  const startVwcePrice = benchMap[filtered[0].date];
   if (!startVwcePrice) return;
 
   // Group transactions by date to detect cash flows
@@ -187,7 +188,7 @@ export function renderBenchmarkChart() {
 
   for (let i = 1; i < filtered.length; i++) {
     const row = filtered[i];
-    const vwcePrice = state.priceMaps[BENCHMARK_SYM]?.[row.date];
+    const vwcePrice = benchMap[row.date];
     const txsToday  = txByDate[row.date];
 
     if (txsToday?.length) {

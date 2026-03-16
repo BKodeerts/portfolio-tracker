@@ -4,9 +4,7 @@ export const state = {
   CURRENT_TICKERS: [],
   COLORS: {},
 
-  fxRateMap: {},
-  priceMaps: {},
-  sortedDates: [],
+  latestFxRate: null,
   chartData: [],
   benchmarkData: [],
 

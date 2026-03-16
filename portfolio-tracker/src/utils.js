@@ -1,13 +1,8 @@
 import { state } from './state.js';
-import { FX_FALLBACK, COLOR_PALETTE, PRESET_COLORS } from './constants.js';
+import { COLOR_PALETTE, PRESET_COLORS } from './constants.js';
 
 export const fmt    = v => `€${Math.round(v).toLocaleString('nl-BE')}`;
 export const fmtPct = v => `${parseFloat(v) >= 0 ? '+' : ''}${parseFloat(v).toFixed(1)}%`;
-
-export function toEur(v, currency, date) {
-  if (currency !== 'USD') return v;
-  return v / (state.fxRateMap[date] || FX_FALLBACK);
-}
 
 export function getColor(ticker) {
   if (!state.COLORS[ticker]) {
