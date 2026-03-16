@@ -201,11 +201,18 @@ async function computePortfolio() {
 
 // ── Push ────────────────────────────────────────────────────────────────────
 
-function readMqttConfig() {
+async function readMqttConfig() {
+  const token = process.env.SUPERVISOR_TOKEN;
+  if (!token) return null;
   try {
-    const opts = JSON.parse(fs.readFileSync('/data/options.json', 'utf8'));
-    if (!opts.mqtt_host) return null;
-    return { host: opts.mqtt_host, port: opts.mqtt_port || 1883, user: opts.mqtt_user || '', pass: opts.mqtt_pass || '' };
+    const r = await fetch('http://supervisor/services/mqtt', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) return null;
+    const json = await r.json();
+    if (json.result !== 'ok' || !json.data?.host) return null;
+    const { host, port, username, password } = json.data;
+    return { host, port: port || 1883, user: username || '', pass: password || '' };
   } catch { return null; }
 }
 
@@ -294,20 +301,20 @@ async function runOnce(mqttCfg) {
   }
 }
 
-function start() {
+async function start() {
   if (!process.env.SUPERVISOR_TOKEN) {
     console.log('[Scheduler] No SUPERVISOR_TOKEN — HA push disabled');
     return;
   }
 
-  const mqttCfg     = readMqttConfig();
+  const mqttCfg     = await readMqttConfig();
   const intervalMin = Number.parseInt(process.env.HA_PUSH_INTERVAL, 10) || 15;
   const intervalMs  = intervalMin * 60 * 1000;
 
   if (mqttCfg) {
     console.log(`[Scheduler] MQTT mode — ${mqttCfg.host}:${mqttCfg.port}`);
   } else {
-    console.log('[Scheduler] REST mode (set mqtt_host in addon options to enable MQTT Discovery)');
+    console.log('[Scheduler] REST mode (no MQTT service available)');
   }
 
   setTimeout(() => runOnce(mqttCfg), 15_000);
