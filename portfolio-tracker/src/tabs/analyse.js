@@ -350,6 +350,7 @@ export function renderAnalyse() {
         <div class="chart-header" style="margin-bottom:12px">
           <div class="card-title" style="margin-bottom:0">Rendement vs ${BENCHMARK_LBL}</div>
           <div class="period-pills">
+            <button class="pill ${state.currentPeriod === '1d'    ? 'on' : ''}" onclick="window._setPeriodAnalyse('1d')">1D</button>
             <button class="pill ${state.currentPeriod === '1m'    ? 'on' : ''}" onclick="window._setPeriodAnalyse('1m')">1M</button>
             <button class="pill ${state.currentPeriod === '3m'    ? 'on' : ''}" onclick="window._setPeriodAnalyse('3m')">3M</button>
             <button class="pill ${state.currentPeriod === '6m'    ? 'on' : ''}" onclick="window._setPeriodAnalyse('6m')">6M</button>

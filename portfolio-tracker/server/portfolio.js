@@ -335,7 +335,21 @@ async function computeFullPortfolio() {
   const currentTickers = Object.keys(netShares).filter(t => netShares[t] > 0.0001);
   const latestFxRate   = fxMap[sortedDates.at(-1)] || FX_FALLBACK;
 
-  return { chartData, benchmarkData, meta, currentTickers, latestFxRate };
+  // Summary positions from the latest chartData row
+  const latest = chartData.at(-1);
+  const positions = latest
+    ? currentTickers.map(ticker => ({
+        ticker,
+        label:   meta[ticker].label,
+        value:   latest[ticker]              || 0,
+        cost:    latest[`${ticker}_cost`]    || 0,
+        pl:      (latest[ticker] || 0) - (latest[`${ticker}_cost`] || 0),
+        plPct:   parseFloat(latest[`${ticker}_pct`] || '0'),
+        shares:  latest[`${ticker}_shares`]  || 0,
+      }))
+    : [];
+
+  return { chartData, benchmarkData, meta, currentTickers, latestFxRate, positions };
 }
 
 // ── Scheduler / HA helpers ────────────────────────────────────────────────────
