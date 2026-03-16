@@ -1,8 +1,7 @@
 import { state } from '../state.js';
-import { getColor } from '../utils.js';
+import { getColor, destroyAllCharts } from '../utils.js';
 import { saveTransactions } from '../api.js';
 import { renderAppHeader } from '../components/header.js';
-import { destroyAllCharts } from '../utils.js';
 
 let txSearchVal = '';
 
@@ -31,9 +30,9 @@ function buildTxTable() {
     .map((t, i) => ({ ...t, _origIdx: i }))
     .sort((a, b) => b.date.localeCompare(a.date))
     .map(t => {
-      const hidden = q && !t.ticker.toLowerCase().includes(q) && !t.date.includes(q) && !(t.label || '').toLowerCase().includes(q);
+      const match = !q || t.ticker.toLowerCase().includes(q) || t.date.includes(q) || (t.label || '').toLowerCase().includes(q);
       const isSale = t.shares < 0;
-      return `<tr data-idx="${t._origIdx}"${hidden ? ' style="display:none"' : ''}>
+      return `<tr data-idx="${t._origIdx}"${match ? '' : ' style="display:none"'}>
         <td><span class="tx-cell" contenteditable="true" data-field="date">${t.date}</span></td>
         <td style="font-family:inherit;font-weight:600">
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${getColor(t.ticker)};margin-right:5px;vertical-align:middle"></span>${t.ticker}
@@ -45,7 +44,7 @@ function buildTxTable() {
         <td><span class="tx-cell" contenteditable="true" data-field="costEur">${t.costEur}</span></td>
         <td>
           <select class="tx-ccy" data-field="currency">
-            <option value="EUR"${t.currency !== 'USD' ? ' selected' : ''}>EUR</option>
+            <option value="EUR"${t.currency === 'USD' ? '' : ' selected'}>EUR</option>
             <option value="USD"${t.currency === 'USD' ? ' selected' : ''}>USD</option>
           </select>
         </td>
@@ -75,7 +74,8 @@ export async function deleteTx(origIdx) {
   try {
     const json = await saveTransactions('replace', newTxs);
     if (json.status !== 'ok') throw new Error(json.message);
-    window._init();
+    await globalThis._init();
+    globalThis._setTab('transacties');
   } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
 }
 
@@ -84,26 +84,27 @@ export async function saveTxAll() {
   const updated = state.RAW_TRANSACTIONS.map(t => ({ ...t }));
 
   for (const tr of rows) {
-    const idx = parseInt(tr.dataset.idx);
-    if (isNaN(idx) || !updated[idx]) continue;
-    const date    = tr.querySelector("[data-field='date']")?.innerText.trim();
+    const idx = Number.parseInt(tr.dataset.idx);
+    if (Number.isNaN(idx) || !updated[idx]) continue;
+    const date      = tr.querySelector("[data-field='date']")?.innerText.trim();
     const sharesRaw = tr.querySelector("[data-field='shares']")?.innerText.trim().replace(',', '.');
     const costRaw   = tr.querySelector("[data-field='costEur']")?.innerText.trim().replace(',', '.');
     const currency  = tr.querySelector("[data-field='currency']")?.value;
-    const shares  = parseFloat(sharesRaw);
-    const costEur = parseFloat(costRaw);
+    const shares    = Number.parseFloat(sharesRaw);
+    const costEur   = Number.parseFloat(costRaw);
     updated[idx] = {
       ...updated[idx],
-      ...(date    ? { date }    : {}),
-      ...(isNaN(shares)  ? {} : { shares }),
-      ...(isNaN(costEur) ? {} : { costEur }),
-      ...(currency ? { currency } : {}),
+      ...(date                   ? { date }    : {}),
+      ...(Number.isNaN(shares)   ? {} : { shares }),
+      ...(Number.isNaN(costEur)  ? {} : { costEur }),
+      ...(currency               ? { currency } : {}),
     };
   }
 
   try {
     const json = await saveTransactions('replace', updated);
     if (json.status !== 'ok') throw new Error(json.message);
-    window._init();
+    await globalThis._init();
+    globalThis._setTab('transacties');
   } catch (e) { alert('Opslaan mislukt: ' + e.message); }
 }

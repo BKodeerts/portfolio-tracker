@@ -38,3 +38,12 @@ export async function lookupIsin(isin, exchange) {
 export async function clearCacheApi() {
   return fetch(`${SERVER_BASE}/api/cache/clear`, { method: 'POST' });
 }
+
+export async function pushToHaApi(payload) {
+  const res = await fetch(`${SERVER_BASE}/api/ha/push`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}

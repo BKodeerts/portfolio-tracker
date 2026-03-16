@@ -6,11 +6,12 @@ import './styles/responsive.css';
 
 import { state } from './state.js';
 import { getColor, destroyAllCharts, getFilteredData } from './utils.js';
-import { fetchTransactions, clearCacheApi } from './api.js';
+import { fetchTransactions, clearCacheApi, pushToHaApi } from './api.js';
 import { buildTickerMeta, computeCurrentTickers, loadData } from './data.js';
 import { renderApp, renderPortfolioChart } from './tabs/portfolio.js';
-import { renderAnalyse, renderAnalyseCharts } from './tabs/analyse.js';
+import { renderAnalyse, renderAnalyseCharts, sortPos, showPosModal, closePosModal } from './tabs/analyse.js';
 import { renderImport, handleCSVFile, updateYahooGuess, saveImport } from './tabs/import.js';
+import { renderTransacties, filterTx, deleteTx, saveTxAll } from './tabs/transacties.js';
 import { loadIntradayData } from './tabs/intraday.js';
 import { renderDonutChart } from './components/donut.js';
 import { renderAppHeader } from './components/header.js';
@@ -44,7 +45,7 @@ async function init() {
     state.CURRENT_TICKERS = computeCurrentTickers();
     Object.keys(state.TICKER_META).forEach(t => getColor(t));
 
-    await loadData(() => renderApp());
+    await loadData(() => { renderApp(); pushToHA(); });
   } catch (e) {
     document.getElementById('root').innerHTML = `
       ${renderAppHeader()}
@@ -60,6 +61,7 @@ function setTab(t) {
   state.currentTab = t;
   if      (t === 'portefeuille') renderApp();
   else if (t === 'analyse')      renderAnalyse();
+  else if (t === 'transacties')  renderTransacties();
   else if (t === 'import')       renderImport();
 }
 
@@ -74,6 +76,7 @@ function toggleTheme() {
   applyTheme();
   if      (state.currentTab === 'portefeuille') renderApp();
   else if (state.currentTab === 'analyse')      renderAnalyse();
+  else if (state.currentTab === 'transacties')  renderTransacties();
   else if (state.currentTab === 'import')       renderImport();
 }
 
@@ -98,6 +101,35 @@ async function clearCache() {
   catch (e) { alert('Cache clear mislukt: ' + e.message); }
 }
 
+async function pushToHA() {
+  if (state.chartData.length === 0) return;
+  const btn = document.getElementById('haPushBtn');
+  if (btn) { btn.textContent = '…'; }
+
+  const latest = state.chartData.at(-1);
+  const prev   = state.chartData.length > 1 ? state.chartData.at(-2) : latest;
+  const daily_pl = (latest.total || 0) - (prev.total || 0);
+
+  const positions = state.CURRENT_TICKERS.map(ticker => ({
+    ticker,
+    label:  state.TICKER_META[ticker]?.label || ticker,
+    value:  latest[ticker] || 0,
+    pl:     (latest[ticker] || 0) - (latest[`${ticker}_cost`] || 0),
+    plPct:  (latest[`${ticker}_cost`] || 0) > 0
+      ? (((latest[ticker] || 0) - (latest[`${ticker}_cost`] || 0)) / (latest[`${ticker}_cost`] || 1) * 100)
+      : 0,
+  }));
+
+  try {
+    const json = await pushToHaApi({ total_value: latest.total || 0, daily_pl, positions });
+    if (!json.ok) throw new Error(json.error || 'push failed');
+    if (btn) { btn.textContent = '✓'; btn.style.color = '#16a34a'; setTimeout(() => { btn.textContent = 'HA'; btn.style.color = ''; }, 3000); }
+  } catch (e) {
+    console.warn('[HA push]', e.message);
+    if (btn) { btn.textContent = 'HA'; btn.style.color = ''; }
+  }
+}
+
 function refreshIntraday() { loadIntradayData(true); }
 
 // Expose all functions referenced by inline onclick= handlers
@@ -110,11 +142,18 @@ window._toggleClosed     = toggleClosed;
 window._toggleTheme      = toggleTheme;
 window._togglePrivacy    = togglePrivacy;
 window._clearCache       = clearCache;
+window._pushToHA         = pushToHA;
 window._refreshIntraday  = refreshIntraday;
 window._handleCSVFile    = handleCSVFile;
 window._updateYahooGuess = updateYahooGuess;
 window._saveImport       = saveImport;
 window._getColor         = getColor;
+window._sortPos          = sortPos;
+window._showPosModal     = showPosModal;
+window._closePosModal    = closePosModal;
+window._filterTx         = filterTx;
+window._deleteTx         = deleteTx;
+window._saveTxAll        = saveTxAll;
 
 // Boot
 document.body.classList.toggle('privacy', state.privacyMode);
