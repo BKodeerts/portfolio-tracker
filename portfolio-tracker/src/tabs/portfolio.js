@@ -4,7 +4,6 @@ import { state } from '../state.js';
 import { BENCHMARK_SYM } from '../constants.js';
 import { fmt, fmtPct, getColor, getFilteredData, destroyAllCharts, chartTheme } from '../utils.js';
 import { renderAppHeader } from '../components/header.js';
-import { renderDonutChart } from '../components/donut.js';
 import { renderMarketStatus, renderIntradaySection, loadIntradayData } from './intraday.js';
 
 export function renderPortfolioChart(visibleTickers) {
@@ -97,42 +96,6 @@ export function renderLegend(visibleTickers) {
   }
 }
 
-export function renderHomePositions(latest) {
-  const el = document.getElementById('homePositions');
-  if (!el) return;
-  const tickers = [...state.CURRENT_TICKERS].sort((a, b) => (latest[b] || 0) - (latest[a] || 0));
-  let totalVal = 0, totalCost = 0;
-
-  const rows = tickers.map(t => {
-    const val  = latest[t] || 0;
-    const cost = latest[`${t}_cost`] || 0;
-    const pct  = cost > 0 ? ((val - cost) / cost * 100) : 0;
-    totalVal += val; totalCost += cost;
-    const cls = pct >= 0 ? 'c-pos' : 'c-neg';
-    return `<div class="pos-row">
-      <div class="pos-row-ticker">
-        <div class="pos-dot" style="background:${getColor(t)}"></div>
-        <span>${t}</span>
-        <span style="color:#475569;font-size:10px;font-weight:400">${state.TICKER_META[t]?.label || ''}</span>
-      </div>
-      <div class="pos-row-val">${fmt(val)}</div>
-      <div class="pos-row-pct ${cls}">${fmtPct(pct)}</div>
-    </div>`;
-  }).join('');
-
-  const totalPl  = totalVal - totalCost;
-  const totalPct = totalCost > 0 ? (totalPl / totalCost * 100) : 0;
-  const tc = totalPl >= 0 ? 'c-pos' : 'c-neg';
-
-  el.innerHTML = `<div class="pos-list">
-    ${rows}
-    <div class="pos-row total-row">
-      <div class="pos-row-ticker">Totaal</div>
-      <div class="pos-row-val">${fmt(totalVal)}</div>
-      <div class="pos-row-pct ${tc}">${fmtPct(totalPct)}</div>
-    </div>
-  </div>`;
-}
 
 export function renderApp() {
   destroyAllCharts();
@@ -219,25 +182,12 @@ export function renderApp() {
       <div class="legend" id="legend"></div>
     </div>
 
-    <div class="home-grid">
-      <div class="chart-card">
-        <div class="card-title">Allocatie</div>
-        <div style="height:200px"><canvas id="homeDonut"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="card-title">Huidige posities</div>
-        <div id="homePositions"></div>
-      </div>
-    </div>
-
     <div class="footer">
       Actief: ${state.CURRENT_TICKERS.join(', ')} · Geen financieel advies · Zelf gehosted
     </div>`;
 
   renderPortfolioChart(visibleTickers);
   renderLegend(visibleTickers);
-  renderDonutChart(latest, 'homeDonut');
-  renderHomePositions(latest);
   renderMarketStatus();
   renderIntradaySection();
   if (!state.intradayLoaded) loadIntradayData();

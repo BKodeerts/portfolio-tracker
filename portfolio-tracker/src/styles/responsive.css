@@ -3,7 +3,16 @@
   .home-grid     { grid-template-columns: 1fr; }
   .analyse-grid  { grid-template-columns: 1fr; }
   .analyse-full  { grid-column: 1; }
-  .chart-header  { gap: 8px; }
+  .chart-header  { gap: 8px; flex-wrap: wrap; }
+  .period-pills  { flex-wrap: wrap; margin-left: 0; }
   .metric-value  { font-size: 16px; }
   .intraday-grid { grid-template-columns: repeat(2, 1fr); }
+  .app-nav       { width: 100%; flex: none; }
+  .header-actions { margin-left: auto; }
+
+  /* Positions table: scrollable + tighter padding */
+  #positionsTableWrap       { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .pos-table                { font-size: 11px; }
+  .pos-table th,
+  .pos-table td             { padding: 8px 8px; }
 }

@@ -15,17 +15,24 @@ export function getTradingMins(yahooSymbol) {
   return /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i.test(yahooSymbol || '') ? 510 : 390;
 }
 
+function isOpen(tz, openH, openM, closeH, closeM) {
+  const now   = new Date();
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, weekday: 'short', hour: 'numeric', minute: 'numeric', hour12: false,
+  }).formatToParts(now);
+  const get = t => parts.find(p => p.type === t)?.value;
+  if (['Sat', 'Sun'].includes(get('weekday'))) return false;
+  const cur = (Number.parseInt(get('hour')) % 24) * 60 + Number.parseInt(get('minute'));
+  return cur >= openH * 60 + openM && cur < closeH * 60 + closeM;
+}
+
+export function isExchangeOpen(yahooSymbol) {
+  return /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i.test(yahooSymbol || '')
+    ? isOpen('Europe/Amsterdam', 9, 0, 17, 30)
+    : isOpen('America/New_York', 9, 30, 16, 0);
+}
+
 export function getMarketStatus() {
-  const now = new Date();
-  function isOpen(tz, openH, openM, closeH, closeM) {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz, weekday: 'short', hour: 'numeric', minute: 'numeric', hour12: false,
-    }).formatToParts(now);
-    const get = t => parts.find(p => p.type === t)?.value;
-    if (['Sat', 'Sun'].includes(get('weekday'))) return false;
-    const cur = (parseInt(get('hour')) % 24) * 60 + parseInt(get('minute'));
-    return cur >= openH * 60 + openM && cur < closeH * 60 + closeM;
-  }
   const badge = (label, open) =>
     `<span class="market-badge"><span class="dot" style="background:${open ? '#4ade80' : '#334155'}"></span>${label}</span>`;
   return badge('NYSE', isOpen('America/New_York', 9, 30, 16, 0)) +
@@ -183,8 +190,12 @@ export function renderIntradaySection() {
     const last    = data.points[data.points.length - 1];
     const pct     = prev ? ((last.close - prev) / prev * 100) : 0;
     const cls     = pct >= 0 ? 'c-pos' : 'c-neg';
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const isStale  = data.date !== todayStr;
+    const todayStr  = new Date().toISOString().slice(0, 10);
+    const isStale   = data.date !== todayStr;
+    const isClosed  = !isStale && !isExchangeOpen(yahoo);
+    let statusLabel = '';
+    if (isStale)       statusLabel = `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(data.date)}</span>`;
+    else if (isClosed) statusLabel = `<span style="font-size:9px;color:#64748b;font-family:'JetBrains Mono',monospace;margin-left:auto">gesloten</span>`;
     // Show price in the stock's native currency (from TICKER_META), converting if Yahoo returns a different currency
     const nativeCcy    = meta?.currency || data.currency || '';
     const displayPrice = (nativeCcy === 'USD' && data.currency === 'EUR')
@@ -193,7 +204,7 @@ export function renderIntradaySection() {
     return `<div class="intraday-card" style="${isStale ? 'opacity:0.5' : ''}">
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
         <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
-        ${isStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(data.date)}</span>` : ''}
+        ${statusLabel}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
       ${sparklineSVG(data.points, prev, getTradingMins(yahoo))}

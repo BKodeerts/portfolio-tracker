@@ -1,6 +1,6 @@
 name: "Portfolio Tracker"
 description: "Self-hosted stock portfolio tracker with Yahoo Finance data"
-version: "0.2.0-beta.06"
+version: "0.2.1"
 slug: "portfolio_tracker"
 init: false
 arch:
@@ -19,7 +19,5 @@ ports_description:
   3069/tcp: "Portfolio Tracker Web UI"
 map:
   - data:rw
-services:
-  - mqtt:want
 options: {}
 schema: {}

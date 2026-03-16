@@ -199,52 +199,7 @@ async function computePortfolio() {
   return buildResult(currentTickers, { meta, prices, priceMaps, yahooSymbols, netShares, buyInvested, fxRate });
 }
 
-// ── Push ────────────────────────────────────────────────────────────────────
-
-async function readMqttConfig() {
-  const token = process.env.SUPERVISOR_TOKEN;
-  if (!token) return null;
-  try {
-    const r = await fetch('http://supervisor/services/mqtt', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!r.ok) return null;
-    const json = await r.json();
-    if (json.result !== 'ok' || !json.data?.host) return null;
-    const { host, port, username, password } = json.data;
-    return { host, port: port || 1883, user: username || '', pass: password || '' };
-  } catch { return null; }
-}
-
-let _mqttClient = null;
-
-async function getMqttClient(cfg) {
-  if (_mqttClient?.connected) return _mqttClient;
-  try {
-    const haMqtt = require('./ha-mqtt.js');
-    _mqttClient = await haMqtt.connect(cfg.host, cfg.port, cfg.user, cfg.pass);
-    return _mqttClient;
-  } catch (e) {
-    console.warn('[Scheduler] MQTT connect failed:', e.message, '— falling back to REST');
-    _mqttClient = null;
-    return null;
-  }
-}
-
-async function pushViaMqtt(portfolio, mqttCfg) {
-  const client = await getMqttClient(mqttCfg);
-  if (!client) return false;
-  const haMqtt = require('./ha-mqtt.js');
-  const { totalValue, totalCost, dailyPl, positions } = portfolio;
-  const totalPl    = totalValue - totalCost;
-  const totalPlPct = totalCost > 0 ? (totalPl / totalCost * 100) : 0;
-  haMqtt.registerDiscovery(client, positions);
-  haMqtt.publishAll(client, { totalValue, totalCost, totalPl, totalPlPct, dailyPl, positions });
-  console.log(`[Scheduler] MQTT push OK — ${positions.length} positions, total €${totalValue.toFixed(0)}, daily €${dailyPl.toFixed(0)}`);
-  return true;
-}
-
-async function pushViaRest(portfolio) {
+async function pushToHA(portfolio) {
   const token = process.env.SUPERVISOR_TOKEN;
   if (!token) return;
 
@@ -284,41 +239,30 @@ async function pushViaRest(portfolio) {
     });
   }
 
-  console.log(`[Scheduler] REST push OK — ${positions.length} positions, total €${totalValue.toFixed(0)}, daily €${dailyPl.toFixed(0)}`);
+  console.log(`[Scheduler] HA push OK — ${positions.length} positions, total €${totalValue.toFixed(0)}, daily €${dailyPl.toFixed(0)}`);
 }
 
-async function runOnce(mqttCfg) {
+async function runOnce() {
   try {
     const portfolio = await computePortfolio();
     if (!portfolio) return;
-    if (mqttCfg) {
-      const ok = await pushViaMqtt(portfolio, mqttCfg);
-      if (ok) return;
-    }
-    await pushViaRest(portfolio);
+    await pushToHA(portfolio);
   } catch (e) {
     console.warn('[Scheduler] run failed:', e.message);
   }
 }
 
-async function start() {
+function start() {
   if (!process.env.SUPERVISOR_TOKEN) {
     console.log('[Scheduler] No SUPERVISOR_TOKEN — HA push disabled');
     return;
   }
 
-  const mqttCfg     = await readMqttConfig();
   const intervalMin = Number.parseInt(process.env.HA_PUSH_INTERVAL, 10) || 15;
   const intervalMs  = intervalMin * 60 * 1000;
 
-  if (mqttCfg) {
-    console.log(`[Scheduler] MQTT mode — ${mqttCfg.host}:${mqttCfg.port}`);
-  } else {
-    console.log('[Scheduler] REST mode (no MQTT service available)');
-  }
-
-  setTimeout(() => runOnce(mqttCfg), 15_000);
-  setInterval(() => runOnce(mqttCfg), intervalMs);
+  setTimeout(runOnce, 15_000);
+  setInterval(runOnce, intervalMs);
 
   console.log(`[Scheduler] HA sensor push every ${intervalMin} min`);
 }

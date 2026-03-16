@@ -5,7 +5,7 @@ import './styles/themes.css';
 import './styles/responsive.css';
 
 import { state } from './state.js';
-import { getColor, destroyAllCharts, getFilteredData } from './utils.js';
+import { getColor, destroyAllCharts } from './utils.js';
 import { fetchTransactions, clearCacheApi, pushToHaApi } from './api.js';
 import { buildTickerMeta, computeCurrentTickers, loadData } from './data.js';
 import { renderApp, renderPortfolioChart } from './tabs/portfolio.js';
@@ -89,7 +89,6 @@ function togglePrivacy() {
     destroyAllCharts();
     const visible = state.showClosed ? Object.keys(state.TICKER_META) : state.CURRENT_TICKERS;
     renderPortfolioChart(visible);
-    renderDonutChart(getFilteredData().at(-1), 'homeDonut');
   } else if (state.currentTab === 'analyse') {
     destroyAllCharts();
     renderAnalyseCharts();

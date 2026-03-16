@@ -9,8 +9,10 @@ export function renderAppHeader() {
       <button class="nav-btn ${tab === 'transacties'   ? 'active' : ''}" onclick="window._setTab('transacties')">Transacties</button>
       <button class="nav-btn ${tab === 'import'        ? 'active' : ''}" onclick="window._setTab('import')">Import</button>
     </nav>
-    <button class="privacy-btn ${state.currentTheme === 'dark' ? 'on' : ''}" onclick="window._toggleTheme()" title="Thema wisselen" style="margin-left:auto">◑</button>
-    <button class="privacy-btn" id="haPushBtn" onclick="window._pushToHA()" title="Stuur naar Home Assistant" style="font-size:11px;letter-spacing:0">HA</button>
-    <button class="privacy-btn ${state.privacyMode ? 'on' : ''}" onclick="window._togglePrivacy()" title="Privacy mode">👁</button>
+    <div class="header-actions">
+      <button class="privacy-btn ${state.currentTheme === 'dark' ? 'on' : ''}" onclick="window._toggleTheme()" title="Thema wisselen">◑</button>
+      <button class="privacy-btn" id="haPushBtn" onclick="window._pushToHA()" title="Stuur naar Home Assistant" style="font-size:11px;letter-spacing:0">HA</button>
+      <button class="privacy-btn ${state.privacyMode ? 'on' : ''}" onclick="window._togglePrivacy()" title="Privacy mode">👁</button>
+    </div>
   </header>`;
 }
