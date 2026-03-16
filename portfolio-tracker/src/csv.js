@@ -99,7 +99,7 @@ export function parseBoleroXLSX(arrayBuffer) {
   const ws   = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-  // Row 2, col 3 contains the print date as an Excel serial number
+  // Sheet starts at row 2; rows[2] = file row 4 (Geprint op), col D (index 3) = serial
   const serial    = rows[2]?.[3];
   const printDate = serial
     ? new Date(Math.round((serial - 25569) * 86400000)).toISOString().slice(0, 10)
@@ -108,8 +108,9 @@ export function parseBoleroXLSX(arrayBuffer) {
   const result = [];
   for (let i = 9; i < rows.length; i++) {
     const r    = rows[i];
+    if (!r) continue;
     const type = r[1];
-    if (!type || type === '') break;
+    if (!type || type === '') continue;
     if (type !== 'Aandelen') continue;
 
     const currency           = String(r[3] || 'EUR').trim();

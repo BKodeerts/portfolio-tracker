@@ -183,7 +183,8 @@ export async function loadData(onSuccess) {
       if (qJson.status === 'ok' && qJson.data) {
         const quotes = qJson.data;
         if (quotes[FX_SYMBOL]?.close) state.fxRateMap[quotes[FX_SYMBOL].date] = quotes[FX_SYMBOL].close;
-        const todayDate = quotes[Object.keys(quotes).find(k => quotes[k]?.date)]?.date;
+        const dow = new Date().getDay();
+        const todayDate = (dow > 0 && dow < 6) ? new Date().toLocaleDateString('sv-SE') : '';
         if (todayDate && todayDate > (state.chartData[state.chartData.length - 1]?.date || '')) {
           const row = { date: todayDate };
           let tv = 0, tc = 0;
