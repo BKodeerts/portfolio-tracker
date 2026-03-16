@@ -109,7 +109,15 @@ async function pushToHA() {
   }
 }
 
-function refreshIntraday() { loadIntradayData(true); }
+function refreshIntraday() {
+  loadIntradayData(true, () => {
+    if (state.currentPeriod === '1d' && state.currentTab === 'portefeuille') {
+      destroyAllCharts();
+      const visible = state.showClosed ? Object.keys(state.TICKER_META) : state.CURRENT_TICKERS;
+      renderPortfolioChart(visible);
+    }
+  });
+}
 
 // Expose all functions referenced by inline onclick= handlers
 window._init             = init;

@@ -214,7 +214,7 @@ export function renderIntradaySection() {
   renderTodayMetric();
 }
 
-export async function loadIntradayData(force = false) {
+export async function loadIntradayData(force = false, onDone = null) {
   const yahooSymbols = [...new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META[t]?.yahoo).filter(Boolean))];
   if (yahooSymbols.length === 0) return;
   const statusEl = document.getElementById('intradayStatus');
@@ -234,4 +234,5 @@ export async function loadIntradayData(force = false) {
   }
   state.intradayLoaded = true;
   renderIntradaySection();
+  onDone?.();
 }

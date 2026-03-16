@@ -300,5 +300,10 @@ export function renderApp() {
   renderLegend(visibleTickers);
   renderMarketStatus();
   renderIntradaySection();
-  if (!state.intradayLoaded) loadIntradayData();
+  if (!state.intradayLoaded) loadIntradayData(false, () => {
+    if (state.currentPeriod === '1d' && state.currentTab === 'portefeuille') {
+      if (state.chartInstances.main) { state.chartInstances.main.destroy(); delete state.chartInstances.main; }
+      renderPortfolioChart(visibleTickers);
+    }
+  });
 }
