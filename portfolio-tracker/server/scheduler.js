@@ -116,7 +116,29 @@ function computeNetShares(meta, transactions, adjShares) {
   return { netShares, buyInvested };
 }
 
-function buildResult(currentTickers, meta, prices, netShares, buyInvested, fxRate) {
+function getPrevTradingDate(priceMaps, yahooSymbols) {
+  const today = new Date().toISOString().slice(0, 10);
+  let latest = null;
+  for (const sym of yahooSymbols) {
+    for (const d of Object.keys(priceMaps[sym] || {})) {
+      if (d < today && (!latest || d > latest)) latest = d;
+    }
+  }
+  return latest;
+}
+
+function valueAtDate(currentTickers, meta, priceMaps, netShares, fxRate, date) {
+  let total = 0;
+  for (const ticker of currentTickers) {
+    const m = meta[ticker];
+    const price = priceMaps[m.yahoo]?.[date];
+    if (!price) continue;
+    total += m.currency === 'USD' ? netShares[ticker] * price / fxRate : netShares[ticker] * price;
+  }
+  return total;
+}
+
+function buildResult(currentTickers, { meta, prices, priceMaps, yahooSymbols, netShares, buyInvested, fxRate }) {
   let totalValue = 0, totalCost = 0;
   const positions = [];
   for (const ticker of currentTickers) {
@@ -134,7 +156,13 @@ function buildResult(currentTickers, meta, prices, netShares, buyInvested, fxRat
       plPct: cost > 0 ? ((value - cost) / cost * 100) : 0,
     });
   }
-  return positions.length ? { totalValue, totalCost, positions } : null;
+  if (!positions.length) return null;
+
+  const prevDate = getPrevTradingDate(priceMaps, yahooSymbols);
+  const prevValue = prevDate ? valueAtDate(currentTickers, meta, priceMaps, netShares, fxRate, prevDate) : totalValue;
+  const dailyPl = totalValue - prevValue;
+
+  return { totalValue, totalCost, dailyPl, positions };
 }
 
 async function computePortfolio() {
@@ -168,14 +196,52 @@ async function computePortfolio() {
     catch (e) { console.warn(`[Scheduler] price failed ${sym}:`, e.message); }
   }
 
-  return buildResult(currentTickers, meta, prices, netShares, buyInvested, fxRate);
+  return buildResult(currentTickers, { meta, prices, priceMaps, yahooSymbols, netShares, buyInvested, fxRate });
 }
 
-async function pushToHA(portfolio) {
+// ── Push ────────────────────────────────────────────────────────────────────
+
+function readMqttConfig() {
+  try {
+    const opts = JSON.parse(fs.readFileSync('/data/options.json', 'utf8'));
+    if (!opts.mqtt_host) return null;
+    return { host: opts.mqtt_host, port: opts.mqtt_port || 1883, user: opts.mqtt_user || '', pass: opts.mqtt_pass || '' };
+  } catch { return null; }
+}
+
+let _mqttClient = null;
+
+async function getMqttClient(cfg) {
+  if (_mqttClient?.connected) return _mqttClient;
+  try {
+    const haMqtt = require('./ha-mqtt.js');
+    _mqttClient = await haMqtt.connect(cfg.host, cfg.port, cfg.user, cfg.pass);
+    return _mqttClient;
+  } catch (e) {
+    console.warn('[Scheduler] MQTT connect failed:', e.message, '— falling back to REST');
+    _mqttClient = null;
+    return null;
+  }
+}
+
+async function pushViaMqtt(portfolio, mqttCfg) {
+  const client = await getMqttClient(mqttCfg);
+  if (!client) return false;
+  const haMqtt = require('./ha-mqtt.js');
+  const { totalValue, totalCost, dailyPl, positions } = portfolio;
+  const totalPl    = totalValue - totalCost;
+  const totalPlPct = totalCost > 0 ? (totalPl / totalCost * 100) : 0;
+  haMqtt.registerDiscovery(client, positions);
+  haMqtt.publishAll(client, { totalValue, totalCost, totalPl, totalPlPct, dailyPl, positions });
+  console.log(`[Scheduler] MQTT push OK — ${positions.length} positions, total €${totalValue.toFixed(0)}, daily €${dailyPl.toFixed(0)}`);
+  return true;
+}
+
+async function pushViaRest(portfolio) {
   const token = process.env.SUPERVISOR_TOKEN;
   if (!token) return;
 
-  const { totalValue, totalCost, positions } = portfolio;
+  const { totalValue, totalCost, dailyPl, positions } = portfolio;
   const base    = 'http://supervisor/core/api/states';
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
@@ -197,8 +263,10 @@ async function pushToHA(portfolio) {
     unit_of_measurement: '€', friendly_name: 'Portfolio Geïnvesteerd',
   });
   await pushState('sensor.portfolio_pl', totalPl.toFixed(2), {
-    unit_of_measurement: '€', friendly_name: 'Portfolio P&L',
-    pl_pct: totalPlPct.toFixed(2),
+    unit_of_measurement: '€', friendly_name: 'Portfolio P&L', pl_pct: totalPlPct.toFixed(2),
+  });
+  await pushState('sensor.portfolio_daily_pl', dailyPl.toFixed(2), {
+    unit_of_measurement: '€', friendly_name: 'Portfolio Dagresultaat',
   });
 
   for (const p of positions) {
@@ -209,14 +277,18 @@ async function pushToHA(portfolio) {
     });
   }
 
-  console.log(`[Scheduler] HA push OK — ${positions.length} positions, total €${totalValue.toFixed(0)}`);
+  console.log(`[Scheduler] REST push OK — ${positions.length} positions, total €${totalValue.toFixed(0)}, daily €${dailyPl.toFixed(0)}`);
 }
 
-async function runOnce() {
+async function runOnce(mqttCfg) {
   try {
     const portfolio = await computePortfolio();
     if (!portfolio) return;
-    await pushToHA(portfolio);
+    if (mqttCfg) {
+      const ok = await pushViaMqtt(portfolio, mqttCfg);
+      if (ok) return;
+    }
+    await pushViaRest(portfolio);
   } catch (e) {
     console.warn('[Scheduler] run failed:', e.message);
   }
@@ -228,11 +300,18 @@ function start() {
     return;
   }
 
+  const mqttCfg     = readMqttConfig();
   const intervalMin = Number.parseInt(process.env.HA_PUSH_INTERVAL, 10) || 15;
   const intervalMs  = intervalMin * 60 * 1000;
 
-  setTimeout(runOnce, 15_000);
-  setInterval(runOnce, intervalMs);
+  if (mqttCfg) {
+    console.log(`[Scheduler] MQTT mode — ${mqttCfg.host}:${mqttCfg.port}`);
+  } else {
+    console.log('[Scheduler] REST mode (set mqtt_host in addon options to enable MQTT Discovery)');
+  }
+
+  setTimeout(() => runOnce(mqttCfg), 15_000);
+  setInterval(() => runOnce(mqttCfg), intervalMs);
 
   console.log(`[Scheduler] HA sensor push every ${intervalMin} min`);
 }
