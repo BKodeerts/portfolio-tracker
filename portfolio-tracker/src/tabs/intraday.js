@@ -60,7 +60,7 @@ export function sparklineSVG(points, prevClose, tradingMins) {
       <stop offset="0%" stop-color="${clr}" stop-opacity="0.2"/>
       <stop offset="100%" stop-color="${clr}" stop-opacity="0.02"/>
     </linearGradient></defs>
-    <line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    <line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="rgba(128,128,128,0.2)" stroke-width="1"/>
     <path d="${fillPath}" fill="url(#${uid})"/>
     <polyline points="${polyPts}" fill="none" stroke="${clr}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
