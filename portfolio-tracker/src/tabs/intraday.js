@@ -162,7 +162,7 @@ export function renderIntradaySection() {
         ${fxIsStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(fxData.date)}</span>` : ''}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
-      ${sparklineSVG(invPoints, prevInv, null)}
+      ${sparklineSVG(invPoints, prevInv, 1440)}
       <div class="metric-sub">${lastInv.toFixed(4)}</div>
     </div>`;
   })() : '';
