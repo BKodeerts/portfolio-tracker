@@ -65,7 +65,7 @@ function setTab(t) {
 function renderAppKeepScroll() { const y = window.scrollY; renderApp(); window.scrollTo(0, y); }
 function setView(v)          { state.currentView = v; renderAppKeepScroll(); }
 function setPeriod(p)        { state.currentPeriod = p; renderAppKeepScroll(); }
-function setPeriodAnalyse(p) { state.currentPeriod = p; renderAnalyse(); }
+function setPeriodAnalyse(p) { const y = window.scrollY; state.currentPeriod = p; renderAnalyse(); window.scrollTo(0, y); }
 function toggleClosed()      { state.showClosed = !state.showClosed; renderAppKeepScroll(); }
 
 function toggleTheme() {
