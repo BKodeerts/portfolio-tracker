@@ -49,7 +49,7 @@ export function showPosModal(ticker) {
   const txRows = txs.map(t => {
     const isSale = t.shares < 0;
     const price  = Math.abs(t.costEur / t.shares);
-    const note   = t.note ? `<div style="font-size:10px;color:#64748b;margin-top:2px">${t.note}</div>` : '';
+    const note   = t.note ? `<div class="c-neutral" style="font-size:10px;margin-top:2px">${t.note}</div>` : '';
     return `<tr>
       <td>${t.date}</td>
       <td style="color:${isSale ? '#ef4444' : '#16a34a'}">${isSale ? 'Verkoop' : 'Koop'}</td>
@@ -159,25 +159,23 @@ export function renderCurrencyDonut() {
   if (!el) return;
   const usd = state.usdExposurePct ?? 0;
   const eur = 100 - usd;
-  const ct  = chartTheme();
-  state.chartInstances.currencyDonut = new Chart(el.getContext('2d'), {
-    type: 'doughnut',
-    data: {
-      labels: ['USD', 'EUR'],
-      datasets: [{ data: [usd, eur], backgroundColor: ['#fbbf24', '#818cf8'], borderColor: ct.donutBorder, borderWidth: 2, hoverOffset: 5 }],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, cutout: '68%',
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
-          bodyColor: ct.bodyColor, bodyFont: { family: "'JetBrains Mono'", size: 11 }, padding: 12, cornerRadius: 10,
-          callbacks: { label: item => ` ${item.label}: ${item.raw.toFixed(1)}%` },
-        },
-      },
-    },
-  });
+  el.innerHTML = `
+    <div class="currency-split">
+      <div class="currency-labels">
+        <div class="currency-label">
+          <div class="currency-label-name">USD</div>
+          <div class="currency-label-pct" style="color:#fbbf24">${usd.toFixed(1)}%</div>
+        </div>
+        <div class="currency-label" style="text-align:right">
+          <div class="currency-label-name">EUR</div>
+          <div class="currency-label-pct" style="color:#818cf8">${eur.toFixed(1)}%</div>
+        </div>
+      </div>
+      <div class="currency-bar">
+        <div style="width:${usd}%;background:#fbbf24"></div>
+        <div style="flex:1;background:#818cf8"></div>
+      </div>
+    </div>`;
 }
 
 export function renderSectorDonut(latest) {
@@ -190,10 +188,23 @@ export function renderSectorDonut(latest) {
     const sector = state.tickerMeta?.[ticker]?.sector || 'Overig';
     sectorValues[sector] = (sectorValues[sector] || 0) + (latest[ticker] || 0);
   }
-  const sectors = Object.keys(sectorValues);
+  const sectors = Object.keys(sectorValues).sort((a, b) => sectorValues[b] - sectorValues[a]);
   const values  = sectors.map(s => sectorValues[s]);
+  const total   = values.reduce((a, b) => a + b, 0);
   const colors  = sectors.map((_, i) => SECTOR_COLORS[i % SECTOR_COLORS.length]);
   const ct      = chartTheme();
+
+  const legendEl = document.getElementById('chartSectorDonutLegend');
+  if (legendEl) {
+    legendEl.innerHTML = sectors.map((s, i) => {
+      const pct = total > 0 ? (values[i] / total * 100) : 0;
+      return `<div class="donut-legend-item">
+        <span class="donut-legend-dot" style="background:${colors[i]}"></span>
+        <span class="donut-legend-ticker">${s}</span>
+        <span class="donut-legend-pct">${pct.toFixed(1)}%</span>
+      </div>`;
+    }).join('');
+  }
 
   state.chartInstances.sectorDonut = new Chart(el.getContext('2d'), {
     type: 'doughnut',
@@ -303,12 +314,12 @@ function renderRollingReturnsTable() {
   const el = document.getElementById('rollingReturnsTable');
   if (!el) return;
   const rr = state.rollingReturns;
-  if (!rr) { el.innerHTML = '<div style="color:#64748b;font-size:12px;padding:12px">Onvoldoende data</div>'; return; }
+  if (!rr) { el.innerHTML = '<div class="c-neutral" style="font-size:12px;padding:12px">Onvoldoende data</div>'; return; }
 
   const periods   = ['1w', '1m', '3m', 'ytd', '1y', 'inception'];
   const labels    = { '1w': '1W', '1m': '1M', '3m': '3M', 'ytd': 'YTD', '1y': '1J', 'inception': 'Totaal' };
   const fmtR = v => {
-    if (v == null) return '<span style="color:#475569">—</span>';
+    if (v == null) return '<span class="c-neutral">—</span>';
     const cls = v >= 0 ? 'c-pos' : 'c-neg';
     return `<span class="${cls}">${v >= 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
   };
@@ -336,7 +347,7 @@ function renderRiskMetricsCard() {
   const irr = state.irrPct;
 
   if (!rm && twr == null && irr == null) {
-    el.innerHTML = '<div style="color:#64748b;font-size:12px;padding:4px">Onvoldoende data (min. 30 dagen)</div>';
+    el.innerHTML = '<div class="c-neutral" style="font-size:12px;padding:4px">Onvoldoende data (min. 30 dagen)</div>';
     return;
   }
 
@@ -487,19 +498,19 @@ function renderTickerMetaEditor() {
     const meta    = state.TICKER_META[ticker] || {};
     const hasManual = tm.manualPriceEur && tm.manualPriceAsOf;
     return `<tr>
-      <td style="font-weight:600">${ticker}<div style="font-size:10px;color:#64748b">${meta.label || ''}</div></td>
-      <td><input id="meta_sector_${ticker}" value="${tm.sector || ''}" placeholder="bv. Tech, ETF" style="width:100px"></td>
-      <td><input id="meta_geo_${ticker}" value="${tm.geo || ''}" placeholder="bv. US, EU" style="width:70px"></td>
+      <td style="font-weight:600">${ticker}<div class="c-neutral" style="font-size:10px">${meta.label || ''}</div></td>
+      <td><input class="meta-input" id="meta_sector_${ticker}" value="${tm.sector || ''}" placeholder="bv. Tech, ETF" style="width:100px"></td>
+      <td><input class="meta-input" id="meta_geo_${ticker}" value="${tm.geo || ''}" placeholder="bv. US, EU" style="width:70px"></td>
       <td>
-        <input id="meta_price_${ticker}" type="number" step="0.01" value="${hasManual ? tm.manualPriceEur : ''}" placeholder="prijs €" style="width:80px">
-        <input id="meta_asof_${ticker}" type="date" value="${hasManual ? tm.manualPriceAsOf : ''}" style="width:120px;margin-left:6px">
+        <input class="meta-input" id="meta_price_${ticker}" type="number" step="0.01" value="${hasManual ? tm.manualPriceEur : ''}" placeholder="prijs €" style="width:80px">
+        <input class="meta-input" id="meta_asof_${ticker}" type="date" value="${hasManual ? tm.manualPriceAsOf : ''}" style="width:120px;margin-left:6px">
       </td>
     </tr>`;
   }).join('');
 
   el.innerHTML = `
     <details>
-      <summary style="cursor:pointer;font-size:13px;font-weight:600;color:#94a3b8;margin-bottom:12px;list-style:none">
+      <summary class="c-neutral" style="cursor:pointer;font-size:13px;font-weight:600;margin-bottom:12px;list-style:none">
         ▸ Ticker instellingen (sector, geo, manuele prijs)
       </summary>
       <table class="pos-table" style="margin-top:8px">
@@ -549,7 +560,10 @@ export function renderAnalyse() {
     <div class="analyse-grid">
       <div class="chart-card">
         <div class="card-title">Allocatie</div>
-        <div style="height:240px"><canvas id="chartDonut"></canvas></div>
+        <div class="donut-with-legend">
+          <div class="donut-canvas-wrap"><canvas id="chartDonut"></canvas></div>
+          <div id="chartDonutLegend" class="donut-legend-list"></div>
+        </div>
       </div>
       <div class="chart-card">
         <div class="card-title">Kostprijs vs Waarde</div>
@@ -557,14 +571,14 @@ export function renderAnalyse() {
       </div>
       <div class="chart-card">
         <div class="card-title">Munt blootstelling</div>
-        <div style="height:140px"><canvas id="chartCurrencyDonut"></canvas></div>
-        <div style="font-size:11px;color:#64748b;margin-top:8px;text-align:center">
-          USD: ${latest ? state.usdExposurePct.toFixed(1) : '—'}% &nbsp;·&nbsp; EUR: ${latest ? (100 - state.usdExposurePct).toFixed(1) : '—'}%
-        </div>
+        <div id="chartCurrencyDonut"></div>
       </div>
       ${hasSectors ? `<div class="chart-card">
         <div class="card-title">Sector allocatie</div>
-        <div style="height:240px"><canvas id="chartSectorDonut"></canvas></div>
+        <div class="donut-with-legend">
+          <div class="donut-canvas-wrap"><canvas id="chartSectorDonut"></canvas></div>
+          <div id="chartSectorDonutLegend" class="donut-legend-list"></div>
+        </div>
       </div>` : ''}
       <div class="chart-card analyse-full">
         <div class="chart-header" style="margin-bottom:12px">

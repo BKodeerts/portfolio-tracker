@@ -1,7 +1,8 @@
 .chart-controls-mobile { display: none; }
 
 @media (max-width: 640px) {
-  .metrics-grid  { grid-template-columns: 1fr 1fr; }
+  .metrics-grid       { grid-template-columns: 1fr 1fr; }
+  .risk-metrics-grid  { grid-template-columns: 1fr 1fr; }
   .home-grid     { grid-template-columns: 1fr; }
   .analyse-grid  { grid-template-columns: 1fr; }
   .analyse-full  { grid-column: 1; }

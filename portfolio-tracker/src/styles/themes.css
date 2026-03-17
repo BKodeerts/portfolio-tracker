@@ -85,6 +85,20 @@ body.theme-dark .tx-ccy                               { background: rgba(255,255
 body.theme-dark .tx-del-btn                            { color: #555; }
 body.theme-dark .tx-del-btn:hover                      { color: #f87171; background: rgba(248,113,113,0.1); }
 body.theme-dark .tx-save-bar                           { border-top-color: rgba(255,255,255,0.06); }
+body.theme-dark .tx-add-form                           { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.07); }
+body.theme-dark .tx-add-form-field label               { color: #a0a0a0; }
+body.theme-dark .tx-add-form-field input,
+body.theme-dark .tx-add-form-field select              { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #d8d8d8; }
+body.theme-dark .tx-add-form-field input:focus,
+body.theme-dark .tx-add-form-field select:focus        { border-color: rgba(255,255,255,0.25); }
+body.theme-dark .tx-add-form-field select option       { background: #222222; }
+body.theme-dark .donut-legend-pct                      { color: #606060; }
+body.theme-dark .donut-legend-val                      { color: #606060; }
+body.theme-dark .currency-label-name                   { color: #606060; }
+body.theme-dark .perf-table th                         { color: #707070; border-bottom-color: rgba(255,255,255,0.06); }
+body.theme-dark .perf-table td                         { border-bottom-color: rgba(255,255,255,0.03); }
+body.theme-dark .risk-stat                             { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.07); }
+body.theme-dark .risk-stat-label                       { color: #707070; }
 
 @media (max-width: 640px) {
   body.theme-dark .tx-table tr { border-color: rgba(255,255,255,0.07); background: rgba(255,255,255,0.02); }

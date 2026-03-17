@@ -15,8 +15,8 @@ function buildTickerRows() {
     .map(([ticker, info]) => `<tr data-orig-ticker="${ticker}" data-orig-yahoo="${info.yahoo}">
       <td><input id="rt_ticker_${ticker}" value="${ticker}" style="width:80px;font-family:'JetBrains Mono',monospace;text-transform:uppercase"></td>
       <td><input id="rt_yahoo_${ticker}" value="${info.yahoo}"></td>
-      <td style="color:#94a3b8;font-size:11px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${info.label}</td>
-      <td style="color:#475569;font-size:11px;text-align:right">${info.count}</td>
+      <td class="c-neutral" style="font-size:11px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${info.label}</td>
+      <td class="c-neutral" style="font-size:11px;text-align:right">${info.count}</td>
     </tr>`).join('');
 }
 
@@ -25,7 +25,7 @@ export function renderImport() {
   state.currentTab = 'import';
   const txCount   = state.RAW_TRANSACTIONS.length;
   const dateRange = txCount > 0
-    ? `${state.RAW_TRANSACTIONS[0].date} → ${state.RAW_TRANSACTIONS[state.RAW_TRANSACTIONS.length - 1].date}`
+    ? `${state.RAW_TRANSACTIONS[0].date} → ${state.RAW_TRANSACTIONS.at(-1).date}`
     : '—';
 
   document.getElementById('root').innerHTML = `
@@ -46,8 +46,8 @@ export function renderImport() {
       <div id="mappingSection" style="display:none"></div>
       ${txCount > 0 ? `
       <div style="margin-top:28px">
-        <h3 style="font-size:13px;color:#e2e8f0;margin:0 0 4px;font-weight:600">Tickers hernoemen</h3>
-        <p style="font-size:12px;color:#64748b;margin-bottom:8px;line-height:1.5">
+        <h3 style="font-size:13px;margin:0 0 4px;font-weight:600">Tickers hernoemen</h3>
+        <p class="c-neutral" style="font-size:12px;margin-bottom:8px;line-height:1.5">
           Wijzig ticker of Yahoo-symbool. Wordt toegepast op alle bijbehorende transacties (handig bij verkeerde ISIN-koppeling).
         </p>
         <table class="map-table">

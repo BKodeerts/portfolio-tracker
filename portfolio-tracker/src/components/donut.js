@@ -10,6 +10,19 @@ export function renderDonutChart(latest, canvasId) {
   const values  = tickers.map(t => latest[t] || 0);
   const total   = values.reduce((a, b) => a + b, 0);
 
+  const legendEl = document.getElementById(canvasId + 'Legend');
+  if (legendEl) {
+    legendEl.innerHTML = tickers.map((t, i) => {
+      const pct = total > 0 ? (values[i] / total * 100) : 0;
+      return `<div class="donut-legend-item">
+        <span class="donut-legend-dot" style="background:${getColor(t)}"></span>
+        <span class="donut-legend-ticker">${t}</span>
+        <span class="donut-legend-pct">${pct.toFixed(1)}%</span>
+        <span class="donut-legend-val privacy-val">${fmt(values[i])}</span>
+      </div>`;
+    }).join('');
+  }
+
   const instKey = canvasId === 'homeDonut' ? 'homeDonut' : 'donut';
   state.chartInstances[instKey] = new Chart(el.getContext('2d'), {
     type: 'doughnut',

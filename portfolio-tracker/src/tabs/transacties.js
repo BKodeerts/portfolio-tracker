@@ -9,29 +9,27 @@ let addTxVisible = false;
 function addTxForm() {
   const today = new Date().toISOString().split('T')[0];
   return `
-    <div id="addTxForm" style="display:${addTxVisible ? 'block' : 'none'};background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:12px">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-        <label><span style="font-size:11px;color:#94a3b8;display:block;margin-bottom:2px">Datum *</span>
-          <input id="addDate" type="date" value="${today}" style="width:130px"></label>
-        <label><span style="font-size:11px;color:#94a3b8;display:block;margin-bottom:2px">Ticker *</span>
-          <input id="addTicker" type="text" placeholder="GOOGL" style="width:70px;text-transform:uppercase"></label>
-        <label><span style="font-size:11px;color:#94a3b8;display:block;margin-bottom:2px">Yahoo *</span>
-          <input id="addYahoo" type="text" placeholder="GOOGL" style="width:90px"></label>
-        <label><span style="font-size:11px;color:#94a3b8;display:block;margin-bottom:2px">Naam</span>
-          <input id="addLabel" type="text" placeholder="Alphabet Inc." style="width:130px"></label>
-        <label><span style="font-size:11px;color:#94a3b8;display:block;margin-bottom:2px">ISIN</span>
-          <input id="addIsin" type="text" placeholder="optioneel" style="width:110px"></label>
-        <label><span style="font-size:11px;color:#94a3b8;display:block;margin-bottom:2px">Aandelen *</span>
-          <input id="addShares" type="number" step="any" placeholder="10" style="width:80px"></label>
-        <label><span style="font-size:11px;color:#94a3b8;display:block;margin-bottom:2px">Kosten € *</span>
-          <input id="addCostEur" type="number" step="any" min="0" placeholder="1234.56" style="width:90px"></label>
-        <label><span style="font-size:11px;color:#94a3b8;display:block;margin-bottom:2px">Munt</span>
-          <select id="addCurrency" style="width:58px">
+    <div id="addTxForm" class="tx-add-form" style="display:${addTxVisible ? 'block' : 'none'}">
+      <div class="tx-add-form-fields">
+        <div class="tx-add-form-field"><label>Datum *</label><input id="addDate" type="date" value="${today}" style="width:130px"></div>
+        <div class="tx-add-form-field"><label>Ticker *</label><input id="addTicker" type="text" placeholder="GOOGL" style="width:72px;text-transform:uppercase"></div>
+        <div class="tx-add-form-field"><label>Yahoo *</label><input id="addYahoo" type="text" placeholder="GOOGL" style="width:90px"></div>
+        <div class="tx-add-form-field"><label>Naam</label><input id="addLabel" type="text" placeholder="Alphabet Inc." style="width:140px"></div>
+        <div class="tx-add-form-field"><label>ISIN</label><input id="addIsin" type="text" placeholder="optioneel" style="width:110px"></div>
+        <div class="tx-add-form-field"><label>Aandelen *</label><input id="addShares" type="number" step="any" placeholder="10" style="width:80px"></div>
+        <div class="tx-add-form-field"><label>Kosten € *</label><input id="addCostEur" type="number" step="any" min="0" placeholder="1234.56" style="width:92px"></div>
+        <div class="tx-add-form-field"><label>Munt</label>
+          <select id="addCurrency" style="width:62px">
             <option value="EUR">EUR</option>
             <option value="USD">USD</option>
-          </select></label>
-        <button class="btn success" onclick="window._addManualTx()">Toevoegen</button>
-        <button class="btn" onclick="window._toggleAddTx()">Annuleren</button>
+          </select>
+        </div>
+        <div class="tx-add-form-field" style="justify-content:flex-end">
+          <div style="display:flex;gap:6px">
+            <button class="btn success" onclick="window._addManualTx()">Toevoegen</button>
+            <button class="btn" onclick="window._toggleAddTx()">Annuleren</button>
+          </div>
+        </div>
       </div>
     </div>`;
 }

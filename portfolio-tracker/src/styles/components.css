@@ -167,10 +167,77 @@
 .tx-name-sub { font-family: inherit; font-size: 11px; color: #888; padding-left: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tx-del-btn:hover { color: #b91c1c; background: rgba(239,68,68,0.08); }
 .tx-save-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,0.07); }
+.tx-add-form {
+  background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;
+}
+.tx-add-form-fields { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.tx-add-form-field { display: flex; flex-direction: column; gap: 3px; }
+.tx-add-form-field label { font-size: 10px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.tx-add-form-field input, .tx-add-form-field select {
+  padding: 7px 10px;
+  background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 7px; color: #1c1c1c; font-size: 12px; font-family: inherit; outline: none;
+}
+.tx-add-form-field input:focus, .tx-add-form-field select:focus { border-color: rgba(0,0,0,0.28); }
+.meta-input {
+  background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 6px; color: #1c1c1c; padding: 5px 8px; font-size: 11px;
+  font-family: 'JetBrains Mono', monospace; outline: none;
+}
+.meta-input:focus { border-color: rgba(0,0,0,0.3); }
+
+/* Rolling returns table */
+.perf-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.perf-table th {
+  color: #888; text-align: right; padding: 7px 12px; font-weight: 600;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+}
+.perf-table th:first-child { text-align: left; padding-left: 0; }
+.perf-table td {
+  padding: 9px 12px; text-align: right;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.perf-table td:first-child { text-align: left; font-family: inherit; font-size: 13px; padding-left: 0; }
+.perf-table tbody tr:last-child td { border-bottom: none; }
+
+/* Risk metrics grid */
+.risk-metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.risk-stat {
+  background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 10px; padding: 10px 12px;
+}
+.risk-stat-label {
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: #888; margin-bottom: 5px; font-weight: 600;
+}
+.risk-stat-val {
+  font-size: 15px; font-weight: 700;
+  font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em;
+}
 
 /* Analyse grid */
 .analyse-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .analyse-full { grid-column: 1 / -1; }
+
+/* Donut + inline legend */
+.donut-with-legend { display: flex; align-items: center; gap: 16px; min-height: 180px; }
+.donut-canvas-wrap { width: 160px; height: 160px; flex-shrink: 0; }
+.donut-legend-list { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.donut-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.donut-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.donut-legend-ticker { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.donut-legend-pct { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #888; min-width: 42px; text-align: right; }
+.donut-legend-val { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #888; min-width: 52px; text-align: right; }
+
+/* Currency split bar */
+.currency-split { display: flex; flex-direction: column; gap: 14px; padding: 8px 4px; }
+.currency-labels { display: flex; justify-content: space-between; align-items: flex-end; }
+.currency-label-name { font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; color: #888; font-weight: 600; margin-bottom: 4px; }
+.currency-label-pct { font-size: 28px; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.03em; line-height: 1; }
+.currency-bar { height: 10px; border-radius: 6px; display: flex; overflow: hidden; gap: 2px; }
 
 /* Import */
 .import-wrap { max-width: 680px; margin: 0 auto; }
