@@ -1,0 +1,26 @@
+configuration:
+  push_interval:
+    name: Push interval (minutes)
+    description: >-
+      How often portfolio data is pushed to Home Assistant sensors.
+      Range: 1–60 minutes. Default: 15.
+      Lower values give more up-to-date readings but increase Yahoo Finance API calls.
+  drawdown_alert_pct:
+    name: Drawdown alert threshold (%)
+    description: >-
+      Turns on binary_sensor.portfolio_drawdown_warning when your portfolio
+      drops this percentage below its all-time peak value.
+      Example: 10 triggers the alert when you are down 10% from the top.
+  target_value:
+    name: Portfolio target value (€)
+    description: >-
+      When your portfolio reaches this value, binary_sensor.portfolio_target_hit
+      turns ON — useful for automation triggers or notifications.
+      Set to 0 to disable the target sensor entirely.
+  push_positions:
+    name: Push per-position sensors
+    description: >-
+      When enabled, creates an individual sensor for each open position
+      (e.g. sensor.portfolio_asts_value) with cost, P&L, and share count as attributes.
+      Disabled by default to avoid cluttering the entity list.
+      Enable only if you want per-stock automations or dashboard cards.
