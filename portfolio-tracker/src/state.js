@@ -8,6 +8,17 @@ export const state = {
   chartData: [],
   benchmarkData: [],
 
+  riskMetrics:         null,
+  rollingReturns:      null,
+  realizedPl:          0,
+  realizedPlPerTicker: {},
+  usdExposurePct:      0,
+  twrPct:              null,
+  irrPct:              null,
+
+  // Ticker metadata (sector, geo, manual price) — loaded from /api/ticker-meta
+  tickerMeta: {},
+
   intradayData: {},
   intradayLoaded: false,
   liveEurUsd: null,

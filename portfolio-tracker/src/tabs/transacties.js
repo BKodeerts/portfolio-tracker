@@ -48,13 +48,14 @@ function buildTxTable() {
             <option value="USD"${t.currency === 'USD' ? ' selected' : ''}>USD</option>
           </select>
         </td>
+        <td class="tx-col-note"><span class="tx-cell" contenteditable="true" data-field="note" inputmode="text">${t.note || ''}</span></td>
         <td class="tx-col-del"><button class="tx-del-btn" onclick="window._deleteTx(${t._origIdx})" title="Verwijder">🗑</button></td>
       </tr>`;
     }).join('');
 
   return `<table class="tx-table">
     <thead><tr>
-      <th>Datum</th><th>Ticker / Naam</th><th>Aandelen</th><th>Kosten €</th><th>Munt</th><th></th>
+      <th>Datum</th><th>Ticker / Naam</th><th>Aandelen</th><th>Kosten €</th><th>Munt</th><th>Notitie</th><th></th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
@@ -90,6 +91,7 @@ export async function saveTxAll() {
     const sharesRaw = tr.querySelector("[data-field='shares']")?.innerText.trim().replace(',', '.');
     const costRaw   = tr.querySelector("[data-field='costEur']")?.innerText.trim().replace(',', '.');
     const currency  = tr.querySelector("[data-field='currency']")?.value;
+    const note      = tr.querySelector("[data-field='note']")?.innerText.trim();
     const shares    = Number.parseFloat(sharesRaw);
     const costEur   = Number.parseFloat(costRaw);
     updated[idx] = {
@@ -98,6 +100,7 @@ export async function saveTxAll() {
       ...(Number.isNaN(shares)   ? {} : { shares }),
       ...(Number.isNaN(costEur)  ? {} : { costEur }),
       ...(currency               ? { currency } : {}),
+      note: note || undefined,
     };
   }
 

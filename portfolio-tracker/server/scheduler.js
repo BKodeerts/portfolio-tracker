@@ -3,13 +3,14 @@
  * Interval and behaviour controlled via /data/options.json (HA addon options).
  *
  * Routing:
- *   enable_ha_sensors: false  →  skip entirely
- *   use_mqtt_discovery: true  →  MQTT discovery (proper unique IDs, grouped device)
- *   use_mqtt_discovery: false →  States API push (simpler, no MQTT required)
+ *   enable_ha_sensors: false          →  skip entirely
+ *   use_mqtt_discovery: true          →  MQTT discovery (proper unique IDs, grouped device)
+ *   use_mqtt_discovery: false         →  States API push (simpler, no MQTT required)
+ *   intraday_during_market_hours: true →  faster push interval while any exchange is open
  */
 
 const { computeCurrentSnapshot } = require('./portfolio.js');
-const { getOptions, pushAll }     = require('./ha-helper.js');
+const { getOptions, pushAll, isMarketOpen } = require('./ha-helper.js');
 
 async function runOnce() {
   const options = getOptions();
@@ -17,7 +18,7 @@ async function runOnce() {
   if (!options.enableHaSensors) return;
 
   try {
-    const snapshot = await computeCurrentSnapshot();
+    const snapshot = await computeCurrentSnapshot({ watchlist: options.watchlist });
     if (!snapshot) return;
 
     if (options.useMqttDiscovery) {
@@ -54,7 +55,7 @@ function start() {
   }
 
   if (options.useMqttDiscovery) {
-    const hasSupervisor  = Boolean(process.env.SUPERVISOR_TOKEN);
+    const hasSupervisor   = Boolean(process.env.SUPERVISOR_TOKEN);
     const hasManualBroker = Boolean(options.mqttBroker);
     if (!hasSupervisor && !hasManualBroker) {
       console.log('[Scheduler] MQTT mode: no SUPERVISOR_TOKEN and no mqtt_broker configured — HA push disabled');
@@ -65,14 +66,32 @@ function start() {
     return;
   }
 
-  const intervalMs = options.pushInterval * 60 * 1000;
+  const normalIntervalMs   = options.pushInterval * 60 * 1000;
+  const intradayIntervalMs = Math.min(normalIntervalMs, 5 * 60 * 1000);
 
-  // Push immediately on startup (2 s delay to let server and cache settle)
-  setTimeout(runOnce, 2_000);
-  setInterval(runOnce, intervalMs);
-
-  const mode = options.useMqttDiscovery ? 'MQTT discovery' : 'states API';
-  console.log(`[Scheduler] HA sensor push every ${options.pushInterval} min via ${mode}`);
+  if (options.intradayDuringMarketHours) {
+    // 1-minute heartbeat; effective push interval adapts to market hours
+    let lastRun = 0;
+    const tick = () => {
+      const marketOpen   = isMarketOpen('NYSE') || isMarketOpen('XETRA');
+      const effectiveMs  = marketOpen ? intradayIntervalMs : normalIntervalMs;
+      if (Date.now() - lastRun >= effectiveMs) {
+        lastRun = Date.now();
+        runOnce();
+      }
+    };
+    setTimeout(runOnce, 2_000);
+    setInterval(tick, 60_000);
+    console.log(
+      `[Scheduler] HA sensor push: ${options.pushInterval} min (market closed) / ` +
+      `${intradayIntervalMs / 60000} min (market open) via ${options.useMqttDiscovery ? 'MQTT discovery' : 'states API'}`,
+    );
+  } else {
+    setTimeout(runOnce, 2_000);
+    setInterval(runOnce, normalIntervalMs);
+    const mode = options.useMqttDiscovery ? 'MQTT discovery' : 'states API';
+    console.log(`[Scheduler] HA sensor push every ${options.pushInterval} min via ${mode}`);
+  }
 }
 
 module.exports = { start };

@@ -12,16 +12,42 @@ export async function loadData(onSuccess) {
     </div>`;
 
   try {
-    const res  = await fetch(`${SERVER_BASE}/api/portfolio`);
-    const json = await res.json();
+    const [portfolioRes, metaRes] = await Promise.all([
+      fetch(`${SERVER_BASE}/api/portfolio`),
+      fetch(`${SERVER_BASE}/api/ticker-meta`),
+    ]);
+    const json     = await portfolioRes.json();
+    const metaJson = await metaRes.json();
+
     if (json.status !== 'ok') throw new Error(json.message || 'Server error');
     if (!json.data) throw new Error('Geen portfoliodata ontvangen');
 
-    state.chartData      = json.data.chartData;
-    state.benchmarkData  = json.data.benchmarkData;
-    state.TICKER_META    = json.data.meta;
-    state.CURRENT_TICKERS = json.data.currentTickers;
-    state.latestFxRate   = json.data.latestFxRate;
+    const d = json.data;
+    state.chartData           = d.chartData;
+    state.benchmarkData       = d.benchmarkData;
+    state.TICKER_META         = d.meta;
+    state.CURRENT_TICKERS     = d.currentTickers;
+    state.latestFxRate        = d.latestFxRate;
+    state.riskMetrics         = d.riskMetrics         ?? null;
+    state.rollingReturns      = d.rollingReturns      ?? null;
+    state.realizedPl          = d.realizedPl          ?? 0;
+    state.realizedPlPerTicker = d.realizedPlPerTicker ?? {};
+    state.usdExposurePct      = d.usdExposurePct      ?? 0;
+    state.twrPct              = d.twrPct              ?? null;
+    state.irrPct              = d.irrPct              ?? null;
+
+    // Per-position 52w data — store on TICKER_META for use in Analyse tab
+    if (d.positions) {
+      for (const pos of d.positions) {
+        if (state.TICKER_META[pos.ticker]) {
+          state.TICKER_META[pos.ticker].high52 = pos.high52;
+          state.TICKER_META[pos.ticker].low52  = pos.low52;
+          state.TICKER_META[pos.ticker].pe     = pos.pe;
+        }
+      }
+    }
+
+    state.tickerMeta = metaJson.status === 'ok' ? (metaJson.data ?? {}) : {};
 
     Object.keys(state.TICKER_META).forEach(t => getColor(t));
     onSuccess();

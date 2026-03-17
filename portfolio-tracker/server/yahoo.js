@@ -1,4 +1,4 @@
-const https = require('https');
+const https = require('node:https');
 
 const FETCH_DELAY = 100;
 
@@ -41,12 +41,29 @@ async function fetchDailyQuote(yahooSymbol) {
   if (!result) return null;
   const timestamps = result.timestamp || [];
   const closes     = result.indicators?.quote?.[0]?.close || [];
+  const meta = result.meta || {};
+  let lastClose = null, prevClose = null;
+  let lastI = -1;
   for (let i = timestamps.length - 1; i >= 0; i--) {
     if (closes[i] != null) {
-      return { date: new Date(timestamps[i] * 1000).toISOString().slice(0, 10), close: closes[i] };
+      if (lastClose == null) { lastClose = closes[i]; lastI = i; }
+      else { prevClose = closes[i]; break; }
     }
   }
-  return null;
+  if (lastClose == null) return null;
+  return {
+    date:              new Date(timestamps[lastI] * 1000).toISOString().slice(0, 10),
+    close:             lastClose,
+    previousClose:     prevClose ?? null,
+    change1dPct:       prevClose ? Number.parseFloat(((lastClose - prevClose) / prevClose * 100).toFixed(2)) : null,
+    fiftyTwoWeekHigh:  meta.fiftyTwoWeekHigh     ?? null,
+    fiftyTwoWeekLow:   meta.fiftyTwoWeekLow      ?? null,
+    trailingPE:        meta.trailingPE            ?? null,
+    dayHigh:           meta.regularMarketDayHigh ?? null,
+    dayLow:            meta.regularMarketDayLow  ?? null,
+    exchangeName:      meta.fullExchangeName      ?? null,
+    exchangeTimezone:  meta.exchangeTimezoneName  ?? null,
+  };
 }
 
 async function fetchIntraday(yahooSymbol) {

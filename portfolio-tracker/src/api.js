@@ -48,3 +48,17 @@ export async function pushToHaApi() {
   const res = await fetch(`${SERVER_BASE}/api/ha/push`, { method: 'POST' });
   return res.json();
 }
+
+export async function fetchTickerMeta() {
+  const res = await fetch(`${SERVER_BASE}/api/ticker-meta`);
+  return res.json();
+}
+
+export async function saveTickerMeta(meta) {
+  const res = await fetch(`${SERVER_BASE}/api/ticker-meta`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(meta),
+  });
+  return res.json();
+}
