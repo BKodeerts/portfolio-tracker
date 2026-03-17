@@ -33,22 +33,22 @@ function buildTxTable() {
       const match = !q || t.ticker.toLowerCase().includes(q) || t.date.includes(q) || (t.label || '').toLowerCase().includes(q);
       const isSale = t.shares < 0;
       return `<tr data-idx="${t._origIdx}"${match ? '' : ' style="display:none"'}>
-        <td><span class="tx-cell" contenteditable="true" data-field="date">${t.date}</span></td>
-        <td style="font-family:inherit;font-weight:600">
+        <td class="tx-col-date"><span class="tx-cell" contenteditable="true" data-field="date" inputmode="text">${t.date}</span></td>
+        <td class="tx-col-ticker" style="font-family:inherit;font-weight:600">
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${getColor(t.ticker)};margin-right:5px;vertical-align:middle"></span>${t.ticker}
         </td>
-        <td style="font-family:inherit;font-size:11px;color:#888">${t.label || ''}</td>
-        <td style="color:${isSale ? '#ef4444' : '#16a34a'}">
-          <span class="tx-cell" contenteditable="true" data-field="shares">${t.shares}</span>
+        <td class="tx-col-naam" style="font-family:inherit;font-size:11px;color:#888">${t.label || ''}</td>
+        <td class="tx-col-shares" style="color:${isSale ? '#ef4444' : '#16a34a'}">
+          <span class="tx-cell" contenteditable="true" data-field="shares" inputmode="decimal">${t.shares}</span>
         </td>
-        <td><span class="tx-cell" contenteditable="true" data-field="costEur">${t.costEur}</span></td>
-        <td>
+        <td class="tx-col-cost"><span class="tx-cell" contenteditable="true" data-field="costEur" inputmode="decimal">${t.costEur}</span></td>
+        <td class="tx-col-ccy">
           <select class="tx-ccy" data-field="currency">
             <option value="EUR"${t.currency === 'USD' ? '' : ' selected'}>EUR</option>
             <option value="USD"${t.currency === 'USD' ? ' selected' : ''}>USD</option>
           </select>
         </td>
-        <td><button class="tx-del-btn" onclick="window._deleteTx(${t._origIdx})" title="Verwijder">🗑</button></td>
+        <td class="tx-col-del"><button class="tx-del-btn" onclick="window._deleteTx(${t._origIdx})" title="Verwijder">🗑</button></td>
       </tr>`;
     }).join('');
 

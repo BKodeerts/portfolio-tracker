@@ -84,3 +84,8 @@ body.theme-dark .tx-ccy                               { background: rgba(255,255
 body.theme-dark .tx-del-btn                            { color: #555; }
 body.theme-dark .tx-del-btn:hover                      { color: #f87171; background: rgba(248,113,113,0.1); }
 body.theme-dark .tx-save-bar                           { border-top-color: rgba(255,255,255,0.06); }
+
+@media (max-width: 640px) {
+  body.theme-dark .tx-table tr { border-color: rgba(255,255,255,0.07); background: rgba(255,255,255,0.02); }
+  body.theme-dark .tx-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+}

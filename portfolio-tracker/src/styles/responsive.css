@@ -28,6 +28,36 @@
   .chart-card               { overflow: hidden; }
   canvas                    { max-width: 100% !important; }
 
+  /* Transactions table → card layout */
+  .tx-table thead { display: none; }
+  .tx-table,
+  .tx-table tbody { display: block; }
+  .tx-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    border: 1px solid rgba(0,0,0,0.07);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    padding: 10px 12px;
+  }
+  .tx-table tbody tr:hover { background: none; }
+  .tx-table td { border-bottom: none; padding: 0; }
+
+  /* Row 1: ticker | naam (fills remaining) | del */
+  .tx-col-ticker { order: 1; flex: 0 0 auto; padding: 0 6px 8px 0; font-size: 13px; }
+  .tx-col-naam   { order: 2; flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px 8px; }
+  .tx-col-del    { order: 3; flex: 0 0 auto; padding: 0 0 8px 0; }
+  /* Row 2: date | shares | cost | ccy (pushed right) */
+  .tx-col-date   { order: 4; flex: 0 0 auto; padding: 0 10px 0 0; }
+  .tx-col-shares { order: 5; flex: 0 0 auto; padding: 0 10px 0 0; }
+  .tx-col-cost   { order: 6; flex: 0 0 auto; padding: 0; }
+  .tx-col-ccy    { order: 7; flex: 0 0 auto; margin-left: auto; padding: 0; }
+
+  /* Larger touch targets for editable cells */
+  .tx-table .tx-cell[contenteditable="true"] { padding: 5px 7px; font-size: 13px; }
+  .tx-table .tx-ccy { padding: 5px 7px; font-size: 12px; }
+
   /* Position modal → bottom sheet */
   .pos-modal-inner {
     position: fixed; bottom: 0; left: 0; right: 0;
