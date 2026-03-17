@@ -706,15 +706,8 @@ async function computeFullPortfolio() {
 
     const tm = tickerMetaLive[pos.ticker] || {};
 
-    // Auto-populate quoteType from instrumentType (already in quote cache)
-    if (!tm.quoteType && q?.instrumentType) {
-      tickerMetaLive[pos.ticker] = { ...tm, quoteType: q.instrumentType };
-      meta[pos.ticker].quoteType = q.instrumentType;
-      tickerMetaChanged = true;
-    }
-
-    // Auto-populate sector from quoteSummary if missing
-    if (!tm.sector) {
+    // Auto-populate quoteType + sector via search (cached 7 days)
+    if (!tm.quoteType || !tm.sector) {
       const summaryKey = `summary_${yahooSym}`;
       let summary = readCache(summaryKey, 7 * 24 * 60 * 60 * 1000);
       if (!summary) {
@@ -726,9 +719,11 @@ async function computeFullPortfolio() {
           console.warn(`[SUMMARY] ${yahooSym}: ${e.message}`);
         }
       }
-      if (summary?.sector) {
-        tickerMetaLive[pos.ticker] = { ...(tickerMetaLive[pos.ticker] || tm), sector: summary.sector };
-        meta[pos.ticker].sector = summary.sector;
+      if (summary) {
+        const patch = { ...(tickerMetaLive[pos.ticker] || tm) };
+        if (!tm.quoteType && summary.quoteType) { patch.quoteType = summary.quoteType; meta[pos.ticker].quoteType = summary.quoteType; }
+        if (!tm.sector    && summary.sector)    { patch.sector    = summary.sector;    meta[pos.ticker].sector    = summary.sector; }
+        tickerMetaLive[pos.ticker] = patch;
         tickerMetaChanged = true;
       }
     }

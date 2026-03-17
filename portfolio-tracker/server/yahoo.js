@@ -1,14 +1,12 @@
 const https = require('node:https');
 
 const FETCH_DELAY = 100;
-
-// Browser-like UA needed for crumb endpoint
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
 
-function fetchYahoo(url, extraHeaders = {}) {
+function fetchYahoo(url) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
-      headers: { 'User-Agent': UA, ...extraHeaders },
+      headers: { 'User-Agent': UA },
       timeout: 15000,
     }, res => {
       let body = '';
@@ -22,81 +20,6 @@ function fetchYahoo(url, extraHeaders = {}) {
     req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
   });
 }
-
-// ── Yahoo crumb auth (required for v10/quoteSummary) ─────────────────────────
-
-let _crumb = null;
-
-// Collect cookies by following redirects; handles EU GDPR consent automatically.
-async function collectYahooCookies() {
-  const jar = {};
-  const addCookies = hdrs => {
-    for (const c of (hdrs['set-cookie'] || [])) {
-      const m = c.match(/^([^=]+)=([^;]*)/);
-      if (m) jar[m[1].trim()] = m[2].trim();
-    }
-  };
-  const jarStr = () => Object.entries(jar).map(([k, v]) => `${k}=${v}`).join('; ');
-
-  const getStep = url => new Promise((resolve, reject) => {
-    const parsed = new URL(url);
-    const req = https.get({
-      hostname: parsed.hostname, path: parsed.pathname + (parsed.search || ''),
-      headers: { 'User-Agent': UA, 'Cookie': jarStr(), 'Accept': 'text/html,*/*', 'Accept-Language': 'en-US,en;q=0.9' },
-      timeout: 15000, maxHeaderSize: 65536,
-    }, res => {
-      addCookies(res.headers);
-      res.resume();
-      resolve({ code: res.statusCode, location: res.headers['location'] });
-    });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
-  });
-
-  const postConsent = (url, sessionId) => new Promise((resolve, reject) => {
-    const parsed = new URL(url);
-    const body   = `agree=agree&consentId=${encodeURIComponent(sessionId)}&sessionId=${encodeURIComponent(sessionId)}&inline=false&locale=en-US&lang=en-US&done=`;
-    const req = https.request({
-      hostname: parsed.hostname, path: parsed.pathname + parsed.search, method: 'POST',
-      headers: { 'User-Agent': UA, 'Cookie': jarStr(), 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
-      timeout: 15000, maxHeaderSize: 65536,
-    }, res => { addCookies(res.headers); res.resume(); resolve(res.headers['location']); });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('Consent timeout')); });
-    req.write(body); req.end();
-  });
-
-  let url = 'https://finance.yahoo.com';
-  for (let i = 0; i < 8; i++) {
-    const { code, location } = await getStep(url);
-    if (code >= 300 && code < 400 && location) {
-      const next = location.startsWith('http') ? location : new URL(location, url).href;
-      if (next.includes('consent.yahoo.com')) {
-        const sessionId = new URL(next).searchParams.get('sessionId') || '';
-        await postConsent(next, sessionId);
-        url = 'https://finance.yahoo.com'; // re-visit after consent
-      } else {
-        url = next;
-      }
-    } else {
-      break;
-    }
-  }
-
-  return jarStr();
-}
-
-async function getYahooCrumb() {
-  if (_crumb && Date.now() - _crumb.fetchedAt < 6 * 60 * 60 * 1000) return _crumb;
-
-  const cookies = await collectYahooCookies();
-  const crumb   = await fetchYahoo('https://query1.finance.yahoo.com/v1/test/getcrumb', { Cookie: cookies });
-
-  _crumb = { crumb: crumb.trim(), cookies, fetchedAt: Date.now() };
-  return _crumb;
-}
-
-// ── Market data fetchers ──────────────────────────────────────────────────────
 
 async function fetchCandles(yahooSymbol, fromDate) {
   const period1 = Math.floor(new Date(fromDate).getTime() / 1000) - 7 * 86400;
@@ -164,15 +87,17 @@ async function fetchIntraday(yahooSymbol) {
   };
 }
 
+// Uses v1/finance/search — no auth required, returns sector/industry/quoteType.
 async function fetchQuoteSummary(yahooSymbol) {
-  const { crumb, cookieHeader } = await getYahooCrumb();
-  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(yahooSymbol)}?modules=assetProfile%2CfundProfile&crumb=${encodeURIComponent(crumb)}`;
-  const text = await fetchYahoo(url, { Cookie: cookieHeader });
-  const result = JSON.parse(text)?.quoteSummary?.result?.[0];
-  if (!result) return null;
+  const url  = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(yahooSymbol)}&quotesCount=5&newsCount=0&enableFuzzyQuery=false`;
+  const text = await fetchYahoo(url);
+  const quotes = JSON.parse(text)?.quotes || [];
+  const match  = quotes.find(q => q.symbol === yahooSymbol) || quotes[0];
+  if (!match) return null;
   return {
-    sector:   result.assetProfile?.sector       ?? result.fundProfile?.categoryName ?? null,
-    industry: result.assetProfile?.industry     ?? null,
+    sector:    match.sector   ?? null,
+    industry:  match.industry ?? null,
+    quoteType: match.quoteType ?? null,
   };
 }
 
