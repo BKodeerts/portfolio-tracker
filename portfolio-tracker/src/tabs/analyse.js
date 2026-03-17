@@ -535,6 +535,22 @@ export async function saveTickerMetaUI() {
   }
 }
 
+export async function resetSectorsUI() {
+  if (!confirm('Sectoren en type-info wissen zodat Yahoo de data opnieuw ophaalt?')) return;
+  const clean = {};
+  for (const [ticker, tm] of Object.entries(state.tickerMeta)) {
+    const { sector: _s, quoteType: _q, ...rest } = tm;
+    if (Object.keys(rest).length) clean[ticker] = rest;
+  }
+  try {
+    const json = await saveTickerMeta(clean);
+    if (json.status !== 'ok') throw new Error(json.message);
+    window.location.reload();
+  } catch (e) {
+    alert('Reset mislukt: ' + e.message);
+  }
+}
+
 function renderTickerMetaEditor() {
   const el = document.getElementById('tickerMetaEditor');
   if (!el) return;
@@ -569,8 +585,9 @@ function renderTickerMetaEditor() {
         <thead><tr><th style="text-align:left">Ticker</th><th>Type</th><th>Sector</th><th>Geo</th><th>Manuele prijs (€ + datum)</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div style="margin-top:12px">
+      <div style="margin-top:12px;display:flex;gap:8px">
         <button class="btn success" onclick="window._saveTickerMetaUI()">Opslaan</button>
+        <button class="btn" onclick="window._resetSectorsUI()">Sectoren resetten (Yahoo)</button>
       </div>
     </details>`;
 }
