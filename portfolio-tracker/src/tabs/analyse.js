@@ -329,42 +329,43 @@ function buildBenchmarkSeries(filtered, ...benchMaps) {
     (txByDate[tx.date] = txByDate[tx.date] || []).push(tx);
   }
 
-  let portfolioTwrFactor = 1.0;
-  let portfolioSubStart  = filtered[0].total;
-  const benchStates      = benchMaps.map(m => ({ factor: 1.0, subStart: m[filtered[0].date] }));
+  const startDate    = filtered[0].date;
+  const startTotal   = filtered[0].total;
+  let   totalInvested = startTotal;
 
-  const portfolioSeries  = [{ x: filtered[0].date, y: 0 }];
-  const benchSeriesArr   = benchMaps.map(() => [{ x: filtered[0].date, y: 0 }]);
+  // Buy benchmark units equal to startTotal at start-of-period price
+  const benchUnits = benchMaps.map(m => {
+    const p = m[startDate];
+    return p ? startTotal / p : 0;
+  });
+
+  const portfolioSeries = [{ x: startDate, y: 0 }];
+  const benchSeriesArr  = benchMaps.map(() => [{ x: startDate, y: 0 }]);
 
   for (let i = 1; i < filtered.length; i++) {
     const row      = filtered[i];
-    const txsToday = txByDate[row.date];
+    const txsToday = txByDate[row.date] || [];
 
-    if (txsToday?.length) {
-      const netCF         = txsToday.reduce((s, tx) => s + (tx.shares > 0 ? tx.costEur : -tx.costEur), 0);
-      const valueBeforeCF = row.total - netCF;
-      if (portfolioSubStart > 0) portfolioTwrFactor *= valueBeforeCF / portfolioSubStart;
-      portfolioSubStart = row.total;
-      for (const [j, m] of benchMaps.entries()) {
+    // Mirror cash flows into benchmark (only transactions after start)
+    for (const tx of txsToday) {
+      if (tx.date <= startDate) continue;
+      const cash = tx.shares > 0 ? tx.costEur : -tx.costEur;
+      totalInvested += cash;
+      benchMaps.forEach((m, j) => {
         const p = m[row.date];
-        if (p != null && benchStates[j].subStart > 0) benchStates[j].factor *= p / benchStates[j].subStart;
-        benchStates[j].subStart = p ?? benchStates[j].subStart;
-      }
+        if (p) benchUnits[j] += cash / p;
+      });
     }
 
-    const portfolioY = portfolioSubStart > 0
-      ? (portfolioTwrFactor * row.total / portfolioSubStart - 1) * 100
-      : (portfolioTwrFactor - 1) * 100;
+    const portfolioY = totalInvested > 0 ? (row.total / totalInvested - 1) * 100 : 0;
     portfolioSeries.push({ x: row.date, y: Number.parseFloat(portfolioY.toFixed(2)) });
 
-    for (const [j, m] of benchMaps.entries()) {
+    benchMaps.forEach((m, j) => {
       const p  = m[row.date];
-      const bs = benchStates[j];
-      const y  = p != null && bs.subStart > 0
-        ? (bs.factor * p / bs.subStart - 1) * 100
-        : null;
+      const bv = p != null ? benchUnits[j] * p : null;
+      const y  = bv != null && totalInvested > 0 ? (bv / totalInvested - 1) * 100 : null;
       benchSeriesArr[j].push({ x: row.date, y: y == null ? null : Number.parseFloat(y.toFixed(2)) });
-    }
+    });
   }
 
   return { portfolioSeries, benchSeriesArr };
