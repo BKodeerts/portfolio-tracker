@@ -329,41 +329,41 @@ function buildBenchmarkSeries(filtered, ...benchMaps) {
     (txByDate[tx.date] = txByDate[tx.date] || []).push(tx);
   }
 
-  const startDate    = filtered[0].date;
-  const startTotal   = filtered[0].total;
-  let   totalInvested = startTotal;
+  const startDate = filtered[0].date;
+  const startCost = filtered[0].totalCost || filtered[0].total;
 
-  // Buy benchmark units equal to startTotal at start-of-period price
+  // Buy benchmark units equal to startCost at start-of-period price
   const benchUnits = benchMaps.map(m => {
     const p = m[startDate];
-    return p ? startTotal / p : 0;
+    return p && startCost > 0 ? startCost / p : 0;
   });
 
   const portfolioSeries = [{ x: startDate, y: 0 }];
   const benchSeriesArr  = benchMaps.map(() => [{ x: startDate, y: 0 }]);
 
   for (let i = 1; i < filtered.length; i++) {
-    const row      = filtered[i];
-    const txsToday = txByDate[row.date] || [];
+    const row       = filtered[i];
+    const totalCost = row.totalCost || 0;
+    const txsToday  = txByDate[row.date] || [];
 
-    // Mirror cash flows into benchmark (only transactions after start)
+    // Mirror cash flows (buys/sells) into benchmark
     for (const tx of txsToday) {
       if (tx.date <= startDate) continue;
       const cash = tx.shares > 0 ? tx.costEur : -tx.costEur;
-      totalInvested += cash;
       benchMaps.forEach((m, j) => {
         const p = m[row.date];
         if (p) benchUnits[j] += cash / p;
       });
     }
 
-    const portfolioY = totalInvested > 0 ? (row.total / totalInvested - 1) * 100 : 0;
+    // Portfolio: unrealized return on FIFO cost basis (matches portfolio tab)
+    const portfolioY = totalCost > 0 ? (row.total / totalCost - 1) * 100 : 0;
     portfolioSeries.push({ x: row.date, y: Number.parseFloat(portfolioY.toFixed(2)) });
 
     benchMaps.forEach((m, j) => {
       const p  = m[row.date];
       const bv = p != null ? benchUnits[j] * p : null;
-      const y  = bv != null && totalInvested > 0 ? (bv / totalInvested - 1) * 100 : null;
+      const y  = bv != null && totalCost > 0 ? (bv / totalCost - 1) * 100 : null;
       benchSeriesArr[j].push({ x: row.date, y: y == null ? null : Number.parseFloat(y.toFixed(2)) });
     });
   }
@@ -447,8 +447,16 @@ function renderRollingReturnsTable() {
     return `<span class="${cls}">${v >= 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
   };
 
+  // For inception (TOTAL), use cost-basis return to match the portfolio tab
+  const lastRow = state.chartData.at(-1);
+  const costBasisReturn = lastRow?.totalCost > 0
+    ? Number.parseFloat(((lastRow.total / lastRow.totalCost - 1) * 100).toFixed(1))
+    : null;
+
+  const getPortfolioVal = p => p === 'inception' ? costBasisReturn : rr[p]?.portfolio;
+
   const header   = periods.map(p => `<th>${labels[p]}</th>`).join('');
-  const portRow  = periods.map(p => `<td>${state.privacyMode ? '●●' : fmtR(rr[p]?.portfolio)}</td>`).join('');
+  const portRow  = periods.map(p => `<td>${state.privacyMode ? '●●' : fmtR(getPortfolioVal(p))}</td>`).join('');
   const vwceRow  = periods.map(p => `<td>${fmtR(rr[p]?.vwce)}</td>`).join('');
   const sp500Row = periods.map(p => `<td>${fmtR(rr[p]?.sp500)}</td>`).join('');
 
