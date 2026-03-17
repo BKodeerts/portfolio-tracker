@@ -473,7 +473,7 @@ function computeRiskMetrics(chartData, benchmarkData) {
 /**
  * Compute rolling period returns for portfolio and benchmark.
  */
-function computeRollingReturns(chartData, benchmarkData) {
+function computeRollingReturns(chartData, benchmarkData, twrPct = null) {
   if (!chartData.length) return null;
 
   const latest  = chartData.at(-1);
@@ -518,7 +518,7 @@ function computeRollingReturns(chartData, benchmarkData) {
     '3m':       calcReturn(findStartRow(91)),
     'ytd':      calcReturn(ytdRow()),
     '1y':       calcReturn(findStartRow(365)),
-    'inception': calcReturn(chartData[0]),
+    'inception': { portfolio: twrPct, benchmark: calcReturn(chartData[0])?.benchmark ?? null },
   };
 }
 
@@ -707,8 +707,8 @@ async function computeFullPortfolio() {
 
   // Analytics
   const riskMetrics    = computeRiskMetrics(chartData, benchmarkData);
-  const rollingReturns = computeRollingReturns(chartData, benchmarkData);
   const twrPct         = computeServerTWR(chartData, transactions);
+  const rollingReturns = computeRollingReturns(chartData, benchmarkData, twrPct);
   const irrPct         = computeXIRR(transactions, totalValue);
 
   // Persist analytics + inception data for HA scheduler
