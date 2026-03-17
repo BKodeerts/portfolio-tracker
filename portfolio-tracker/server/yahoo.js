@@ -25,44 +25,74 @@ function fetchYahoo(url, extraHeaders = {}) {
 
 // ── Yahoo crumb auth (required for v10/quoteSummary) ─────────────────────────
 
-let _crumb = null; // { crumb, cookies, fetchedAt }
+let _crumb = null;
+
+// Collect cookies by following redirects; handles EU GDPR consent automatically.
+async function collectYahooCookies() {
+  const jar = {};
+  const addCookies = hdrs => {
+    for (const c of (hdrs['set-cookie'] || [])) {
+      const m = c.match(/^([^=]+)=([^;]*)/);
+      if (m) jar[m[1].trim()] = m[2].trim();
+    }
+  };
+  const jarStr = () => Object.entries(jar).map(([k, v]) => `${k}=${v}`).join('; ');
+
+  const getStep = url => new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const req = https.get({
+      hostname: parsed.hostname, path: parsed.pathname + (parsed.search || ''),
+      headers: { 'User-Agent': UA, 'Cookie': jarStr(), 'Accept': 'text/html,*/*', 'Accept-Language': 'en-US,en;q=0.9' },
+      timeout: 15000, maxHeaderSize: 65536,
+    }, res => {
+      addCookies(res.headers);
+      res.resume();
+      resolve({ code: res.statusCode, location: res.headers['location'] });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+  });
+
+  const postConsent = (url, sessionId) => new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const body   = `agree=agree&consentId=${encodeURIComponent(sessionId)}&sessionId=${encodeURIComponent(sessionId)}&inline=false&locale=en-US&lang=en-US&done=`;
+    const req = https.request({
+      hostname: parsed.hostname, path: parsed.pathname + parsed.search, method: 'POST',
+      headers: { 'User-Agent': UA, 'Cookie': jarStr(), 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
+      timeout: 15000, maxHeaderSize: 65536,
+    }, res => { addCookies(res.headers); res.resume(); resolve(res.headers['location']); });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Consent timeout')); });
+    req.write(body); req.end();
+  });
+
+  let url = 'https://finance.yahoo.com';
+  for (let i = 0; i < 8; i++) {
+    const { code, location } = await getStep(url);
+    if (code >= 300 && code < 400 && location) {
+      const next = location.startsWith('http') ? location : new URL(location, url).href;
+      if (next.includes('consent.yahoo.com')) {
+        const sessionId = new URL(next).searchParams.get('sessionId') || '';
+        await postConsent(next, sessionId);
+        url = 'https://finance.yahoo.com'; // re-visit after consent
+      } else {
+        url = next;
+      }
+    } else {
+      break;
+    }
+  }
+
+  return jarStr();
+}
 
 async function getYahooCrumb() {
   if (_crumb && Date.now() - _crumb.fetchedAt < 6 * 60 * 60 * 1000) return _crumb;
 
-  // Step 1: visit finance.yahoo.com to get session cookies
-  const cookieHeader = await new Promise((resolve, reject) => {
-    const req = https.get('https://finance.yahoo.com', {
-      headers: { 'User-Agent': UA },
-      timeout: 15000,
-      maxHeaderSize: 65536,
-    }, res => {
-      res.resume();
-      const cookies = (res.headers['set-cookie'] || []).map(c => c.split(';')[0]).join('; ');
-      resolve(cookies);
-    });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('Crumb cookie timeout')); });
-  });
+  const cookies = await collectYahooCookies();
+  const crumb   = await fetchYahoo('https://query1.finance.yahoo.com/v1/test/getcrumb', { Cookie: cookies });
 
-  // Step 2: fetch the crumb token
-  const crumb = await new Promise((resolve, reject) => {
-    const req = https.get('https://query1.finance.yahoo.com/v1/test/getcrumb', {
-      headers: { 'User-Agent': UA, 'Cookie': cookieHeader },
-      timeout: 15000,
-    }, res => {
-      let body = '';
-      res.on('data', chunk => (body += chunk));
-      res.on('end', () => {
-        if (res.statusCode === 200) resolve(body.trim());
-        else reject(new Error(`Crumb HTTP ${res.statusCode}: ${body.slice(0, 100)}`));
-      });
-    });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('Crumb fetch timeout')); });
-  });
-
-  _crumb = { crumb, cookieHeader, fetchedAt: Date.now() };
+  _crumb = { crumb: crumb.trim(), cookies, fetchedAt: Date.now() };
   return _crumb;
 }
 
