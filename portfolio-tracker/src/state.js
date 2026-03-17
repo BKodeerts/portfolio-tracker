@@ -16,6 +16,7 @@ export const state = {
   currentTab: 'portefeuille',
   currentView: 'total',
   currentPeriod: '1d',
+  analysePeriod: '1y',
   showClosed: false,
   chartInstances: {},
   posSort: { col: 'value', dir: 'desc' },

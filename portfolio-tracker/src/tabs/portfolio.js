@@ -215,7 +215,7 @@ export function renderLegend(visibleTickers) {
       <div class="legend-item"><div class="legend-line" style="background:#334155;border-top:2px dashed #334155;height:0;width:16px;margin-top:1px"></div>${refLabel}</div>`;
   } else {
     el.innerHTML = visibleTickers.map(t => `
-      <div class="legend-item">
+      <div class="legend-item" style="cursor:pointer" onclick="window._showPosModal('${t}')">
         <div class="legend-dot" style="background:${getColor(t)}"></div>
         ${t}${!state.CURRENT_TICKERS.includes(t) ? '<span style="color:#374151"> gesloten</span>' : ''}
       </div>`).join('');

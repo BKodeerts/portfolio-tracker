@@ -76,7 +76,7 @@ export function sparklineSVG(points, prevClose, tradingMins) {
 export function computeTodayPL() {
   const today = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
   let plEur = 0, baseEur = 0;
-  const latest = state.chartData[state.chartData.length - 1];
+  const latest = state.chartData.at(-1);
   if (!latest) return null;
 
   // Current live FX rate (EUR/USD), and the rate at the previous close.
@@ -179,7 +179,7 @@ export function renderIntradaySection() {
   gridEl.innerHTML = fxCard + entries.map(({ ticker, yahoo, data }) => {
     const hasData = data?.points?.length > 0;
     if (!hasData) {
-      return `<div class="intraday-card" style="opacity:0.45">
+      return `<div class="intraday-card" style="opacity:0.45;cursor:pointer" onclick="window._showPosModal('${ticker}')">
         <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
           <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
         </div>
@@ -203,7 +203,7 @@ export function renderIntradaySection() {
     const displayPrice = (nativeCcy === 'USD' && data.currency === 'EUR')
       ? last.close * (state.liveEurUsd || FX_FALLBACK)
       : last.close;
-    return `<div class="intraday-card" style="${isStale ? 'opacity:0.5' : ''}">
+    return `<div class="intraday-card" style="${isStale ? 'opacity:0.5;' : ''}cursor:pointer" onclick="window._showPosModal('${ticker}')">
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
         <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
         ${statusLabel}

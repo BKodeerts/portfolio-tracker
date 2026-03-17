@@ -55,7 +55,6 @@ async function init() {
 
 function setTab(t) {
   state.currentTab = t;
-  if (t === 'analyse' && state.currentPeriod === '1d') state.currentPeriod = 'total';
   if      (t === 'portefeuille') renderApp();
   else if (t === 'analyse')      renderAnalyse();
   else if (t === 'transacties')  renderTransacties();
@@ -65,7 +64,7 @@ function setTab(t) {
 function renderAppKeepScroll() { const y = window.scrollY; renderApp(); window.scrollTo(0, y); }
 function setView(v)          { state.currentView = v; renderAppKeepScroll(); }
 function setPeriod(p)        { state.currentPeriod = p; renderAppKeepScroll(); }
-function setPeriodAnalyse(p) { const y = window.scrollY; state.currentPeriod = p; renderAnalyse(); window.scrollTo(0, y); }
+function setPeriodAnalyse(p) { const y = window.scrollY; state.analysePeriod = p; renderAnalyse(); window.scrollTo(0, y); }
 function toggleClosed()      { state.showClosed = !state.showClosed; renderAppKeepScroll(); }
 
 function toggleTheme() {

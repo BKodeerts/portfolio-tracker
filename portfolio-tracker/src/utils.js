@@ -12,18 +12,18 @@ export function getColor(ticker) {
   return state.COLORS[ticker];
 }
 
-export function getFilteredData() {
-  if (state.currentPeriod === 'total') return state.chartData;
+export function getFilteredData(period = state.currentPeriod) {
+  if (period === 'total') return state.chartData;
   const now = new Date();
   let cutoff;
-  if      (state.currentPeriod === '1d')  { const d = new Date(now); d.setDate(d.getDate()-1);         cutoff = d.toISOString().slice(0,10); }
-  else if (state.currentPeriod === 'ytd') cutoff = `${now.getFullYear()}-01-01`;
-  else if (state.currentPeriod === '1m')  { const d = new Date(now); d.setMonth(d.getMonth()-1);       cutoff = d.toISOString().slice(0,10); }
-  else if (state.currentPeriod === '3m')  { const d = new Date(now); d.setMonth(d.getMonth()-3);       cutoff = d.toISOString().slice(0,10); }
-  else if (state.currentPeriod === '6m')  { const d = new Date(now); d.setMonth(d.getMonth()-6);       cutoff = d.toISOString().slice(0,10); }
-  else if (state.currentPeriod === '1y')  { const d = new Date(now); d.setFullYear(d.getFullYear()-1); cutoff = d.toISOString().slice(0,10); }
-  else if (state.currentPeriod === '2y')  { const d = new Date(now); d.setFullYear(d.getFullYear()-2); cutoff = d.toISOString().slice(0,10); }
-  else if (state.currentPeriod === '3y')  { const d = new Date(now); d.setFullYear(d.getFullYear()-3); cutoff = d.toISOString().slice(0,10); }
+  if      (period === '1d')  { const d = new Date(now); d.setDate(d.getDate()-1);         cutoff = d.toISOString().slice(0,10); }
+  else if (period === 'ytd') cutoff = `${now.getFullYear()}-01-01`;
+  else if (period === '1m')  { const d = new Date(now); d.setMonth(d.getMonth()-1);       cutoff = d.toISOString().slice(0,10); }
+  else if (period === '3m')  { const d = new Date(now); d.setMonth(d.getMonth()-3);       cutoff = d.toISOString().slice(0,10); }
+  else if (period === '6m')  { const d = new Date(now); d.setMonth(d.getMonth()-6);       cutoff = d.toISOString().slice(0,10); }
+  else if (period === '1y')  { const d = new Date(now); d.setFullYear(d.getFullYear()-1); cutoff = d.toISOString().slice(0,10); }
+  else if (period === '2y')  { const d = new Date(now); d.setFullYear(d.getFullYear()-2); cutoff = d.toISOString().slice(0,10); }
+  else if (period === '3y')  { const d = new Date(now); d.setFullYear(d.getFullYear()-3); cutoff = d.toISOString().slice(0,10); }
   return state.chartData.filter(d => d.date >= cutoff);
 }
 
