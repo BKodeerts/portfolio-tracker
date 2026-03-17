@@ -412,7 +412,7 @@ function buildSnapshotPositions(currentTickers, meta, prices, netShares, buyInve
     const cost = buyInvested[ticker] || 0;
     totalValue += value;
     totalCost  += cost;
-    positions.push({ ticker, label: m.label, value, pl: value - cost, plPct: cost > 0 ? ((value - cost) / cost * 100) : 0 });
+    positions.push({ ticker, label: m.label, value, cost, shares: netShares[ticker], pl: value - cost, plPct: cost > 0 ? ((value - cost) / cost * 100) : 0 });
   }
   return { totalValue, totalCost, positions };
 }

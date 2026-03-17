@@ -1,51 +1,30 @@
 /**
  * Background HA sensor push scheduler.
- * Runs on the server, no browser needed.
- * Interval controlled by HA_PUSH_INTERVAL env var (minutes, default 15).
+ * Interval and behaviour controlled via /data/options.json (HA addon options).
  */
 
 const { computeCurrentSnapshot } = require('./portfolio.js');
+const { getOptions, pushAll }     = require('./ha-helper.js');
 
-async function pushToHA(portfolio) {
+async function runOnce() {
   const token = process.env.SUPERVISOR_TOKEN;
   if (!token) return;
 
-  const { totalValue, totalCost, dailyPl } = portfolio;
-  const base    = 'http://supervisor/core/api/states';
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-
-  async function pushState(entity, value, attributes) {
-    const r = await fetch(`${base}/${entity}`, {
-      method: 'POST', headers,
-      body: JSON.stringify({ state: String(value), attributes }),
-    });
-    if (!r.ok) throw new Error(`${entity}: HTTP ${r.status}`);
-  }
-
-  const totalPl    = totalValue - totalCost;
-  const totalPlPct = totalCost > 0 ? (totalPl / totalCost * 100) : 0;
-
-  await pushState('sensor.portfolio_value', totalValue.toFixed(2), {
-    unit_of_measurement: '€', friendly_name: 'Portfolio Waarde',
-  });
-  await pushState('sensor.portfolio_pl', totalPl.toFixed(2), {
-    unit_of_measurement: '€', friendly_name: 'Portfolio P&L',
-  });
-  await pushState('sensor.portfolio_pl_pct', totalPlPct.toFixed(2), {
-    unit_of_measurement: '%', friendly_name: 'Portfolio P&L %',
-  });
-  await pushState('sensor.portfolio_daily_pl', (dailyPl || 0).toFixed(2), {
-    unit_of_measurement: '€', friendly_name: 'Portfolio Vandaag',
-  });
-
-  console.log(`[Scheduler] HA push OK — €${totalValue.toFixed(0)}, P&L €${totalPl.toFixed(0)} (${totalPlPct.toFixed(1)}%), vandaag €${(dailyPl || 0).toFixed(0)}`);
-}
-
-async function runOnce() {
   try {
-    const portfolio = await computeCurrentSnapshot();
-    if (!portfolio) return;
-    await pushToHA(portfolio);
+    const snapshot = await computeCurrentSnapshot();
+    if (!snapshot) return;
+
+    const options = getOptions();
+    const pushed  = await pushAll(token, snapshot, options);
+
+    const { totalValue, totalCost, dailyPl } = snapshot;
+    const pl    = totalValue - totalCost;
+    const plPct = totalCost > 0 ? (pl / totalCost * 100) : 0;
+    console.log(
+      `[Scheduler] HA push OK (${pushed} entities) — ` +
+      `€${totalValue.toFixed(0)}, P&L €${pl.toFixed(0)} (${plPct.toFixed(1)}%), ` +
+      `vandaag €${(dailyPl || 0).toFixed(0)}`,
+    );
   } catch (e) {
     console.warn('[Scheduler] run failed:', e.message);
   }
@@ -57,13 +36,14 @@ function start() {
     return;
   }
 
-  const intervalMin = Number.parseInt(process.env.HA_PUSH_INTERVAL, 10) || 15;
-  const intervalMs  = intervalMin * 60 * 1000;
+  const options    = getOptions();
+  const intervalMs = options.pushInterval * 60 * 1000;
 
-  setTimeout(runOnce, 15_000);
+  // Push immediately on startup (2 s delay to let the server and cache settle)
+  setTimeout(runOnce, 2_000);
   setInterval(runOnce, intervalMs);
 
-  console.log(`[Scheduler] HA sensor push every ${intervalMin} min`);
+  console.log(`[Scheduler] HA sensor push every ${options.pushInterval} min`);
 }
 
 module.exports = { start };
