@@ -160,12 +160,12 @@
 .tx-cell[contenteditable="true"]:focus { background: rgba(0,0,0,0.07); outline: 1px solid rgba(0,0,0,0.2); }
 .tx-ccy { background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.1); color: #1c1c1c; border-radius: 5px; font-size: 11px; padding: 2px 4px; font-family: 'JetBrains Mono', monospace; }
 .tx-del-btn { background: none; border: none; color: #bbb; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; line-height: 1; }
-.tx-col-name-group { min-width: 0; }
-.tx-name-top { display: flex; align-items: center; gap: 5px; font-family: inherit; }
+.tx-col-name-group { min-width: 0; overflow: hidden; }
+.tx-name-top { display: flex; align-items: center; gap: 5px; font-family: inherit; min-width: 0; }
 .tx-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.tx-name-ticker { font-weight: 600; font-size: 12px; font-family: inherit; }
+.tx-name-ticker { font-weight: 600; font-size: 12px; font-family: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .tx-name-sub { font-family: inherit; font-size: 11px; color: #888; padding-left: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tx-del-btn:hover { color: #ef4444; background: rgba(239,68,68,0.08); }
+.tx-del-btn:hover { color: #b91c1c; background: rgba(239,68,68,0.08); }
 .tx-save-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,0.07); }
 
 /* Analyse grid */

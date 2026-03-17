@@ -22,7 +22,9 @@ export function showPosModal(ticker) {
   const meta  = state.TICKER_META[ticker] || {};
   const color = getColor(ticker);
   const txs   = state.RAW_TRANSACTIONS.filter(t => t.ticker === ticker).slice().sort((a, b) => b.date.localeCompare(a.date));
-  const latest = state.lastLatest;
+  const latest = (state.lastLatest[ticker] !== undefined ? state.lastLatest : null)
+    ?? state.chartData.at(-1)
+    ?? {};
 
   const val  = latest[ticker] || 0;
   const cost = latest[`${ticker}_cost`] || 0;
