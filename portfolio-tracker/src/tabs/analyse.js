@@ -642,10 +642,11 @@ function renderTickerMetaEditor() {
 // ── Breakdown tab ─────────────────────────────────────────────────────────────
 
 function getAvailableTabs() {
-  const hasSectors   = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.sector).filter(Boolean)).size >= 1;
+  const hasSectors    = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.sector).filter(Boolean)).size >= 1;
   const hasIndustries = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.industry).filter(Boolean)).size >= 1;
-  const hasTypes     = state.CURRENT_TICKERS.some(t => state.TICKER_META?.[t]?.quoteType);
+  const hasTypes      = state.CURRENT_TICKERS.some(t => state.TICKER_META?.[t]?.quoteType);
   return [
+    'allocatie',
     hasSectors    ? 'sector'    : null,
     hasIndustries ? 'industrie' : null,
     hasTypes      ? 'type'      : null,
@@ -658,12 +659,15 @@ function renderBreakdownContent(latest) {
   if (!el) return;
 
   // Destroy any previous breakdown chart instances
-  ['sectorDonut', 'industryDonut', 'typeDonut'].forEach(key => {
+  ['donut', 'sectorDonut', 'industryDonut', 'typeDonut'].forEach(key => {
     if (state.chartInstances[key]) { state.chartInstances[key].destroy(); delete state.chartInstances[key]; }
   });
 
   const tab = state.breakdownTab;
-  if (tab === 'sector') {
+  if (tab === 'allocatie') {
+    el.innerHTML = `<div class="donut-with-legend"><div class="donut-canvas-wrap"><canvas id="chartDonut"></canvas></div><div id="chartDonutLegend" class="donut-legend-list"></div></div>`;
+    renderDonutChart(latest, 'chartDonut');
+  } else if (tab === 'sector') {
     el.innerHTML = `<div class="donut-with-legend"><div class="donut-canvas-wrap"><canvas id="chartSectorDonut"></canvas></div><div id="chartSectorDonutLegend" class="donut-legend-list"></div></div>`;
     renderSectorDonut(latest);
   } else if (tab === 'industrie') {
@@ -695,7 +699,6 @@ export function renderAnalyseCharts() {
   const available = getAvailableTabs();
   if (!available.includes(state.breakdownTab)) state.breakdownTab = available[0];
 
-  renderDonutChart(latest, 'chartDonut');
   renderBarChart(latest);
   renderBreakdownContent(latest);
   renderBenchmarkChart();
@@ -713,30 +716,28 @@ export function renderAnalyse() {
   const available = getAvailableTabs();
   if (!available.includes(state.breakdownTab)) state.breakdownTab = available[0];
 
-  const TAB_LABELS = { sector: 'Sector', industrie: 'Industrie', type: 'Type', munt: 'Munt' };
+  const TAB_LABELS = { allocatie: 'Allocatie', sector: 'Sector', industrie: 'Industrie', type: 'Type', munt: 'Munt' };
 
   document.getElementById('root').innerHTML = `
     ${renderAppHeader()}
     <div class="analyse-grid">
       <div class="chart-card">
-        <div class="card-title">Allocatie</div>
-        <div class="donut-with-legend">
-          <div class="donut-canvas-wrap"><canvas id="chartDonut"></canvas></div>
-          <div id="chartDonutLegend" class="donut-legend-list"></div>
+        <div class="chart-header" style="margin-bottom:14px">
+          <div class="card-title" style="margin-bottom:0">Verdeling</div>
+          <div class="seg desktop-only" id="breakdownTabs">
+            ${available.map(t => `<button class="seg-btn${state.breakdownTab === t ? ' on' : ''}" data-tab="${t}" onclick="window._setBreakdownTab('${t}')">${TAB_LABELS[t]}</button>`).join('')}
+          </div>
+          <div class="chart-controls-mobile">
+            <select class="mobile-select" onchange="window._setBreakdownTab(this.value)">
+              ${available.map(t => `<option value="${t}"${state.breakdownTab === t ? ' selected' : ''}>${TAB_LABELS[t]}</option>`).join('')}
+            </select>
+          </div>
         </div>
+        <div id="breakdownContent"></div>
       </div>
       <div class="chart-card">
         <div class="card-title">Kostprijs vs Waarde</div>
         <div style="height:240px"><canvas id="chartBar"></canvas></div>
-      </div>
-      <div class="chart-card analyse-full">
-        <div class="chart-header" style="margin-bottom:14px">
-          <div class="card-title" style="margin-bottom:0">Verdeling</div>
-          <div class="seg" id="breakdownTabs">
-            ${available.map(t => `<button class="seg-btn${state.breakdownTab === t ? ' on' : ''}" data-tab="${t}" onclick="window._setBreakdownTab('${t}')">${TAB_LABELS[t]}</button>`).join('')}
-          </div>
-        </div>
-        <div id="breakdownContent"></div>
       </div>
       <div class="chart-card analyse-full">
         <div class="chart-header" style="margin-bottom:12px">
