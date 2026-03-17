@@ -324,19 +324,11 @@ export function renderAssetTypeDonut(latest) {
 }
 
 function buildBenchmarkSeries(filtered, ...benchMaps) {
-  const txByDate = {};
-  for (const tx of state.RAW_TRANSACTIONS) {
-    (txByDate[tx.date] = txByDate[tx.date] || []).push(tx);
-  }
-
-  const startDate = filtered[0].date;
-  const startCost = filtered[0].totalCost || filtered[0].total;
-
-  // Buy benchmark units equal to startCost at start-of-period price
-  const benchUnits = benchMaps.map(m => {
-    const p = m[startDate];
-    return p && startCost > 0 ? startCost / p : 0;
-  });
+  const startDate   = filtered[0].date;
+  const startCost   = filtered[0].totalCost || 1;
+  const startTotal  = filtered[0].total     || 0;
+  const baseReturn  = startCost > 0 ? startTotal / startCost : 1; // (1 + r0)
+  const benchBases  = benchMaps.map(m => m[startDate] ?? null);
 
   const portfolioSeries = [{ x: startDate, y: 0 }];
   const benchSeriesArr  = benchMaps.map(() => [{ x: startDate, y: 0 }]);
@@ -344,28 +336,19 @@ function buildBenchmarkSeries(filtered, ...benchMaps) {
   for (let i = 1; i < filtered.length; i++) {
     const row       = filtered[i];
     const totalCost = row.totalCost || 0;
-    const txsToday  = txByDate[row.date] || [];
 
-    // Mirror cash flows (buys/sells) into benchmark
-    for (const tx of txsToday) {
-      if (tx.date <= startDate) continue;
-      const cash = tx.shares > 0 ? tx.costEur : -tx.costEur;
-      benchMaps.forEach((m, j) => {
-        const p = m[row.date];
-        if (p) benchUnits[j] += cash / p;
-      });
-    }
-
-    // Portfolio: unrealized return on FIFO cost basis (matches portfolio tab)
-    const portfolioY = totalCost > 0 ? (row.total / totalCost - 1) * 100 : 0;
+    // Portfolio: unrealized return relative to start of period (FIFO cost, no spikes from sells)
+    const absReturn = totalCost > 0 ? row.total / totalCost : baseReturn;
+    const portfolioY = ((absReturn / baseReturn) - 1) * 100;
     portfolioSeries.push({ x: row.date, y: Number.parseFloat(portfolioY.toFixed(2)) });
 
-    benchMaps.forEach((m, j) => {
-      const p  = m[row.date];
-      const bv = p != null ? benchUnits[j] * p : null;
-      const y  = bv != null && totalCost > 0 ? (bv / totalCost - 1) * 100 : null;
+    // Benchmark: simple indexed return from period start
+    for (const [j, m] of benchMaps.entries()) {
+      const p    = m[row.date];
+      const base = benchBases[j];
+      const y    = p != null && base ? (p / base - 1) * 100 : null;
       benchSeriesArr[j].push({ x: row.date, y: y == null ? null : Number.parseFloat(y.toFixed(2)) });
-    });
+    }
   }
 
   return { portfolioSeries, benchSeriesArr };
