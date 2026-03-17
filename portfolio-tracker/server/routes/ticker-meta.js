@@ -22,7 +22,7 @@ router.post('/', (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Expected a JSON object' });
     }
     // Sanitize: only allow known fields per ticker
-    const allowed = ['quoteType', 'sector', 'geo', 'manualPriceEur', 'manualPriceAsOf'];
+    const allowed = ['quoteType', 'sector', 'industry', 'geo', 'manualPriceEur', 'manualPriceAsOf'];
     const clean = {};
     for (const [ticker, meta] of Object.entries(body)) {
       if (typeof meta !== 'object' || !meta) continue;

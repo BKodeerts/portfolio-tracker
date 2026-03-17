@@ -228,6 +228,53 @@ export function renderSectorDonut(latest) {
   });
 }
 
+export function renderIndustryDonut(latest) {
+  const el = document.getElementById('chartIndustryDonut');
+  if (!el) return;
+
+  const industryValues = {};
+  for (const ticker of state.CURRENT_TICKERS) {
+    const industry = state.TICKER_META?.[ticker]?.industry || 'Overig';
+    industryValues[industry] = (industryValues[industry] || 0) + (latest[ticker] || 0);
+  }
+  const industries = Object.keys(industryValues).sort((a, b) => industryValues[b] - industryValues[a]);
+  const values     = industries.map(s => industryValues[s]);
+  const total      = values.reduce((a, b) => a + b, 0);
+  const colors     = industries.map((_, i) => SECTOR_COLORS[i % SECTOR_COLORS.length]);
+  const ct         = chartTheme();
+
+  const legendEl = document.getElementById('chartIndustryDonutLegend');
+  if (legendEl) {
+    legendEl.innerHTML = industries.map((s, i) => {
+      const pct = total > 0 ? (values[i] / total * 100) : 0;
+      return `<div class="donut-legend-item">
+        <span class="donut-legend-dot" style="background:${colors[i]}"></span>
+        <span class="donut-legend-ticker">${s}</span>
+        <span class="donut-legend-pct">${pct.toFixed(1)}%</span>
+      </div>`;
+    }).join('');
+  }
+
+  state.chartInstances.industryDonut = new Chart(el.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: industries,
+      datasets: [{ data: values, backgroundColor: colors, borderColor: ct.donutBorder, borderWidth: 2, hoverOffset: 5 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
+          bodyColor: ct.bodyColor, bodyFont: { family: "'JetBrains Mono'", size: 11 }, padding: 12, cornerRadius: 10,
+          callbacks: { label: item => ` ${item.label}: ${state.privacyMode ? '●●●' : fmt(item.raw)} (${((item.raw / total) * 100).toFixed(1)}%)` },
+        },
+      },
+    },
+  });
+}
+
 export function renderAssetTypeDonut(latest) {
   const el = document.getElementById('chartTypeDonut');
   if (!el) return;
@@ -597,15 +644,18 @@ function renderTickerMetaEditor() {
 export function renderAnalyseCharts() {
   const latest = state.chartData[state.chartData.length - 1];
 
-  const sectors   = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.sector).filter(Boolean));
-  const hasSectors = sectors.size >= 1;
-  const hasTypes   = state.CURRENT_TICKERS.some(t => state.TICKER_META?.[t]?.quoteType);
+  const sectors    = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.sector).filter(Boolean));
+  const industries = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.industry).filter(Boolean));
+  const hasSectors   = sectors.size >= 1;
+  const hasIndustries = industries.size >= 1;
+  const hasTypes     = state.CURRENT_TICKERS.some(t => state.TICKER_META?.[t]?.quoteType);
 
   renderDonutChart(latest, 'chartDonut');
   renderBarChart(latest);
   renderCurrencyDonut();
-  if (hasTypes)   renderAssetTypeDonut(latest);
-  if (hasSectors) renderSectorDonut(latest);
+  if (hasTypes)      renderAssetTypeDonut(latest);
+  if (hasSectors)    renderSectorDonut(latest);
+  if (hasIndustries) renderIndustryDonut(latest);
   renderBenchmarkChart();
   renderRollingReturnsTable();
   renderRiskMetricsCard();
@@ -618,9 +668,11 @@ export function renderAnalyse() {
   state.currentTab = 'analyse';
   const latest = state.chartData[state.chartData.length - 1];
 
-  const sectors    = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.sector).filter(Boolean));
-  const hasSectors = sectors.size >= 1;
-  const hasTypes   = state.CURRENT_TICKERS.some(t => state.TICKER_META?.[t]?.quoteType);
+  const sectors     = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.sector).filter(Boolean));
+  const industries  = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.industry).filter(Boolean));
+  const hasSectors    = sectors.size >= 1;
+  const hasIndustries = industries.size >= 1;
+  const hasTypes      = state.CURRENT_TICKERS.some(t => state.TICKER_META?.[t]?.quoteType);
 
   document.getElementById('root').innerHTML = `
     ${renderAppHeader()}
@@ -652,6 +704,13 @@ export function renderAnalyse() {
         <div class="donut-with-legend">
           <div class="donut-canvas-wrap"><canvas id="chartSectorDonut"></canvas></div>
           <div id="chartSectorDonutLegend" class="donut-legend-list"></div>
+        </div>
+      </div>` : ''}
+      ${hasIndustries ? `<div class="chart-card">
+        <div class="card-title">Industrie allocatie</div>
+        <div class="donut-with-legend">
+          <div class="donut-canvas-wrap"><canvas id="chartIndustryDonut"></canvas></div>
+          <div id="chartIndustryDonutLegend" class="donut-legend-list"></div>
         </div>
       </div>` : ''}
       <div class="chart-card analyse-full">

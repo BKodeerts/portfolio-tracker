@@ -45,6 +45,7 @@ function buildMeta(transactions) {
         label:           tx.label || tx.ticker,
         quoteType:       extra.quoteType       || null,
         sector:          extra.sector          || null,
+        industry:        extra.industry        || null,
         geo:             extra.geo             || null,
         manualPriceEur:  extra.manualPriceEur  || null,
         manualPriceAsOf: extra.manualPriceAsOf || null,
@@ -723,6 +724,7 @@ async function computeFullPortfolio() {
         const patch = { ...(tickerMetaLive[pos.ticker] || tm) };
         if (!tm.quoteType && summary.quoteType) { patch.quoteType = summary.quoteType; meta[pos.ticker].quoteType = summary.quoteType; }
         if (!tm.sector    && summary.sector)    { patch.sector    = summary.sector;    meta[pos.ticker].sector    = summary.sector; }
+        if (!tm.industry  && summary.industry)  { patch.industry  = summary.industry;  meta[pos.ticker].industry  = summary.industry; }
         tickerMetaLive[pos.ticker] = patch;
         tickerMetaChanged = true;
       }
