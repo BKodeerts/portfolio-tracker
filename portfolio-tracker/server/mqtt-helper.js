@@ -46,8 +46,9 @@ async function resolveBrokerCredentials(options) {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (r.ok) {
-        const svc = await r.json();
-        // Response: { host, port, username, password, ssl, protocol }
+        // Supervisor API wraps responses: { result: "ok", data: { host, port, ... } }
+        const json = await r.json();
+        const svc  = json.data ?? json;
         return {
           host:     svc.host,
           port:     svc.port     ?? 1883,
@@ -56,6 +57,8 @@ async function resolveBrokerCredentials(options) {
           ssl:      svc.ssl      ?? false,
         };
       }
+      console.warn(`[MQTT] Supervisor services/mqtt returned ${r.status}`);
+
     } catch {
       // fall through to manual options
     }
@@ -226,7 +229,7 @@ async function publishDiscovery(mqttClient, options) {
 }
 
 async function publishPositionDiscovery(mqttClient, pos) {
-  const slug      = pos.ticker.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  const slug      = pos.ticker.toLowerCase().replaceAll(/[^a-z0-9]/g, '_');
   const stateTopic = `portfolio_tracker/positions/${slug}/state`;
 
   await mqttClient.publishAsync(
@@ -258,6 +261,12 @@ async function removePositionDiscovery(mqttClient, slug) {
 }
 
 // ── State publishing ──────────────────────────────────────────────────────────
+
+function marketStatus() {
+  if (isWeekend()) return 'weekend';
+  if (isMarketOpen('NYSE') || isMarketOpen('XETRA')) return 'open';
+  return 'closed';
+}
 
 async function publishState(mqttClient, snapshot, options) {
   const { totalValue, totalCost, dailyPl, positions } = snapshot;
@@ -292,7 +301,7 @@ async function publishState(mqttClient, snapshot, options) {
     xetra_open:       isMarketOpen('XETRA'),
     drawdown_warning: drawdownPct >= options.drawdownAlertPct,
     target_hit:       options.targetValue > 0 && totalValue >= options.targetValue,
-    market_status:    isWeekend() ? 'weekend' : (isMarketOpen('NYSE') || isMarketOpen('XETRA') ? 'open' : 'closed'),
+    market_status:    marketStatus(),
     last_updated:     new Date().toISOString(),
   };
 

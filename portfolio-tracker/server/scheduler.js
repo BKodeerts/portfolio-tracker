@@ -53,8 +53,15 @@ function start() {
     return;
   }
 
-  if (!options.useMqttDiscovery && !process.env.SUPERVISOR_TOKEN) {
-    console.log('[Scheduler] No SUPERVISOR_TOKEN and MQTT not enabled — HA push disabled');
+  if (options.useMqttDiscovery) {
+    const hasSupervisor  = Boolean(process.env.SUPERVISOR_TOKEN);
+    const hasManualBroker = Boolean(options.mqttBroker);
+    if (!hasSupervisor && !hasManualBroker) {
+      console.log('[Scheduler] MQTT mode: no SUPERVISOR_TOKEN and no mqtt_broker configured — HA push disabled');
+      return;
+    }
+  } else if (!process.env.SUPERVISOR_TOKEN) {
+    console.log('[Scheduler] States API mode: no SUPERVISOR_TOKEN — HA push disabled');
     return;
   }
 

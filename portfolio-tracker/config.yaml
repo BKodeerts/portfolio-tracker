@@ -1,6 +1,6 @@
 name: "Portfolio Tracker"
 description: "Self-hosted stock portfolio tracker with Yahoo Finance data"
-version: "0.3.2"
+version: "0.3.3"
 slug: "portfolio_tracker"
 init: false
 arch:
@@ -9,6 +9,8 @@ arch:
   - armhf
   - armv7
 homeassistant_api: true
+services:
+  - mqtt:want
 ingress: true
 ingress_port: 3069
 panel_icon: "mdi:chart-line"
