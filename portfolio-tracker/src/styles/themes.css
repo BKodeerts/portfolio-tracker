@@ -92,6 +92,9 @@ body.theme-dark .tx-add-form-field select              { background: rgba(255,25
 body.theme-dark .tx-add-form-field input:focus,
 body.theme-dark .tx-add-form-field select:focus        { border-color: rgba(255,255,255,0.28); }
 body.theme-dark .tx-add-form-field select option       { background: #222226; }
+body.theme-dark .meta-input                            { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.13); color: #e2e2e2; }
+body.theme-dark .meta-input:focus                      { border-color: rgba(255,255,255,0.28); }
+body.theme-dark .meta-input::placeholder               { color: #606060; }
 body.theme-dark .donut-legend-pct                      { color: #808080; }
 body.theme-dark .donut-legend-val                      { color: #808080; }
 body.theme-dark .currency-label-name                   { color: #808080; }
