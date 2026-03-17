@@ -5,7 +5,7 @@
 
 const fs   = require('node:fs');
 const path = require('node:path');
-const { fetchDailyQuote, fetchCandles, fetchIntraday, sleep, FETCH_DELAY } = require('./yahoo.js');
+const { fetchDailyQuote, fetchCandles, fetchIntraday, fetchQuoteSummary, sleep, FETCH_DELAY } = require('./yahoo.js');
 const { readCache, writeCache, QUOTES_CACHE_TTL, CACHE_TTL, INTRADAY_CACHE_TTL } = require('./cache.js');
 
 const DATA_DIR          = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -43,6 +43,7 @@ function buildMeta(transactions) {
         yahoo:           tx.yahoo,
         currency:        extra.manualPriceEur ? 'EUR' : (tx.currency || 'EUR'),
         label:           tx.label || tx.ticker,
+        quoteType:       extra.quoteType       || null,
         sector:          extra.sector          || null,
         geo:             extra.geo             || null,
         manualPriceEur:  extra.manualPriceEur  || null,
@@ -692,12 +693,49 @@ async function computeFullPortfolio() {
       }))
     : [];
 
-  // Enrich positions with 52w data from cached quotes
+  // Enrich positions with 52w data + auto-populate quoteType/sector in ticker_meta
+  const tickerMetaLive = loadTickerMeta();
+  let tickerMetaChanged = false;
+
   for (const pos of positions) {
-    const q = await getQuote(meta[pos.ticker].yahoo);
+    const yahooSym = meta[pos.ticker].yahoo;
+    const q = await getQuote(yahooSym);
     pos.high52 = q?.fiftyTwoWeekHigh ?? null;
     pos.low52  = q?.fiftyTwoWeekLow  ?? null;
     pos.pe     = q?.trailingPE       ?? null;
+
+    const tm = tickerMetaLive[pos.ticker] || {};
+
+    // Auto-populate quoteType from instrumentType (already in quote cache)
+    if (!tm.quoteType && q?.instrumentType) {
+      tickerMetaLive[pos.ticker] = { ...tm, quoteType: q.instrumentType };
+      meta[pos.ticker].quoteType = q.instrumentType;
+      tickerMetaChanged = true;
+    }
+
+    // Auto-populate sector from quoteSummary if missing
+    if (!tm.sector) {
+      const summaryKey = `summary_${yahooSym}`;
+      let summary = readCache(summaryKey, 7 * 24 * 60 * 60 * 1000);
+      if (!summary) {
+        try {
+          summary = await fetchQuoteSummary(yahooSym);
+          if (summary) writeCache(summaryKey, summary);
+          await sleep(FETCH_DELAY);
+        } catch (e) {
+          console.warn(`[SUMMARY] ${yahooSym}: ${e.message}`);
+        }
+      }
+      if (summary?.sector) {
+        tickerMetaLive[pos.ticker] = { ...(tickerMetaLive[pos.ticker] || tm), sector: summary.sector };
+        meta[pos.ticker].sector = summary.sector;
+        tickerMetaChanged = true;
+      }
+    }
+  }
+
+  if (tickerMetaChanged) {
+    fs.writeFileSync(TICKER_META_FILE, JSON.stringify(tickerMetaLive, null, 2));
   }
 
   // Currency exposure

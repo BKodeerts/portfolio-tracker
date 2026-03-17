@@ -8,6 +8,8 @@ import { renderDonutChart } from '../components/donut.js';
 import { saveTickerMeta } from '../api.js';
 
 const SECTOR_COLORS = ['#818cf8','#34d399','#fbbf24','#f87171','#60a5fa','#a78bfa','#fb923c','#4ade80','#38bdf8','#f472b6'];
+const TYPE_COLORS   = ['#60a5fa','#34d399','#fbbf24','#f87171','#a78bfa','#fb923c','#38bdf8','#4ade80','#f472b6','#818cf8'];
+const QUOTE_TYPE_LABELS = { EQUITY:'Aandeel', ETF:'ETF', MUTUALFUND:'Fonds', OPTION:'Optie', WARRANT:'Warrant', FUTURE:'Future', INDEX:'Index', CURRENCY:'Valuta', CRYPTOCURRENCY:'Crypto' };
 
 // ── Sort state ────────────────────────────────────────────────────────────────
 
@@ -185,7 +187,7 @@ export function renderSectorDonut(latest) {
   // Group position values by sector
   const sectorValues = {};
   for (const ticker of state.CURRENT_TICKERS) {
-    const sector = state.tickerMeta?.[ticker]?.sector || 'Overig';
+    const sector = state.TICKER_META?.[ticker]?.sector || 'Overig';
     sectorValues[sector] = (sectorValues[sector] || 0) + (latest[ticker] || 0);
   }
   const sectors = Object.keys(sectorValues).sort((a, b) => sectorValues[b] - sectorValues[a]);
@@ -220,6 +222,54 @@ export function renderSectorDonut(latest) {
           backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
           bodyColor: ct.bodyColor, bodyFont: { family: "'JetBrains Mono'", size: 11 }, padding: 12, cornerRadius: 10,
           callbacks: { label: item => ` ${item.label}: ${state.privacyMode ? '●●●' : fmt(item.raw)} (${((item.raw / values.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)` },
+        },
+      },
+    },
+  });
+}
+
+export function renderAssetTypeDonut(latest) {
+  const el = document.getElementById('chartTypeDonut');
+  if (!el) return;
+
+  const typeValues = {};
+  for (const ticker of state.CURRENT_TICKERS) {
+    const raw  = state.TICKER_META?.[ticker]?.quoteType || null;
+    const label = (raw && QUOTE_TYPE_LABELS[raw]) ? QUOTE_TYPE_LABELS[raw] : (raw || 'Overig');
+    typeValues[label] = (typeValues[label] || 0) + (latest[ticker] || 0);
+  }
+  const types  = Object.keys(typeValues).sort((a, b) => typeValues[b] - typeValues[a]);
+  const values = types.map(t => typeValues[t]);
+  const total  = values.reduce((a, b) => a + b, 0);
+  const colors = types.map((_, i) => TYPE_COLORS[i % TYPE_COLORS.length]);
+  const ct     = chartTheme();
+
+  const legendEl = document.getElementById('chartTypeDonutLegend');
+  if (legendEl) {
+    legendEl.innerHTML = types.map((t, i) => {
+      const pct = total > 0 ? (values[i] / total * 100) : 0;
+      return `<div class="donut-legend-item">
+        <span class="donut-legend-dot" style="background:${colors[i]}"></span>
+        <span class="donut-legend-ticker">${t}</span>
+        <span class="donut-legend-pct">${pct.toFixed(1)}%</span>
+      </div>`;
+    }).join('');
+  }
+
+  state.chartInstances.typeDonut = new Chart(el.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: types,
+      datasets: [{ data: values, backgroundColor: colors, borderColor: ct.donutBorder, borderWidth: 2, hoverOffset: 5 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
+          bodyColor: ct.bodyColor, bodyFont: { family: "'JetBrains Mono'", size: 11 }, padding: 12, cornerRadius: 10,
+          callbacks: { label: item => ` ${item.label}: ${state.privacyMode ? '●●●' : fmt(item.raw)} (${((item.raw / total) * 100).toFixed(1)}%)` },
         },
       },
     },
@@ -464,16 +514,14 @@ export async function saveTickerMetaUI() {
   const allTickers = Object.keys(state.TICKER_META);
   const result = {};
   for (const ticker of allTickers) {
-    const sector = document.getElementById(`meta_sector_${ticker}`)?.value?.trim() || '';
-    const geo    = document.getElementById(`meta_geo_${ticker}`)?.value?.trim()    || '';
+    const geo    = document.getElementById(`meta_geo_${ticker}`)?.value?.trim() || '';
     const priceEl = document.getElementById(`meta_price_${ticker}`);
     const asOfEl  = document.getElementById(`meta_asof_${ticker}`);
     const manualPriceEur  = priceEl ? Number.parseFloat(priceEl.value) || null : null;
     const manualPriceAsOf = asOfEl  ? asOfEl.value || null : null;
     const existing = state.tickerMeta[ticker] || {};
     const merged   = { ...existing };
-    if (sector) merged.sector = sector; else delete merged.sector;
-    if (geo)    merged.geo    = geo;    else delete merged.geo;
+    if (geo) merged.geo = geo; else delete merged.geo;
     if (manualPriceEur && manualPriceAsOf) { merged.manualPriceEur = manualPriceEur; merged.manualPriceAsOf = manualPriceAsOf; }
     else { delete merged.manualPriceEur; delete merged.manualPriceAsOf; }
     if (Object.keys(merged).length) result[ticker] = merged;
@@ -497,9 +545,13 @@ function renderTickerMetaEditor() {
     const tm      = state.tickerMeta[ticker] || {};
     const meta    = state.TICKER_META[ticker] || {};
     const hasManual = tm.manualPriceEur && tm.manualPriceAsOf;
+    const rawType = meta.quoteType || null;
+    const typeLabel = (rawType && QUOTE_TYPE_LABELS[rawType]) ? QUOTE_TYPE_LABELS[rawType] : (rawType || '—');
+    const sectorLabel = meta.sector || '—';
     return `<tr>
       <td style="font-weight:600">${ticker}<div class="c-neutral" style="font-size:10px">${meta.label || ''}</div></td>
-      <td><input class="meta-input" id="meta_sector_${ticker}" value="${tm.sector || ''}" placeholder="bv. Tech, ETF" style="width:100px"></td>
+      <td class="c-neutral" style="font-size:12px">${typeLabel}</td>
+      <td class="c-neutral" style="font-size:12px">${sectorLabel}</td>
       <td><input class="meta-input" id="meta_geo_${ticker}" value="${tm.geo || ''}" placeholder="bv. US, EU" style="width:70px"></td>
       <td>
         <input class="meta-input" id="meta_price_${ticker}" type="number" step="0.01" value="${hasManual ? tm.manualPriceEur : ''}" placeholder="prijs €" style="width:80px">
@@ -511,10 +563,10 @@ function renderTickerMetaEditor() {
   el.innerHTML = `
     <details>
       <summary class="c-neutral" style="cursor:pointer;font-size:13px;font-weight:600;margin-bottom:12px;list-style:none">
-        ▸ Ticker instellingen (sector, geo, manuele prijs)
+        ▸ Ticker instellingen (geo, manuele prijs)
       </summary>
       <table class="pos-table" style="margin-top:8px">
-        <thead><tr><th style="text-align:left">Ticker</th><th>Sector</th><th>Geo</th><th>Manuele prijs (€ + datum)</th></tr></thead>
+        <thead><tr><th style="text-align:left">Ticker</th><th>Type</th><th>Sector</th><th>Geo</th><th>Manuele prijs (€ + datum)</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <div style="margin-top:12px">
@@ -528,15 +580,14 @@ function renderTickerMetaEditor() {
 export function renderAnalyseCharts() {
   const latest = state.chartData[state.chartData.length - 1];
 
-  // Determine if sector data is available (≥2 distinct sectors)
-  const sectors = new Set(
-    state.CURRENT_TICKERS.map(t => state.tickerMeta?.[t]?.sector).filter(Boolean),
-  );
+  const sectors   = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.sector).filter(Boolean));
   const hasSectors = sectors.size >= 1;
+  const hasTypes   = state.CURRENT_TICKERS.some(t => state.TICKER_META?.[t]?.quoteType);
 
   renderDonutChart(latest, 'chartDonut');
   renderBarChart(latest);
   renderCurrencyDonut();
+  if (hasTypes)   renderAssetTypeDonut(latest);
   if (hasSectors) renderSectorDonut(latest);
   renderBenchmarkChart();
   renderRollingReturnsTable();
@@ -550,10 +601,9 @@ export function renderAnalyse() {
   state.currentTab = 'analyse';
   const latest = state.chartData[state.chartData.length - 1];
 
-  const sectors = new Set(
-    state.CURRENT_TICKERS.map(t => state.tickerMeta?.[t]?.sector).filter(Boolean),
-  );
+  const sectors    = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.sector).filter(Boolean));
   const hasSectors = sectors.size >= 1;
+  const hasTypes   = state.CURRENT_TICKERS.some(t => state.TICKER_META?.[t]?.quoteType);
 
   document.getElementById('root').innerHTML = `
     ${renderAppHeader()}
@@ -573,6 +623,13 @@ export function renderAnalyse() {
         <div class="card-title">Munt blootstelling</div>
         <div id="chartCurrencyDonut"></div>
       </div>
+      ${hasTypes ? `<div class="chart-card">
+        <div class="card-title">Type</div>
+        <div class="donut-with-legend">
+          <div class="donut-canvas-wrap"><canvas id="chartTypeDonut"></canvas></div>
+          <div id="chartTypeDonutLegend" class="donut-legend-list"></div>
+        </div>
+      </div>` : ''}
       ${hasSectors ? `<div class="chart-card">
         <div class="card-title">Sector allocatie</div>
         <div class="donut-with-legend">

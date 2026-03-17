@@ -63,6 +63,7 @@ async function fetchDailyQuote(yahooSymbol) {
     dayLow:            meta.regularMarketDayLow  ?? null,
     exchangeName:      meta.fullExchangeName      ?? null,
     exchangeTimezone:  meta.exchangeTimezoneName  ?? null,
+    instrumentType:    meta.instrumentType        || null,
   };
 }
 
@@ -85,6 +86,17 @@ async function fetchIntraday(yahooSymbol) {
   };
 }
 
+async function fetchQuoteSummary(yahooSymbol) {
+  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(yahooSymbol)}?modules=assetProfile%2CfundProfile`;
+  const text = await fetchYahoo(url);
+  const result = JSON.parse(text)?.quoteSummary?.result?.[0];
+  if (!result) return null;
+  return {
+    sector:   result.assetProfile?.sector       ?? result.fundProfile?.categoryName ?? null,
+    industry: result.assetProfile?.industry     ?? null,
+  };
+}
+
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-module.exports = { fetchCandles, fetchDailyQuote, fetchIntraday, fetchYahoo, sleep, FETCH_DELAY };
+module.exports = { fetchCandles, fetchDailyQuote, fetchIntraday, fetchQuoteSummary, fetchYahoo, sleep, FETCH_DELAY };

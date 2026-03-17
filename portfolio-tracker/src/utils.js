@@ -39,11 +39,11 @@ export function chartTheme() {
     tooltipBorder: dark ? 'rgba(255,255,255,0.1)'  : 'rgba(0,0,0,0.08)',
     titleColor:    '#888',
     bodyColor:     dark ? '#d8d8d8'                : '#1c1c1c',
-    gridColor:     dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)',
-    tickColor:     dark ? '#666'                   : '#999',
-    costLine:      dark ? '#555'                   : '#ccc',
-    costFill:      dark ? 'rgba(68,68,68,0.05)'    : 'rgba(0,0,0,0.03)',
-    donutBorder:   dark ? 'rgba(26,26,26,0.9)'     : 'rgba(243,245,248,0.9)',
-    benchmarkLine: dark ? '#666'                   : '#bbb',
+    gridColor:     dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+    tickColor:     dark ? '#909090'                : '#999',
+    costLine:      dark ? '#666'                   : '#ccc',
+    costFill:      dark ? 'rgba(80,80,80,0.07)'    : 'rgba(0,0,0,0.03)',
+    donutBorder:   dark ? 'rgba(24,24,27,0.9)'     : 'rgba(243,245,248,0.9)',
+    benchmarkLine: dark ? '#888'                   : '#bbb',
   };
 }
