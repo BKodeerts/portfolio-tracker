@@ -16,6 +16,7 @@ const STATE_FILE        = path.join(DATA_DIR, 'portfolio_state.json');
 const FX_SYMBOL        = 'EURUSD=X';
 const FX_FALLBACK      = 1.09;
 const BENCHMARK_SYM    = 'VWCE.DE';
+const SP500_SYM        = '^GSPC';
 const SPLIT_CANDIDATES = [2, 3, 4, 5, 8, 10, 20, 25, 50, 100];
 
 // ── Data access ───────────────────────────────────────────────────────────────
@@ -384,15 +385,16 @@ async function appendTodaySnapshot(chartData, meta, transactions, fxMap, adjShar
 /**
  * Build benchmark data indexed to 100 at the first chartData date.
  */
-function buildBenchmarkData(priceMaps, chartData) {
-  if (!priceMaps[BENCHMARK_SYM] || !chartData.length) return [];
-  const basePrice = priceMaps[BENCHMARK_SYM][chartData[0].date];
-  if (!basePrice) return [];
+function buildBenchmarkData(priceMaps, chartData, symbol, fxMap = null) {
+  if (!priceMaps[symbol] || !chartData.length) return [];
+  const toEur = (date, price) => fxMap ? price / (fxMap[date] || FX_FALLBACK) : price;
+  const baseEur = toEur(chartData[0].date, priceMaps[symbol][chartData[0].date]);
+  if (!baseEur) return [];
   return chartData
     .map(row => {
-      const p = priceMaps[BENCHMARK_SYM][row.date];
+      const p = priceMaps[symbol][row.date];
       if (p == null) return null;
-      return { date: row.date, value: Number.parseFloat(((p / basePrice) * 100).toFixed(2)) };
+      return { date: row.date, value: Number.parseFloat((toEur(row.date, p) / baseEur * 100).toFixed(2)) };
     })
     .filter(Boolean);
 }
@@ -475,13 +477,13 @@ function computeRiskMetrics(chartData, benchmarkData) {
 /**
  * Compute rolling period returns for portfolio and benchmark.
  */
-function computeRollingReturns(chartData, benchmarkData, twrPct = null) {
+function computeRollingReturns(chartData, benchmarkData, sp500Data, twrPct = null) {
   if (!chartData.length) return null;
 
-  const latest  = chartData.at(-1);
-  const today   = latest.date;
-  const benchMap = {};
-  for (const b of benchmarkData) benchMap[b.date] = b.value;
+  const latest   = chartData.at(-1);
+  const today    = latest.date;
+  const vwceMap  = Object.fromEntries(benchmarkData.map(b => [b.date, b.value]));
+  const sp500Map = Object.fromEntries(sp500Data.map(b => [b.date, b.value]));
 
   function findStartRow(daysAgo) {
     const cutoff = new Date(today);
@@ -501,26 +503,27 @@ function computeRollingReturns(chartData, benchmarkData, twrPct = null) {
     return chartData[0];
   }
 
+  const benchReturn = (map, startRow) => {
+    const s = map[startRow.date], l = map[latest.date];
+    return s && l ? Number.parseFloat(((l / s - 1) * 100).toFixed(2)) : null;
+  };
+
   function calcReturn(startRow) {
     if (!startRow || startRow.date === latest.date) return null;
     const portfolio = startRow.total > 0
       ? Number.parseFloat(((latest.total / startRow.total - 1) * 100).toFixed(2))
       : null;
-    const startBench  = benchMap[startRow.date];
-    const latestBench = benchMap[latest.date];
-    const benchmark   = startBench && latestBench
-      ? Number.parseFloat(((latestBench / startBench - 1) * 100).toFixed(2))
-      : null;
-    return { portfolio, benchmark };
+    return { portfolio, vwce: benchReturn(vwceMap, startRow), sp500: benchReturn(sp500Map, startRow) };
   }
 
+  const inception0 = calcReturn(chartData[0]);
   return {
-    '1w':       calcReturn(findStartRow(7)),
-    '1m':       calcReturn(findStartRow(30)),
-    '3m':       calcReturn(findStartRow(91)),
-    'ytd':      calcReturn(ytdRow()),
-    '1y':       calcReturn(findStartRow(365)),
-    'inception': { portfolio: twrPct, benchmark: calcReturn(chartData[0])?.benchmark ?? null },
+    '1w':        calcReturn(findStartRow(7)),
+    '1m':        calcReturn(findStartRow(30)),
+    '3m':        calcReturn(findStartRow(91)),
+    'ytd':       calcReturn(ytdRow()),
+    '1y':        calcReturn(findStartRow(365)),
+    'inception': { portfolio: twrPct, vwce: inception0?.vwce ?? null, sp500: inception0?.sp500 ?? null },
   };
 }
 
@@ -639,7 +642,7 @@ async function computeFullPortfolio() {
   // Skip Yahoo fetch for manually-priced symbols
   const fetchSymbols = yahooSymbols.filter(sym => !Object.values(manualPrices).length ||
     !Object.values(meta).find(m => m.yahoo === sym && m.manualPriceEur));
-  const allSymbols   = [...new Set([...fetchSymbols, FX_SYMBOL, BENCHMARK_SYM])];
+  const allSymbols   = [...new Set([...fetchSymbols, FX_SYMBOL, BENCHMARK_SYM, SP500_SYM])];
 
   const rawCandles = {};
   for (const sym of allSymbols) {
@@ -667,7 +670,8 @@ async function computeFullPortfolio() {
   let chartData = buildChartData(meta, transactions, priceMaps, fxMap, sortedDates, adjSharesFn);
   chartData = await appendTodaySnapshot(chartData, meta, transactions, fxMap, adjSharesFn);
 
-  const benchmarkData  = buildBenchmarkData(priceMaps, chartData);
+  const benchmarkData  = buildBenchmarkData(priceMaps, chartData, BENCHMARK_SYM);
+  const sp500Data      = buildBenchmarkData(priceMaps, chartData, SP500_SYM, fxMap);
   const { netShares }  = computeNetShares(meta, transactions, adjSharesFn);
   const currentTickers = Object.keys(netShares).filter(t => netShares[t] > 0.0001);
   const latestFxRate   = fxMap[sortedDates.at(-1)] || FX_FALLBACK;
@@ -743,7 +747,7 @@ async function computeFullPortfolio() {
   // Analytics
   const riskMetrics    = computeRiskMetrics(chartData, benchmarkData);
   const twrPct         = computeServerTWR(chartData, transactions);
-  const rollingReturns = computeRollingReturns(chartData, benchmarkData, twrPct);
+  const rollingReturns = computeRollingReturns(chartData, benchmarkData, sp500Data, twrPct);
   const irrPct         = computeXIRR(transactions, totalValue);
 
   // Persist analytics + inception data for HA scheduler
@@ -757,7 +761,7 @@ async function computeFullPortfolio() {
   });
 
   return {
-    chartData, benchmarkData, meta, currentTickers, latestFxRate, positions,
+    chartData, benchmarkData, sp500Data, meta, currentTickers, latestFxRate, positions,
     realizedPl, realizedPlPerTicker, usdExposurePct,
     riskMetrics, rollingReturns, twrPct, irrPct,
   };

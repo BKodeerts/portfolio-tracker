@@ -25,6 +25,7 @@ export async function loadData(onSuccess) {
     const d = json.data;
     state.chartData           = d.chartData;
     state.benchmarkData       = d.benchmarkData;
+    state.sp500Data           = d.sp500Data ?? [];
     state.TICKER_META         = d.meta;
     state.CURRENT_TICKERS     = d.currentTickers;
     state.latestFxRate        = d.latestFxRate;

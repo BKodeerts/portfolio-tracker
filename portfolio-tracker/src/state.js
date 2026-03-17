@@ -7,6 +7,8 @@ export const state = {
   latestFxRate: null,
   chartData: [],
   benchmarkData: [],
+  sp500Data: [],
+  activeBenchmark: 'vwce',
 
   riskMetrics:         null,
   rollingReturns:      null,

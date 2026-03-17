@@ -323,63 +323,81 @@ export function renderAssetTypeDonut(latest) {
   });
 }
 
-function buildBenchmarkSeries(filtered, benchMap) {
+function buildBenchmarkSeries(filtered, ...benchMaps) {
   const txByDate = {};
   for (const tx of state.RAW_TRANSACTIONS) {
-    if (!txByDate[tx.date]) txByDate[tx.date] = [];
-    txByDate[tx.date].push(tx);
+    (txByDate[tx.date] = txByDate[tx.date] || []).push(tx);
   }
 
   let portfolioTwrFactor = 1.0;
-  let vwceTwrFactor = 1.0;
-  let portfolioSubStart = filtered[0].total;
-  let vwceSubStart = benchMap[filtered[0].date];
+  let portfolioSubStart  = filtered[0].total;
+  const benchStates      = benchMaps.map(m => ({ factor: 1.0, subStart: m[filtered[0].date] }));
 
-  const portfolioSeries = [{ x: filtered[0].date, y: 0 }];
-  const benchSeries     = [{ x: filtered[0].date, y: 0 }];
+  const portfolioSeries  = [{ x: filtered[0].date, y: 0 }];
+  const benchSeriesArr   = benchMaps.map(() => [{ x: filtered[0].date, y: 0 }]);
 
   for (let i = 1; i < filtered.length; i++) {
-    const row = filtered[i];
-    const vwcePrice = benchMap[row.date];
-    const txsToday  = txByDate[row.date];
+    const row      = filtered[i];
+    const txsToday = txByDate[row.date];
 
-    if (txsToday && txsToday.length > 0) {
-      const netCF = txsToday.reduce((s, tx) => s + (tx.shares > 0 ? tx.costEur : -tx.costEur), 0);
+    if (txsToday?.length) {
+      const netCF         = txsToday.reduce((s, tx) => s + (tx.shares > 0 ? tx.costEur : -tx.costEur), 0);
       const valueBeforeCF = row.total - netCF;
       if (portfolioSubStart > 0) portfolioTwrFactor *= valueBeforeCF / portfolioSubStart;
-      if (vwcePrice != null && vwceSubStart > 0) vwceTwrFactor *= vwcePrice / vwceSubStart;
       portfolioSubStart = row.total;
-      vwceSubStart = vwcePrice ?? vwceSubStart;
+      for (const [j, m] of benchMaps.entries()) {
+        const p = m[row.date];
+        if (p != null && benchStates[j].subStart > 0) benchStates[j].factor *= p / benchStates[j].subStart;
+        benchStates[j].subStart = p ?? benchStates[j].subStart;
+      }
     }
 
     const portfolioY = portfolioSubStart > 0
       ? (portfolioTwrFactor * row.total / portfolioSubStart - 1) * 100
       : (portfolioTwrFactor - 1) * 100;
-    const vwceY = vwcePrice != null && vwceSubStart > 0
-      ? (vwceTwrFactor * vwcePrice / vwceSubStart - 1) * 100
-      : null;
-
     portfolioSeries.push({ x: row.date, y: Number.parseFloat(portfolioY.toFixed(2)) });
-    benchSeries.push({ x: row.date, y: vwceY == null ? null : Number.parseFloat(vwceY.toFixed(2)) });
+
+    for (const [j, m] of benchMaps.entries()) {
+      const p  = m[row.date];
+      const bs = benchStates[j];
+      const y  = p != null && bs.subStart > 0
+        ? (bs.factor * p / bs.subStart - 1) * 100
+        : null;
+      benchSeriesArr[j].push({ x: row.date, y: y == null ? null : Number.parseFloat(y.toFixed(2)) });
+    }
   }
 
-  return { portfolioSeries, benchSeries };
+  return { portfolioSeries, benchSeriesArr };
 }
 
 export function renderBenchmarkChart() {
   const filtered = getFilteredData(state.analysePeriod);
   if (filtered.length < 2) return;
 
-  const benchMap = Object.fromEntries(state.benchmarkData.map(b => [b.date, b.value]));
-  if (!benchMap[filtered[0].date]) return;
+  const vwceMap  = Object.fromEntries(state.benchmarkData.map(b => [b.date, b.value]));
+  const sp500Map = Object.fromEntries(state.sp500Data.map(b => [b.date, b.value]));
+  const ab = state.activeBenchmark;
 
-  const { portfolioSeries, benchSeries } = buildBenchmarkSeries(filtered, benchMap);
+  const activeMaps   = ab === 'both' ? [vwceMap, sp500Map] : ab === 'sp500' ? [sp500Map] : [vwceMap];
+  const activeLabels = ab === 'both' ? [BENCHMARK_LBL, 'S&P 500'] : ab === 'sp500' ? ['S&P 500'] : [BENCHMARK_LBL];
+  const activeColors = ['#34d399', '#fbbf24'];
+
+  if (!activeMaps[0][filtered[0].date]) return;
+
+  const { portfolioSeries, benchSeriesArr } = buildBenchmarkSeries(filtered, ...activeMaps);
+  const ct = chartTheme();
+
+  const benchDatasets = benchSeriesArr.map((series, i) => ({
+    label: activeLabels[i], data: series,
+    borderColor: activeColors[i], fill: false, borderWidth: 1.5,
+    borderDash: [4, 4], pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', spanGaps: true,
+  }));
 
   state.chartInstances.benchmark = new Chart(document.getElementById('chartBenchmark').getContext('2d'), {
     type: 'line',
     data: { datasets: [
       { label: 'Portefeuille', data: portfolioSeries, borderColor: '#818cf8', fill: false, borderWidth: 2, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', spanGaps: true },
-      { label: BENCHMARK_LBL,  data: benchSeries, borderColor: chartTheme().benchmarkLine, fill: false, borderWidth: 1.5, borderDash: [4, 4], pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', spanGaps: true },
+      ...benchDatasets,
     ]},
     options: {
       responsive: true, maintainAspectRatio: false,
@@ -405,6 +423,13 @@ export function renderBenchmarkChart() {
   });
 }
 
+export function setBenchmark(key) {
+  state.activeBenchmark = key;
+  if (state.chartInstances.benchmark) { state.chartInstances.benchmark.destroy(); delete state.chartInstances.benchmark; }
+  renderBenchmarkChart();
+  document.querySelectorAll('#benchmarkPills .pill').forEach(b => b.classList.toggle('on', b.dataset.bench === key));
+}
+
 // ── Rolling returns table ─────────────────────────────────────────────────────
 
 function renderRollingReturnsTable() {
@@ -421,15 +446,17 @@ function renderRollingReturnsTable() {
     return `<span class="${cls}">${v >= 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
   };
 
-  const header = periods.map(p => `<th>${labels[p]}</th>`).join('');
-  const portRow = periods.map(p => `<td>${state.privacyMode ? '●●' : fmtR(rr[p]?.portfolio)}</td>`).join('');
-  const benchRow = periods.map(p => `<td>${fmtR(rr[p]?.benchmark)}</td>`).join('');
+  const header   = periods.map(p => `<th>${labels[p]}</th>`).join('');
+  const portRow  = periods.map(p => `<td>${state.privacyMode ? '●●' : fmtR(rr[p]?.portfolio)}</td>`).join('');
+  const vwceRow  = periods.map(p => `<td>${fmtR(rr[p]?.vwce)}</td>`).join('');
+  const sp500Row = periods.map(p => `<td>${fmtR(rr[p]?.sp500)}</td>`).join('');
 
   el.innerHTML = `<table class="perf-table">
     <thead><tr><th></th>${header}</tr></thead>
     <tbody>
       <tr><td style="font-weight:600;color:#818cf8">Portefeuille</td>${portRow}</tr>
-      <tr><td style="color:#888">${BENCHMARK_LBL}</td>${benchRow}</tr>
+      <tr><td style="color:#34d399">${BENCHMARK_LBL}</td>${vwceRow}</tr>
+      <tr><td style="color:#fbbf24">S&amp;P 500</td>${sp500Row}</tr>
     </tbody>
   </table>`;
 }
@@ -741,13 +768,22 @@ export function renderAnalyse() {
       </div>
       <div class="chart-card analyse-full">
         <div class="chart-header" style="margin-bottom:12px">
-          <div class="card-title" style="margin-bottom:0">Rendement vs ${BENCHMARK_LBL}</div>
-          <div class="period-pills desktop-only">
+          <div class="card-title" style="margin-bottom:0">Rendement vergelijking</div>
+          <div class="period-pills desktop-only" id="benchmarkPills">
+            ${[['vwce', BENCHMARK_LBL], ['sp500', 'S&P 500'], ['both', 'Beide']].map(([k, l]) =>
+              `<button class="pill ${state.activeBenchmark === k ? 'on' : ''}" data-bench="${k}" onclick="window._setBenchmark('${k}')">${l}</button>`
+            ).join('')}
+            <span style="width:1px;background:var(--border);margin:0 4px;align-self:stretch"></span>
             ${['1m','3m','6m','ytd','1y','2y','3y','total'].map(p =>
               `<button class="pill ${state.analysePeriod === p ? 'on' : ''}" onclick="window._setPeriodAnalyse('${p}')">${p.toUpperCase()}</button>`
             ).join('')}
           </div>
           <div class="chart-controls-mobile">
+            <select class="mobile-select" onchange="window._setBenchmark(this.value)">
+              ${[['vwce', BENCHMARK_LBL], ['sp500', 'S&P 500'], ['both', 'Beide']].map(([k, l]) =>
+                `<option value="${k}"${state.activeBenchmark === k ? ' selected' : ''}>${l}</option>`
+              ).join('')}
+            </select>
             <select class="mobile-select" onchange="window._setPeriodAnalyse(this.value)">
               ${['1m','3m','6m','ytd','1y','2y','3y','total'].map(p =>
                 `<option value="${p}" ${state.analysePeriod === p ? 'selected' : ''}>${p.toUpperCase()}</option>`
