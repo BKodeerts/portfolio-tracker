@@ -639,23 +639,65 @@ function renderTickerMetaEditor() {
     </details>`;
 }
 
+// ── Breakdown tab ─────────────────────────────────────────────────────────────
+
+function getAvailableTabs() {
+  const hasSectors   = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.sector).filter(Boolean)).size >= 1;
+  const hasIndustries = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.industry).filter(Boolean)).size >= 1;
+  const hasTypes     = state.CURRENT_TICKERS.some(t => state.TICKER_META?.[t]?.quoteType);
+  return [
+    hasSectors    ? 'sector'    : null,
+    hasIndustries ? 'industrie' : null,
+    hasTypes      ? 'type'      : null,
+    'munt',
+  ].filter(Boolean);
+}
+
+function renderBreakdownContent(latest) {
+  const el = document.getElementById('breakdownContent');
+  if (!el) return;
+
+  // Destroy any previous breakdown chart instances
+  ['sectorDonut', 'industryDonut', 'typeDonut'].forEach(key => {
+    if (state.chartInstances[key]) { state.chartInstances[key].destroy(); delete state.chartInstances[key]; }
+  });
+
+  const tab = state.breakdownTab;
+  if (tab === 'sector') {
+    el.innerHTML = `<div class="donut-with-legend"><div class="donut-canvas-wrap"><canvas id="chartSectorDonut"></canvas></div><div id="chartSectorDonutLegend" class="donut-legend-list"></div></div>`;
+    renderSectorDonut(latest);
+  } else if (tab === 'industrie') {
+    el.innerHTML = `<div class="donut-with-legend"><div class="donut-canvas-wrap"><canvas id="chartIndustryDonut"></canvas></div><div id="chartIndustryDonutLegend" class="donut-legend-list"></div></div>`;
+    renderIndustryDonut(latest);
+  } else if (tab === 'type') {
+    el.innerHTML = `<div class="donut-with-legend"><div class="donut-canvas-wrap"><canvas id="chartTypeDonut"></canvas></div><div id="chartTypeDonutLegend" class="donut-legend-list"></div></div>`;
+    renderAssetTypeDonut(latest);
+  } else {
+    el.innerHTML = `<div id="chartCurrencyDonut"></div>`;
+    renderCurrencyDonut();
+  }
+}
+
+export function setBreakdownTab(tab) {
+  state.breakdownTab = tab;
+  document.querySelectorAll('#breakdownTabs .seg-btn').forEach(btn => {
+    btn.classList.toggle('on', btn.dataset.tab === tab);
+  });
+  renderBreakdownContent(state.lastLatest);
+}
+
 // ── Orchestration ─────────────────────────────────────────────────────────────
 
 export function renderAnalyseCharts() {
   const latest = state.chartData[state.chartData.length - 1];
 
-  const sectors    = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.sector).filter(Boolean));
-  const industries = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.industry).filter(Boolean));
-  const hasSectors   = sectors.size >= 1;
-  const hasIndustries = industries.size >= 1;
-  const hasTypes     = state.CURRENT_TICKERS.some(t => state.TICKER_META?.[t]?.quoteType);
+  // Ensure breakdownTab is valid for available data
+  const available = getAvailableTabs();
+  if (!available.includes(state.breakdownTab)) state.breakdownTab = available[0];
 
   renderDonutChart(latest, 'chartDonut');
   renderBarChart(latest);
-  renderCurrencyDonut();
-  if (hasTypes)      renderAssetTypeDonut(latest);
-  if (hasSectors)    renderSectorDonut(latest);
-  if (hasIndustries) renderIndustryDonut(latest);
+  renderBreakdownContent(latest);
   renderBenchmarkChart();
   renderRollingReturnsTable();
   renderRiskMetricsCard();
@@ -668,11 +710,10 @@ export function renderAnalyse() {
   state.currentTab = 'analyse';
   const latest = state.chartData[state.chartData.length - 1];
 
-  const sectors     = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.sector).filter(Boolean));
-  const industries  = new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META?.[t]?.industry).filter(Boolean));
-  const hasSectors    = sectors.size >= 1;
-  const hasIndustries = industries.size >= 1;
-  const hasTypes      = state.CURRENT_TICKERS.some(t => state.TICKER_META?.[t]?.quoteType);
+  const available = getAvailableTabs();
+  if (!available.includes(state.breakdownTab)) state.breakdownTab = available[0];
+
+  const TAB_LABELS = { sector: 'Sector', industrie: 'Industrie', type: 'Type', munt: 'Munt' };
 
   document.getElementById('root').innerHTML = `
     ${renderAppHeader()}
@@ -688,31 +729,15 @@ export function renderAnalyse() {
         <div class="card-title">Kostprijs vs Waarde</div>
         <div style="height:240px"><canvas id="chartBar"></canvas></div>
       </div>
-      <div class="chart-card">
-        <div class="card-title">Munt blootstelling</div>
-        <div id="chartCurrencyDonut"></div>
+      <div class="chart-card analyse-full">
+        <div class="chart-header" style="margin-bottom:14px">
+          <div class="card-title" style="margin-bottom:0">Verdeling</div>
+          <div class="seg" id="breakdownTabs">
+            ${available.map(t => `<button class="seg-btn${state.breakdownTab === t ? ' on' : ''}" data-tab="${t}" onclick="window._setBreakdownTab('${t}')">${TAB_LABELS[t]}</button>`).join('')}
+          </div>
+        </div>
+        <div id="breakdownContent"></div>
       </div>
-      ${hasTypes ? `<div class="chart-card">
-        <div class="card-title">Type</div>
-        <div class="donut-with-legend">
-          <div class="donut-canvas-wrap"><canvas id="chartTypeDonut"></canvas></div>
-          <div id="chartTypeDonutLegend" class="donut-legend-list"></div>
-        </div>
-      </div>` : ''}
-      ${hasSectors ? `<div class="chart-card">
-        <div class="card-title">Sector allocatie</div>
-        <div class="donut-with-legend">
-          <div class="donut-canvas-wrap"><canvas id="chartSectorDonut"></canvas></div>
-          <div id="chartSectorDonutLegend" class="donut-legend-list"></div>
-        </div>
-      </div>` : ''}
-      ${hasIndustries ? `<div class="chart-card">
-        <div class="card-title">Industrie allocatie</div>
-        <div class="donut-with-legend">
-          <div class="donut-canvas-wrap"><canvas id="chartIndustryDonut"></canvas></div>
-          <div id="chartIndustryDonutLegend" class="donut-legend-list"></div>
-        </div>
-      </div>` : ''}
       <div class="chart-card analyse-full">
         <div class="chart-header" style="margin-bottom:12px">
           <div class="card-title" style="margin-bottom:0">Rendement vs ${BENCHMARK_LBL}</div>

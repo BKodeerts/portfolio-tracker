@@ -35,4 +35,5 @@ export const state = {
 
   privacyMode: localStorage.getItem('privacy') === '1',
   currentTheme: localStorage.getItem('theme') || 'default',
+  breakdownTab: 'sector',
 };

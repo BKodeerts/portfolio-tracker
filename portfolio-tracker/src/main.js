@@ -9,7 +9,7 @@ import { getColor, destroyAllCharts } from './utils.js';
 import { fetchTransactions, clearCacheApi } from './api.js';
 import { loadData } from './data.js';
 import { renderApp, renderPortfolioChart } from './tabs/portfolio.js';
-import { renderAnalyse, renderAnalyseCharts, sortPos, showPosModal, closePosModal, saveTickerMetaUI, resetSectorsUI } from './tabs/analyse.js';
+import { renderAnalyse, renderAnalyseCharts, sortPos, showPosModal, closePosModal, saveTickerMetaUI, resetSectorsUI, setBreakdownTab } from './tabs/analyse.js';
 import { renderImport, handleCSVFile, updateYahooGuess, saveImport, saveTickerRenames } from './tabs/import.js';
 import { renderTransacties, filterTx, deleteTx, saveTxAll, toggleAddTx, addManualTx } from './tabs/transacties.js';
 import { loadIntradayData } from './tabs/intraday.js';
@@ -134,6 +134,7 @@ window._addManualTx         = addManualTx;
 window._saveTickerRenames   = saveTickerRenames;
 window._saveTickerMetaUI    = saveTickerMetaUI;
 window._resetSectorsUI      = resetSectorsUI;
+window._setBreakdownTab     = setBreakdownTab;
 
 // Boot
 document.body.classList.toggle('privacy', state.privacyMode);
