@@ -35,6 +35,7 @@ async function getYahooCrumb() {
     const req = https.get('https://finance.yahoo.com', {
       headers: { 'User-Agent': UA },
       timeout: 15000,
+      maxHeaderSize: 65536,
     }, res => {
       res.resume();
       const cookies = (res.headers['set-cookie'] || []).map(c => c.split(';')[0]).join('; ');
