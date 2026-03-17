@@ -44,15 +44,16 @@
   .tx-table tbody tr:hover { background: none; }
   .tx-table td { border-bottom: none; padding: 0; }
 
-  /* Row 1: ticker | naam (fills remaining) | del */
-  .tx-col-ticker { order: 1; flex: 0 0 auto; padding: 0 6px 8px 0; font-size: 13px; }
-  .tx-col-naam   { order: 2; flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px 8px; }
-  .tx-col-del    { order: 3; flex: 0 0 auto; padding: 0 0 8px 0; }
+  /* Row 1: name-group (fills remaining) | del */
+  .tx-col-name-group { order: 1; flex: 1 1 0; min-width: 0; padding: 0 8px 8px 0; }
+  .tx-name-ticker    { font-size: 13px; }
+  .tx-name-sub       { font-size: 11px; padding-left: 11px; max-width: none; }
+  .tx-col-del        { order: 2; flex: 0 0 auto; padding: 0 0 8px 0; }
   /* Row 2: date | shares | cost | ccy (pushed right) */
-  .tx-col-date   { order: 4; flex: 0 0 auto; padding: 0 10px 0 0; }
-  .tx-col-shares { order: 5; flex: 0 0 auto; padding: 0 10px 0 0; }
-  .tx-col-cost   { order: 6; flex: 0 0 auto; padding: 0; }
-  .tx-col-ccy    { order: 7; flex: 0 0 auto; margin-left: auto; padding: 0; }
+  .tx-col-date   { order: 3; flex: 0 0 auto; padding: 0 10px 0 0; }
+  .tx-col-shares { order: 4; flex: 0 0 auto; padding: 0 10px 0 0; }
+  .tx-col-cost   { order: 5; flex: 0 0 auto; padding: 0; }
+  .tx-col-ccy    { order: 6; flex: 0 0 auto; margin-left: auto; padding: 0; }
 
   /* Larger touch targets for editable cells */
   .tx-table .tx-cell[contenteditable="true"] { padding: 5px 7px; font-size: 13px; }

@@ -34,14 +34,14 @@ function buildTxTable() {
       const isSale = t.shares < 0;
       return `<tr data-idx="${t._origIdx}"${match ? '' : ' style="display:none"'}>
         <td class="tx-col-date"><span class="tx-cell" contenteditable="true" data-field="date" inputmode="text">${t.date}</span></td>
-        <td class="tx-col-ticker" style="font-family:inherit;font-weight:600">
-          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${getColor(t.ticker)};margin-right:5px;vertical-align:middle"></span>${t.ticker}
+        <td class="tx-col-name-group">
+          <div class="tx-name-top"><span class="tx-dot" style="background:${getColor(t.ticker)}"></span><span class="tx-name-ticker">${t.ticker}</span></div>
+          <div class="tx-name-sub">${t.label || ''}</div>
         </td>
-        <td class="tx-col-naam" style="font-family:inherit;font-size:11px;color:#888">${t.label || ''}</td>
         <td class="tx-col-shares" style="color:${isSale ? '#ef4444' : '#16a34a'}">
           <span class="tx-cell" contenteditable="true" data-field="shares" inputmode="decimal">${t.shares}</span>
         </td>
-        <td class="tx-col-cost"><span class="tx-cell" contenteditable="true" data-field="costEur" inputmode="decimal">${t.costEur}</span></td>
+        <td class="tx-col-cost"><span class="tx-cell" contenteditable="true" data-field="costEur" inputmode="decimal">${Number.parseFloat(t.costEur).toFixed(2)}</span></td>
         <td class="tx-col-ccy">
           <select class="tx-ccy" data-field="currency">
             <option value="EUR"${t.currency === 'USD' ? '' : ' selected'}>EUR</option>
@@ -54,7 +54,7 @@ function buildTxTable() {
 
   return `<table class="tx-table">
     <thead><tr>
-      <th>Datum</th><th>Ticker</th><th>Naam</th><th>Aandelen</th><th>Kosten €</th><th>Munt</th><th></th>
+      <th>Datum</th><th>Ticker / Naam</th><th>Aandelen</th><th>Kosten €</th><th>Munt</th><th></th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;

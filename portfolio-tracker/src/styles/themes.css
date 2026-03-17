@@ -78,6 +78,7 @@ body.theme-dark .tx-search:focus                       { border-color: rgba(255,
 body.theme-dark .tx-table th                           { color: #707070; border-bottom-color: rgba(255,255,255,0.06); }
 body.theme-dark .tx-table td                           { border-bottom-color: rgba(255,255,255,0.03); }
 body.theme-dark .tx-table tbody tr:hover               { background: rgba(255,255,255,0.03); }
+body.theme-dark .tx-name-sub                          { color: #606060; }
 body.theme-dark .tx-cell[contenteditable="true"]:hover { background: rgba(255,255,255,0.07); }
 body.theme-dark .tx-cell[contenteditable="true"]:focus { background: rgba(255,255,255,0.1); outline-color: rgba(255,255,255,0.2); }
 body.theme-dark .tx-ccy                               { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #d8d8d8; }
