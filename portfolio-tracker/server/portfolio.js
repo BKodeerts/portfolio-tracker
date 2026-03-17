@@ -5,8 +5,8 @@
 
 const fs   = require('node:fs');
 const path = require('node:path');
-const { fetchDailyQuote, fetchCandles, sleep, FETCH_DELAY } = require('./yahoo.js');
-const { readCache, writeCache, QUOTES_CACHE_TTL, CACHE_TTL } = require('./cache.js');
+const { fetchDailyQuote, fetchCandles, fetchIntraday, sleep, FETCH_DELAY } = require('./yahoo.js');
+const { readCache, writeCache, QUOTES_CACHE_TTL, CACHE_TTL, INTRADAY_CACHE_TTL } = require('./cache.js');
 
 const DATA_DIR          = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const TRANSACTIONS_FILE = path.join(DATA_DIR, 'transactions.json');
@@ -45,6 +45,31 @@ async function getQuote(yahooSymbol) {
   if (q) writeCache(cacheKey, q);
   await sleep(FETCH_DELAY);
   return q || null;
+}
+
+async function getIntradayPrice(yahooSymbol) {
+  const cacheKey = `intraday_snap_${yahooSymbol}`;
+  const cached = readCache(cacheKey, INTRADAY_CACHE_TTL);
+  if (cached != null) return cached;
+  try {
+    const data = await fetchIntraday(yahooSymbol);
+    if (!data?.points.length) return null;
+    const close = data.points[data.points.length - 1].close;
+    writeCache(cacheKey, close);
+    await sleep(FETCH_DELAY);
+    return close;
+  } catch {
+    return null;
+  }
+}
+
+async function getLivePrices(yahooSymbols) {
+  const prices = {};
+  for (const sym of yahooSymbols) {
+    const live = await getIntradayPrice(sym);
+    prices[sym] = live ?? (await getQuote(sym))?.close ?? null;
+  }
+  return prices;
 }
 
 async function getRawCandles(yahooSymbol, fromDate) {
@@ -376,6 +401,22 @@ function valueAtDate(currentTickers, meta, priceMaps, netShares, fxRate, date) {
   return total;
 }
 
+function buildSnapshotPositions(currentTickers, meta, prices, netShares, buyInvested, fxRate) {
+  let totalValue = 0, totalCost = 0;
+  const positions = [];
+  for (const ticker of currentTickers) {
+    const m = meta[ticker];
+    const price = prices[m.yahoo];
+    if (!price) continue;
+    const value = m.currency === 'USD' ? netShares[ticker] * price / fxRate : netShares[ticker] * price;
+    const cost = buyInvested[ticker] || 0;
+    totalValue += value;
+    totalCost  += cost;
+    positions.push({ ticker, label: m.label, value, pl: value - cost, plPct: cost > 0 ? ((value - cost) / cost * 100) : 0 });
+  }
+  return { totalValue, totalCost, positions };
+}
+
 /**
  * Lightweight current-value snapshot for the scheduler / HA push.
  * Uses a scalar FX rate (current) for simplicity — no full time-series needed.
@@ -389,8 +430,10 @@ async function computeCurrentSnapshot() {
   const yahooSymbols = [...new Set(Object.values(meta).map(m => m.yahoo))];
 
   const needsFx = Object.values(meta).some(m => m.currency === 'USD');
-  const fxQuote = needsFx ? await getQuote(FX_SYMBOL) : null;
-  const fxRate  = fxQuote?.close || FX_FALLBACK;
+  let fxRate = FX_FALLBACK;
+  if (needsFx) {
+    fxRate = (await getIntradayPrice(FX_SYMBOL)) ?? (await getQuote(FX_SYMBOL))?.close ?? FX_FALLBACK;
+  }
 
   // Fetch candles for split detection + prev-day value
   const rawCandles = {};
@@ -411,30 +454,9 @@ async function computeCurrentSnapshot() {
   const currentTickers = Object.keys(netShares).filter(t => netShares[t] > 0.0001);
   if (!currentTickers.length) return null;
 
-  // Current prices
-  const prices = {};
-  for (const sym of yahooSymbols) {
-    const q = await getQuote(sym);
-    if (q) prices[sym] = q.close;
-  }
+  const prices = await getLivePrices(yahooSymbols);
 
-  let totalValue = 0, totalCost = 0;
-  const positions = [];
-  for (const ticker of currentTickers) {
-    const m = meta[ticker];
-    const price = prices[m.yahoo];
-    if (!price) continue;
-    const value = m.currency === 'USD'
-      ? netShares[ticker] * price / fxRate
-      : netShares[ticker] * price;
-    const cost = buyInvested[ticker] || 0;
-    totalValue += value;
-    totalCost  += cost;
-    positions.push({
-      ticker, label: m.label, value, pl: value - cost,
-      plPct: cost > 0 ? ((value - cost) / cost * 100) : 0,
-    });
-  }
+  const { totalValue, totalCost, positions } = buildSnapshotPositions(currentTickers, meta, prices, netShares, buyInvested, fxRate);
 
   if (!positions.length) return null;
 

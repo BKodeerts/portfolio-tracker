@@ -10,7 +10,7 @@ async function pushToHA(portfolio) {
   const token = process.env.SUPERVISOR_TOKEN;
   if (!token) return;
 
-  const { totalValue, totalCost } = portfolio;
+  const { totalValue, totalCost, dailyPl } = portfolio;
   const base    = 'http://supervisor/core/api/states';
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
@@ -25,14 +25,20 @@ async function pushToHA(portfolio) {
   const totalPl    = totalValue - totalCost;
   const totalPlPct = totalCost > 0 ? (totalPl / totalCost * 100) : 0;
 
+  await pushState('sensor.portfolio_value', totalValue.toFixed(2), {
+    unit_of_measurement: '€', friendly_name: 'Portfolio Waarde',
+  });
   await pushState('sensor.portfolio_pl', totalPl.toFixed(2), {
     unit_of_measurement: '€', friendly_name: 'Portfolio P&L',
   });
   await pushState('sensor.portfolio_pl_pct', totalPlPct.toFixed(2), {
     unit_of_measurement: '%', friendly_name: 'Portfolio P&L %',
   });
+  await pushState('sensor.portfolio_daily_pl', (dailyPl || 0).toFixed(2), {
+    unit_of_measurement: '€', friendly_name: 'Portfolio Vandaag',
+  });
 
-  console.log(`[Scheduler] HA push OK — P&L €${totalPl.toFixed(0)} (${totalPlPct.toFixed(1)}%)`);
+  console.log(`[Scheduler] HA push OK — €${totalValue.toFixed(0)}, P&L €${totalPl.toFixed(0)} (${totalPlPct.toFixed(1)}%), vandaag €${(dailyPl || 0).toFixed(0)}`);
 }
 
 async function runOnce() {

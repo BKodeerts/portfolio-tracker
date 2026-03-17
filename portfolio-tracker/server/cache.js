@@ -3,7 +3,7 @@ const path = require('path');
 
 const CACHE_DIR          = process.env.CACHE_DIR || path.join(__dirname, '..', 'cache');
 const CACHE_TTL          = 24 * 60 * 60 * 1000;  // 24h
-const QUOTES_CACHE_TTL   = 24 * 60 * 60 * 1000;  // 24h
+const QUOTES_CACHE_TTL   = 15 * 60 * 1000;        // 15min
 const INTRADAY_CACHE_TTL =  5 * 60 * 1000;        // 5min
 
 if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });

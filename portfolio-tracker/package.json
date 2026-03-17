@@ -1,6 +1,6 @@
 {
   "name": "portfolio-tracker",
-  "version": "0.2.20",
+  "version": "0.2.21",
   "description": "Self-hosted portfolio tracker with Yahoo Finance data",
   "scripts": {
     "dev": "vite",

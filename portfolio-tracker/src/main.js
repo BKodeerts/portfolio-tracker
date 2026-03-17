@@ -6,7 +6,7 @@ import './styles/responsive.css';
 
 import { state } from './state.js';
 import { getColor, destroyAllCharts } from './utils.js';
-import { fetchTransactions, clearCacheApi, pushToHaApi } from './api.js';
+import { fetchTransactions, clearCacheApi } from './api.js';
 import { loadData } from './data.js';
 import { renderApp, renderPortfolioChart } from './tabs/portfolio.js';
 import { renderAnalyse, renderAnalyseCharts, sortPos, showPosModal, closePosModal } from './tabs/analyse.js';
@@ -41,7 +41,7 @@ async function init() {
     }
 
     state.RAW_TRANSACTIONS = json.data;
-    await loadData(() => { renderApp(); pushToHA(); });
+    await loadData(() => { renderApp(); });
   } catch (e) {
     document.getElementById('root').innerHTML = `
       ${renderAppHeader()}
@@ -97,18 +97,6 @@ async function clearCache() {
   catch (e) { alert('Cache clear mislukt: ' + e.message); }
 }
 
-async function pushToHA() {
-  const btn = document.getElementById('haPushBtn');
-  if (btn) { btn.textContent = '…'; }
-  try {
-    const json = await pushToHaApi();
-    if (!json.ok) throw new Error(json.error || 'push failed');
-    if (btn) { btn.textContent = '✓'; btn.style.color = '#16a34a'; setTimeout(() => { btn.textContent = 'HA'; btn.style.color = ''; }, 3000); }
-  } catch (e) {
-    console.warn('[HA push]', e.message);
-    if (btn) { btn.textContent = 'HA'; btn.style.color = ''; }
-  }
-}
 
 function refreshIntraday() {
   loadIntradayData(true, () => {
@@ -130,7 +118,6 @@ window._toggleClosed     = toggleClosed;
 window._toggleTheme      = toggleTheme;
 window._togglePrivacy    = togglePrivacy;
 window._clearCache       = clearCache;
-window._pushToHA         = pushToHA;
 window._refreshIntraday  = refreshIntraday;
 window._handleCSVFile    = handleCSVFile;
 window._updateYahooGuess = updateYahooGuess;
