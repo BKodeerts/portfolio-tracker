@@ -10,8 +10,8 @@ import { fetchTransactions, clearCacheApi } from './api.js';
 import { loadData } from './data.js';
 import { renderApp, renderPortfolioChart } from './tabs/portfolio.js';
 import { renderAnalyse, renderAnalyseCharts, sortPos, showPosModal, closePosModal, saveTickerMetaUI } from './tabs/analyse.js';
-import { renderImport, handleCSVFile, updateYahooGuess, saveImport } from './tabs/import.js';
-import { renderTransacties, filterTx, deleteTx, saveTxAll } from './tabs/transacties.js';
+import { renderImport, handleCSVFile, updateYahooGuess, saveImport, saveTickerRenames } from './tabs/import.js';
+import { renderTransacties, filterTx, deleteTx, saveTxAll, toggleAddTx, addManualTx } from './tabs/transacties.js';
 import { loadIntradayData } from './tabs/intraday.js';
 import { renderDonutChart } from './components/donut.js';
 import { renderAppHeader } from './components/header.js';
@@ -129,6 +129,9 @@ window._closePosModal    = closePosModal;
 window._filterTx         = filterTx;
 window._deleteTx         = deleteTx;
 window._saveTxAll           = saveTxAll;
+window._toggleAddTx         = toggleAddTx;
+window._addManualTx         = addManualTx;
+window._saveTickerRenames   = saveTickerRenames;
 window._saveTickerMetaUI    = saveTickerMetaUI;
 
 // Boot

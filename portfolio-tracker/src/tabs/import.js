@@ -4,6 +4,22 @@ import { parseDeGiroCSV, parseBoleroXLSX, aggregateOrders, buildIsinLookup, gues
 import { renderAppHeader } from '../components/header.js';
 import { destroyAllCharts } from '../utils.js';
 
+function buildTickerRows() {
+  const byTicker = {};
+  state.RAW_TRANSACTIONS.forEach(t => {
+    if (!byTicker[t.ticker]) byTicker[t.ticker] = { yahoo: t.yahoo, label: t.label || '', count: 0 };
+    byTicker[t.ticker].count++;
+  });
+  return Object.entries(byTicker)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([ticker, info]) => `<tr data-orig-ticker="${ticker}" data-orig-yahoo="${info.yahoo}">
+      <td><input id="rt_ticker_${ticker}" value="${ticker}" style="width:80px;font-family:'JetBrains Mono',monospace;text-transform:uppercase"></td>
+      <td><input id="rt_yahoo_${ticker}" value="${info.yahoo}"></td>
+      <td style="color:#94a3b8;font-size:11px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${info.label}</td>
+      <td style="color:#475569;font-size:11px;text-align:right">${info.count}</td>
+    </tr>`).join('');
+}
+
 export function renderImport() {
   destroyAllCharts();
   state.currentTab = 'import';
@@ -28,6 +44,20 @@ export function renderImport() {
         <input type="file" id="csvInput" accept=".csv,.xlsx,text/csv,text/plain" style="display:none" onchange="window._handleCSVFile(this.files[0])">
       </div>
       <div id="mappingSection" style="display:none"></div>
+      ${txCount > 0 ? `
+      <div style="margin-top:28px">
+        <h3 style="font-size:13px;color:#e2e8f0;margin:0 0 4px;font-weight:600">Tickers hernoemen</h3>
+        <p style="font-size:12px;color:#64748b;margin-bottom:8px;line-height:1.5">
+          Wijzig ticker of Yahoo-symbool. Wordt toegepast op alle bijbehorende transacties (handig bij verkeerde ISIN-koppeling).
+        </p>
+        <table class="map-table">
+          <thead><tr><th>Ticker</th><th>Yahoo symbool</th><th>Label</th><th>#</th></tr></thead>
+          <tbody>${buildTickerRows()}</tbody>
+        </table>
+        <div class="import-actions" style="margin-top:8px">
+          <button class="btn success" onclick="window._saveTickerRenames()">Tickers opslaan</button>
+        </div>
+      </div>` : ''}
     </div>`;
 }
 
@@ -160,6 +190,31 @@ export async function saveImport(mode) {
     const json = await saveTransactions(mode, transactions);
     if (json.status !== 'ok') throw new Error(json.message);
     alert(`${json.count} transacties opgeslagen.`);
-    await window._init();
+    await globalThis._init();
+  } catch (e) { alert('Opslaan mislukt: ' + e.message); }
+}
+
+export async function saveTickerRenames() {
+  const rows = document.querySelectorAll('[data-orig-ticker]');
+  let changed = false;
+  const updated = state.RAW_TRANSACTIONS.map(t => ({ ...t }));
+
+  rows.forEach(row => {
+    const origTicker = row.dataset.origTicker;
+    const origYahoo  = row.dataset.origYahoo;
+    const newTicker  = (document.getElementById(`rt_ticker_${origTicker}`)?.value || '').trim().toUpperCase();
+    const newYahoo   = (document.getElementById(`rt_yahoo_${origTicker}`)?.value  || '').trim();
+    if (!newTicker || !newYahoo) return;
+    if (newTicker === origTicker && newYahoo === origYahoo) return;
+    updated.forEach(t => {
+      if (t.ticker === origTicker) { t.ticker = newTicker; t.yahoo = newYahoo; changed = true; }
+    });
+  });
+
+  if (!changed) { alert('Geen wijzigingen gevonden.'); return; }
+  try {
+    const json = await saveTransactions('replace', updated);
+    if (json.status !== 'ok') throw new Error(json.message);
+    await globalThis._init();
   } catch (e) { alert('Opslaan mislukt: ' + e.message); }
 }
