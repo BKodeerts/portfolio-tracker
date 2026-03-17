@@ -1,26 +1,73 @@
 configuration:
+  enable_ha_sensors:
+    name: Enable HA sensor push
+    description: >-
+      Master switch for all Home Assistant sensor integration.
+      When disabled, no sensors are created or updated and all options below are ignored.
+      Enable this first before configuring anything else.
+
   push_interval:
     name: Push interval (minutes)
     description: >-
-      How often portfolio data is pushed to Home Assistant sensors.
-      Range: 1–60 minutes. Default: 15.
+      How often portfolio data is pushed to Home Assistant. Range: 1–60 minutes. Default: 15.
+      Only applies when HA sensor push is enabled.
       Lower values give more up-to-date readings but increase Yahoo Finance API calls.
+
+  use_mqtt_discovery:
+    name: Use MQTT discovery
+    description: >-
+      When enabled, sensors are registered via MQTT discovery — giving them proper unique IDs,
+      the ability to rename/assign to rooms, and grouping under a single "Portfolio Tracker" device.
+      Requires the Mosquitto broker addon to be installed (credentials are auto-detected).
+      When disabled, sensors are pushed via the States API (simpler, no MQTT required).
+      Only applies when HA sensor push is enabled.
+
   drawdown_alert_pct:
     name: Drawdown alert threshold (%)
     description: >-
-      Turns on binary_sensor.portfolio_drawdown_warning when your portfolio
-      drops this percentage below its all-time peak value.
-      Example: 10 triggers the alert when you are down 10% from the top.
+      Turns on binary_sensor.portfolio_drawdown_warning when your portfolio drops this
+      percentage below its all-time peak value.
+      Example: 10 triggers when you are down 10% from the peak.
+      Only applies when HA sensor push is enabled.
+
   target_value:
     name: Portfolio target value (€)
     description: >-
-      When your portfolio reaches this value, binary_sensor.portfolio_target_hit
-      turns ON — useful for automation triggers or notifications.
+      When your portfolio reaches this value, binary_sensor.portfolio_target_hit turns ON —
+      useful for automation triggers or mobile notifications.
       Set to 0 to disable the target sensor entirely.
+      Only applies when HA sensor push is enabled.
+
   push_positions:
     name: Push per-position sensors
     description: >-
-      When enabled, creates an individual sensor for each open position
-      (e.g. sensor.portfolio_asts_value) with cost, P&L, and share count as attributes.
-      Disabled by default to avoid cluttering the entity list.
-      Enable only if you want per-stock automations or dashboard cards.
+      Creates an individual sensor for each open position (e.g. sensor.portfolio_asts_value)
+      with cost basis, P&L, and share count as attributes.
+      Disable to keep the entity list clean — all position data is also available
+      as attributes on sensor.portfolio_value.
+      Only applies when HA sensor push is enabled.
+
+  mqtt_broker:
+    name: MQTT broker address (optional)
+    description: >-
+      Hostname or IP of your MQTT broker. Leave empty to use auto-discovery
+      from the Mosquitto broker addon. Only needed if auto-discovery fails
+      or you run an external broker. Only applies when MQTT discovery is enabled.
+
+  mqtt_port:
+    name: MQTT broker port (optional)
+    description: >-
+      Port of your MQTT broker. Default: 1883 (unencrypted), 8883 (TLS).
+      Leave empty when using auto-discovery. Only applies when MQTT discovery is enabled.
+
+  mqtt_username:
+    name: MQTT username (optional)
+    description: >-
+      Username for MQTT broker authentication. Leave empty when using auto-discovery.
+      Only applies when MQTT discovery is enabled.
+
+  mqtt_password:
+    name: MQTT password (optional)
+    description: >-
+      Password for MQTT broker authentication. Leave empty when using auto-discovery.
+      Only applies when MQTT discovery is enabled.

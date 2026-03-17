@@ -17,17 +17,29 @@ function getOptions() {
   try {
     const raw = JSON.parse(fs.readFileSync('/data/options.json', 'utf8'));
     return {
-      pushInterval:     Number(raw.push_interval      ?? process.env.HA_PUSH_INTERVAL ?? 15),
-      drawdownAlertPct: Number(raw.drawdown_alert_pct ?? 10),
-      targetValue:      Number(raw.target_value       ?? 0),
-      pushPositions:    Boolean(raw.push_positions    ?? false),
+      enableHaSensors:  Boolean(raw.enable_ha_sensors  ?? false),
+      pushInterval:     Number(raw.push_interval       ?? process.env.HA_PUSH_INTERVAL ?? 15),
+      useMqttDiscovery: Boolean(raw.use_mqtt_discovery ?? false),
+      drawdownAlertPct: Number(raw.drawdown_alert_pct  ?? 10),
+      targetValue:      Number(raw.target_value        ?? 0),
+      pushPositions:    Boolean(raw.push_positions     ?? false),
+      mqttBroker:       raw.mqtt_broker   ?? null,
+      mqttPort:         raw.mqtt_port     ?? 1883,
+      mqttUsername:     raw.mqtt_username ?? null,
+      mqttPassword:     raw.mqtt_password ?? null,
     };
   } catch {
     return {
+      enableHaSensors:  false,
       pushInterval:     Number(process.env.HA_PUSH_INTERVAL ?? 15),
+      useMqttDiscovery: false,
       drawdownAlertPct: 10,
       targetValue:      0,
       pushPositions:    false,
+      mqttBroker:       null,
+      mqttPort:         1883,
+      mqttUsername:     null,
+      mqttPassword:     null,
     };
   }
 }
@@ -223,4 +235,4 @@ async function pushAll(token, snapshot, options) {
   return 8 + (options.targetValue > 0 ? 1 : 0) + (options.pushPositions ? positions.length : 0);
 }
 
-module.exports = { getOptions, pushAll };
+module.exports = { getOptions, readState, writeState, isWeekend, isMarketOpen, pushAll };
