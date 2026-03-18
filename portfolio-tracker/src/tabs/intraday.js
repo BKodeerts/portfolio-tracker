@@ -287,6 +287,7 @@ export function renderIntradaySection() {
     </div>`;
   }).join('');
 
+  renderMarketStatus();
   renderTodayMetric();
 }
 
