@@ -97,17 +97,23 @@ function buildRenderContext(filtered) {
   return { latest, plClass, profitSign, visibleTickers, closedToggleHtml, periodChangeHtml, refreshAction };
 }
 
-function buildYBounds(datasets, ref) {
+function yBoundsRange(view, datasets, tickerVals, visibleTickers) {
+  if (view === 'pct') return { floorMin: -2, ceilMax: 2 };
+  if (view === 'pl') {
+    const prevTotal = visibleTickers.reduce((s, t) => s + (tickerVals[t]?.prevValueEur || 0), 0);
+    return { floorMin: -prevTotal * 0.02, ceilMax: prevTotal * 0.02 };
+  }
+  const ref = datasets.find(d => d.label === 'Vorige slotkoers')?.data?.[0]?.y;
+  return { floorMin: ref * 0.98, ceilMax: ref * 1.02 };
+}
+
+function buildYBounds(datasets, floorMin, ceilMax) {
   const allVals = datasets.flatMap(ds => ds.data).filter(v => v != null && Number.isFinite(v));
   if (allVals.length === 0) return {};
   const dMin = Math.min(...allVals);
   const dMax = Math.max(...allVals);
   const mid  = (Math.abs(dMin) + Math.abs(dMax)) / 2;
   const pad  = Math.max((dMax - dMin) * 0.2, mid * 0.003);
-  // Enforce a minimum visible range so small moves don't look like huge spikes.
-  // For pct view: at least -2% to +5%. For € views: same asymmetry relative to prevClose.
-  const floorMin = ref == null ? -2 : ref * 0.98;
-  const ceilMax  = ref == null ?  2 : ref * 1.02;
   return { min: Math.min(dMin - pad, floorMin), max: Math.max(dMax + pad, ceilMax) };
 }
 
@@ -219,11 +225,10 @@ export function renderPortfolioChart(visibleTickers) {
 
   // Tight y-axis bounds for intraday — only for non-stacked views, since stacking makes
   // individual dataset max != visible chart max (fill: true also forces axis to include 0)
-  const stackedView = state.currentView === 'individual' || state.currentView === 'pl';
-  const prevCloseRef = state.currentView === 'pct'
-    ? null
-    : datasets.find(d => d.label === 'Vorige slotkoers')?.data?.[0]?.y;
-  const yBounds = useIntraday && !stackedView ? buildYBounds(datasets, prevCloseRef) : {};
+  const stackedView = state.currentView === 'individual';
+  const yBounds = useIntraday && !stackedView
+    ? buildYBounds(datasets, ...Object.values(yBoundsRange(state.currentView, datasets, intra?.tickerVals, visibleTickers)))
+    : {};
 
   const xDayStart = new Date(); xDayStart.setHours(0, 0, 0, 0);
   const xDayEnd   = new Date(); xDayEnd.setHours(23, 59, 59, 999);
@@ -300,7 +305,8 @@ export function renderPortfolioChart(visibleTickers) {
              ticks: { color: chartTheme().tickColor, font: { size: 10 },
                callback: v => {
                  if (state.currentView === 'pct') return `${+v.toFixed(2)}%`;
-                 return state.privacyMode ? '●●' : `€${(v / 1000).toFixed(0)}k`;
+                 if (state.privacyMode) return '●●';
+                 return Math.abs(v) < 1000 ? `€${Math.round(v)}` : `€${+(v / 1000).toFixed(1)}k`;
                } } },
       },
     },
