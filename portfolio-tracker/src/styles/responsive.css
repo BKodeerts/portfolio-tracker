@@ -2,7 +2,7 @@
 
 @media (max-width: 640px) {
   .top-bar-inner { padding: 10px 14px 10px; }
-  .display-controls { padding-top: 0; align-self: center; flex-direction: row; }
+  .display-controls { padding-top: 0; align-self: center; }
 
   /* Summary bar: strip cards, show as compact inline row */
   .summary-bar-grid { display: flex; gap: 0; margin-bottom: 8px; }
