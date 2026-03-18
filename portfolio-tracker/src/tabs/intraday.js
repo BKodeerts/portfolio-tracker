@@ -13,8 +13,14 @@ function staleDayLabel(dateStr) {
 
 export const EU_EXCHANGE_RE = /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i;
 
+// Maps Yahoo exchange codes to display labels for US exchanges
+const US_EXCHANGE_LABELS = {
+  NMS: 'NASDAQ', NGM: 'NASDAQ', NCM: 'NASDAQ',
+  NYQ: 'NYSE', NYSEArca: 'NYSE',
+};
+
 // Per-exchange config: yahoo suffix → { label, tz, open [h,m], close [h,m] }
-// Empty string = US stocks (no Yahoo suffix)
+// Empty string = US stocks (no Yahoo suffix) — label used as fallback only
 const EXCHANGE_DEFS = {
   '':    { label: 'US',    tz: 'America/New_York',   open: [9,30],  close: [16,0]  },
   '.DE': { label: 'XETRA', tz: 'Europe/Berlin',      open: [9,0],   close: [17,30] },
@@ -74,17 +80,36 @@ export function getMarketStatus() {
   }
 
   const todayStr = new Date().toLocaleDateString('sv-SE');
-  return [...seen.entries()].map(([sfx, def]) => {
-    let open = null;
-    if (state.intradayData) {
-      for (const [sym, data] of Object.entries(state.intradayData)) {
-        if (!data?.marketState || data.date !== todayStr || sym.endsWith('=X')) continue;
-        if (yahooSuffix(sym) === sfx) { open = data.marketState === 'REGULAR'; break; }
+  const exchanges = new Map(); // label → open (bool)
+  const coveredSfx = new Set();
+
+  if (state.intradayData) {
+    for (const [sym, data] of Object.entries(state.intradayData)) {
+      if (sym.endsWith('=X') || !data) continue;
+      const sfx = yahooSuffix(sym);
+      const def = EXCHANGE_DEFS[sfx];
+      // Only show badges for exchanges actually in the portfolio
+      if (!def || !seen.has(sfx)) continue;
+      // For US stocks use the actual exchange code (NASDAQ/NYSE), fall back to 'US'
+      const label = !sfx ? (US_EXCHANGE_LABELS[data.exchange] ?? def.label) : def.label;
+      if (!exchanges.has(label)) {
+        const open = data.date === todayStr && data.marketState
+          ? data.marketState === 'REGULAR'
+          : isOpen(def.tz, ...def.open, ...def.close);
+        exchanges.set(label, open);
       }
+      coveredSfx.add(sfx);
     }
-    if (open === null) open = isOpen(def.tz, ...def.open, ...def.close);
-    return badge(def.label, open);
-  }).join('');
+  }
+  // Fallback: portfolio suffixes not present in intradayData
+  for (const [sfx, def] of seen.entries()) {
+    if (!coveredSfx.has(sfx)) exchanges.set(def.label, isOpen(def.tz, ...def.open, ...def.close));
+  }
+  if (exchanges.size === 0) {
+    exchanges.set('US', isOpen('America/New_York', 9, 30, 16, 0));
+    exchanges.set('XETRA', isOpen('Europe/Berlin', 9, 0, 17, 30));
+  }
+  return [...exchanges.entries()].map(([label, open]) => badge(label, open)).join('');
 }
 
 export function renderMarketStatus() {

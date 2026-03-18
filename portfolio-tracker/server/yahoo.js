@@ -84,6 +84,7 @@ async function fetchIntraday(yahooSymbol) {
     previousClose: meta.chartPreviousClose ?? meta.regularMarketPreviousClose ?? null,
     currency: meta.currency || null,
     marketState: meta.marketState || null,
+    exchange: meta.exchange || null,
     points,
   };
 }
