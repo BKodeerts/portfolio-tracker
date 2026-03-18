@@ -1,6 +1,8 @@
 .chart-controls-mobile { display: none; }
 
 @media (max-width: 640px) {
+  .top-bar-inner { padding: 8px 12px 10px; }
+
   .metrics-grid       { grid-template-columns: 1fr 1fr; }
   .risk-metrics-grid  { grid-template-columns: 1fr 1fr; }
   .home-grid     { grid-template-columns: 1fr; }
@@ -17,7 +19,7 @@
   .chart-controls-mobile { display: flex; gap: 6px; flex: 1; }
 
   /* Tighter root padding on mobile */
-  #root { padding: 16px 12px 48px; }
+  #root { padding: 14px 12px 48px; }
 
   /* Positions table: scrollable + tighter padding */
   #positionsTableWrap       { overflow-x: auto; -webkit-overflow-scrolling: touch; }

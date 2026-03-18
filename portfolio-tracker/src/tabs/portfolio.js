@@ -4,7 +4,7 @@ import { state } from '../state.js';
 import { FX_FALLBACK, FX_SYMBOL } from '../constants.js';
 import { fmt, fmtPct, getColor, getFilteredData, destroyAllCharts, chartTheme } from '../utils.js';
 import { renderAppHeader } from '../components/header.js';
-import { renderMarketStatus, renderIntradaySection, loadIntradayData, computeTodayPL, EU_EXCHANGE_RE } from './intraday.js';
+import { renderMarketStatus, renderIntradaySection, loadIntradayData, computeTodayPL, renderTodayMetric, EU_EXCHANGE_RE } from './intraday.js';
 
 function buildIntradayChartData(visibleTickers) {
   const latest = state.chartData.at(-1);
@@ -333,38 +333,47 @@ export function renderLegend(visibleTickers) {
 }
 
 
+export function renderSummaryBar() {
+  const el = document.getElementById('summary-bar');
+  if (!el) return;
+  const latest = state.chartData.at(-1);
+  if (!latest) return;
+  const plClass    = latest.profit >= 0 ? 'c-pos' : 'c-neg';
+  const profitSign = latest.profit >= 0 ? '+' : '';
+  el.innerHTML = `<div class="metrics-grid summary-bar-grid">
+    <div class="metric-card">
+      <div class="metric-label">Geïnvesteerd</div>
+      <div class="metric-value c-neutral privacy-val">${fmt(latest.totalCost)}</div>
+      <div class="metric-sub">kostprijs</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Portefeuille</div>
+      <div class="metric-value c-brand privacy-val">${fmt(latest.total)}</div>
+      <div class="metric-sub">huidige waarde</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">P&amp;L totaal</div>
+      <div class="metric-value ${plClass} privacy-val">${profitSign}${fmt(latest.profit)}</div>
+      <div class="metric-sub ${plClass}">${fmtPct(latest.pctReturn)}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Vandaag</div>
+      <div id="metricToday"><div class="metric-value c-neutral">—</div><div class="metric-sub">laden…</div></div>
+    </div>
+  </div>`;
+  if (state.intradayLoaded) renderTodayMetric();
+}
+
 export function renderApp() {
   destroyAllCharts();
   state.currentTab = 'portefeuille';
+  renderAppHeader();
+  renderSummaryBar();
 
-  const { latest, plClass, profitSign, visibleTickers, closedToggleHtml, periodChangeHtml, refreshAction } =
+  const { visibleTickers, closedToggleHtml, periodChangeHtml, refreshAction } =
     buildRenderContext(getFilteredData());
 
   document.getElementById('root').innerHTML = `
-    ${renderAppHeader()}
-
-    <div class="metrics-grid">
-      <div class="metric-card">
-        <div class="metric-label">Geïnvesteerd</div>
-        <div class="metric-value c-neutral privacy-val">${fmt(latest.totalCost)}</div>
-        <div class="metric-sub">kostprijs</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Portefeuille</div>
-        <div class="metric-value c-brand privacy-val">${fmt(latest.total)}</div>
-        <div class="metric-sub">huidige waarde</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">P&amp;L totaal</div>
-        <div class="metric-value ${plClass} privacy-val" style="font-size:17px">${profitSign}${fmt(latest.profit)}</div>
-        <div class="metric-sub ${plClass}">${fmtPct(latest.pctReturn)}</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Vandaag</div>
-        <div id="metricToday"><div class="metric-value c-neutral" style="font-size:17px">—</div><div class="metric-sub">laden…</div></div>
-      </div>
-    </div>
-
     <div class="intraday-section">
       <div class="intraday-section-header">
         <div class="card-title" style="margin-bottom:0">Vandaag</div>
@@ -431,6 +440,7 @@ export function renderApp() {
   renderIntradaySection();
   if (!state.intradayLoaded) {
     loadIntradayData(false, () => {
+      renderTodayMetric();
       if (state.currentPeriod === '1d' && state.currentTab === 'portefeuille') {
         if (state.chartInstances.main) { state.chartInstances.main.destroy(); delete state.chartInstances.main; }
         renderPortfolioChart(visibleTickers);

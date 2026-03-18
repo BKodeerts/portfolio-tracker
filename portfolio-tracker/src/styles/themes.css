@@ -1,3 +1,8 @@
+body.theme-dark #top-bar {
+  background: rgba(18, 18, 20, 0.9);
+  border-bottom-color: rgba(255,255,255,0.08);
+}
+
 body.theme-dark {
   background: linear-gradient(145deg, #18181b 0%, #1f1f23 50%, #18181b 100%);
   color: #e2e2e2;
