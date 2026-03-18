@@ -14,7 +14,6 @@ import { renderAnalyse, renderAnalyseCharts, sortPos, showPosModal, closePosModa
 import { renderImport, handleCSVFile, updateYahooGuess, saveImport, saveTickerRenames } from './tabs/import.js';
 import { renderTransacties, filterTx, deleteTx, saveTxAll, toggleAddTx, addManualTx } from './tabs/transacties.js';
 import { loadIntradayData } from './tabs/intraday.js';
-import { renderDonutChart } from './components/donut.js';
 import { renderAppHeader } from './components/header.js';
 
 function applyTheme() {
@@ -49,7 +48,7 @@ async function init() {
       <div class="error-box">
         <div style="font-size:14px;color:#f87171;margin-bottom:8px;font-weight:600">Laden mislukt</div>
         <div style="font-size:12px;color:#94a3b8">${e.message}</div>
-        <button class="btn" onclick="window._init()" style="margin-top:16px">Opnieuw</button>
+        <button class="btn" onclick="globalThis._init()" style="margin-top:16px">Opnieuw</button>
       </div>`;
   }
 }
@@ -62,10 +61,10 @@ function setTab(t) {
   else if (t === 'import')       renderImport();
 }
 
-function renderAppKeepScroll() { const y = window.scrollY; renderApp(); window.scrollTo(0, y); }
+function renderAppKeepScroll() { const y = globalThis.scrollY; renderApp(); globalThis.scrollTo(0, y); }
 function setView(v)          { state.currentView = v; renderAppKeepScroll(); }
 function setPeriod(p)        { state.currentPeriod = p; renderAppKeepScroll(); }
-function setPeriodAnalyse(p) { const y = window.scrollY; state.analysePeriod = p; renderAnalyse(); window.scrollTo(0, y); }
+function setPeriodAnalyse(p) { const y = globalThis.scrollY; state.analysePeriod = p; renderAnalyse(); globalThis.scrollTo(0, y); }
 function toggleClosed()      { state.showClosed = !state.showClosed; renderAppKeepScroll(); }
 
 function toggleTheme() {
@@ -98,7 +97,6 @@ async function clearCache() {
   catch (e) { alert('Cache clear mislukt: ' + e.message); }
 }
 
-
 function refreshIntraday() {
   loadIntradayData(true, () => {
     if (state.currentPeriod === '1d' && state.currentTab === 'portefeuille') {
@@ -110,42 +108,45 @@ function refreshIntraday() {
 }
 
 // Expose all functions referenced by inline onclick= handlers
-window._init             = init;
-window._setTab           = setTab;
-window._setView          = setView;
-window._setPeriod        = setPeriod;
-window._setPeriodAnalyse = setPeriodAnalyse;
-window._toggleClosed     = toggleClosed;
-window._toggleTheme      = toggleTheme;
-window._togglePrivacy    = togglePrivacy;
-window._clearCache       = clearCache;
-window._refreshIntraday  = refreshIntraday;
-window._handleCSVFile    = handleCSVFile;
-window._updateYahooGuess = updateYahooGuess;
-window._saveImport       = saveImport;
-window._getColor         = getColor;
-window._sortPos          = sortPos;
-window._showPosModal     = showPosModal;
-window._closePosModal    = closePosModal;
-window._filterTx         = filterTx;
-window._deleteTx         = deleteTx;
-window._saveTxAll           = saveTxAll;
-window._toggleAddTx         = toggleAddTx;
-window._addManualTx         = addManualTx;
-window._saveTickerRenames   = saveTickerRenames;
-window._saveTickerMetaUI    = saveTickerMetaUI;
-window._resetSectorsUI      = resetSectorsUI;
-window._setBreakdownTab     = setBreakdownTab;
-window._setBenchmark        = setBenchmark;
+globalThis._init             = init;
+globalThis._setTab           = setTab;
+globalThis._setView          = setView;
+globalThis._setPeriod        = setPeriod;
+globalThis._setPeriodAnalyse = setPeriodAnalyse;
+globalThis._toggleClosed     = toggleClosed;
+globalThis._toggleTheme      = toggleTheme;
+globalThis._togglePrivacy    = togglePrivacy;
+globalThis._clearCache       = clearCache;
+globalThis._refreshIntraday  = refreshIntraday;
+globalThis._handleCSVFile    = handleCSVFile;
+globalThis._updateYahooGuess = updateYahooGuess;
+globalThis._saveImport       = saveImport;
+globalThis._getColor         = getColor;
+globalThis._sortPos          = sortPos;
+globalThis._showPosModal     = showPosModal;
+globalThis._closePosModal    = closePosModal;
+globalThis._filterTx         = filterTx;
+globalThis._deleteTx         = deleteTx;
+globalThis._saveTxAll           = saveTxAll;
+globalThis._toggleAddTx         = toggleAddTx;
+globalThis._addManualTx         = addManualTx;
+globalThis._saveTickerRenames   = saveTickerRenames;
+globalThis._saveTickerMetaUI    = saveTickerMetaUI;
+globalThis._resetSectorsUI      = resetSectorsUI;
+globalThis._setBreakdownTab     = setBreakdownTab;
+globalThis._setBenchmark        = setBenchmark;
 
-// Dismiss chart tooltips on mobile when finger lifts (works for all canvases)
+// Dismiss chart tooltips on mobile when finger lifts (works for all canvases).
+// rAF defers until after Chart.js finishes its own touch handling.
 document.addEventListener('touchend', e => {
   const canvas = e.target.closest('canvas');
   if (!canvas) return;
   const chart = Chart.getChart(canvas);
   if (!chart) return;
-  chart.tooltip.setActiveElements([], {});
-  chart.update('none');
+  requestAnimationFrame(() => {
+    chart.tooltip.setActiveElements([], {});
+    chart.update('none');
+  });
 }, { passive: true });
 
 // Boot
