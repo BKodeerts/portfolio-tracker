@@ -298,7 +298,7 @@ export function renderApp() {
   const first    = filtered[0];
 
   const periodProfit = latest.profit - first.profit;
-  const periodPct    = (Number.Number.parseFloat(latest.pctReturn) - Number.Number.parseFloat(first.pctReturn)).toFixed(1);
+  const periodPct    = (Number.parseFloat(latest.pctReturn) - Number.parseFloat(first.pctReturn)).toFixed(1);
   const hasPeriod    = state.currentPeriod !== 'total';
 
   const plClass  = latest.profit >= 0 ? 'c-pos' : 'c-neg';
