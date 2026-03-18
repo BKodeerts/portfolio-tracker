@@ -13,6 +13,28 @@ function staleDayLabel(dateStr) {
 
 export const EU_EXCHANGE_RE = /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i;
 
+// Per-exchange config: yahoo suffix → { label, tz, open [h,m], close [h,m] }
+// Empty string = US stocks (no Yahoo suffix)
+const EXCHANGE_DEFS = {
+  '':    { label: 'US',    tz: 'America/New_York',   open: [9,30],  close: [16,0]  },
+  '.DE': { label: 'XETRA', tz: 'Europe/Berlin',      open: [9,0],   close: [17,30] },
+  '.AS': { label: 'AEX',   tz: 'Europe/Amsterdam',   open: [9,0],   close: [17,30] },
+  '.PA': { label: 'EPA',   tz: 'Europe/Paris',       open: [9,0],   close: [17,30] },
+  '.L':  { label: 'LSE',   tz: 'Europe/London',      open: [8,0],   close: [16,30] },
+  '.MI': { label: 'MIL',   tz: 'Europe/Rome',        open: [9,0],   close: [17,30] },
+  '.BR': { label: 'XBRU',  tz: 'Europe/Brussels',    open: [9,0],   close: [17,30] },
+  '.SW': { label: 'SWX',   tz: 'Europe/Zurich',      open: [9,0],   close: [17,30] },
+  '.ST': { label: 'SSEX',  tz: 'Europe/Stockholm',   open: [9,0],   close: [17,30] },
+  '.HE': { label: 'OMX',   tz: 'Europe/Helsinki',    open: [9,0],   close: [17,30] },
+  '.CO': { label: 'KFX',   tz: 'Europe/Copenhagen',  open: [9,0],   close: [17,30] },
+  '.OL': { label: 'OSE',   tz: 'Europe/Oslo',        open: [9,0],   close: [17,30] },
+};
+
+function yahooSuffix(symbol) {
+  const m = (symbol || '').match(/\.([A-Z]{1,2})$/i);
+  return m ? `.${m[1].toUpperCase()}` : '';
+}
+
 export function getTradingMins(yahooSymbol) {
   return EU_EXCHANGE_RE.test(yahooSymbol || '') ? 510 : 390;
 }
@@ -29,16 +51,40 @@ function isOpen(tz, openH, openM, closeH, closeM) {
 }
 
 export function isExchangeOpen(yahooSymbol) {
-  return /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i.test(yahooSymbol || '')
-    ? isOpen('Europe/Amsterdam', 9, 0, 17, 30)
-    : isOpen('America/New_York', 9, 30, 16, 0);
+  const sfx = yahooSuffix(yahooSymbol);
+  const def = EXCHANGE_DEFS[sfx] || EXCHANGE_DEFS[''];
+  return isOpen(def.tz, ...def.open, ...def.close);
 }
 
 export function getMarketStatus() {
   const badge = (label, open) =>
     `<span class="market-badge"><span class="dot" style="background:${open ? '#4ade80' : '#334155'}"></span>${label}</span>`;
-  return badge('NYSE', isOpen('America/New_York', 9, 30, 16, 0)) +
-         badge('XETRA', isOpen('Europe/Amsterdam', 9, 0, 17, 30));
+
+  // Collect unique exchange suffixes from currently tracked tickers
+  const seen = new Map();
+  for (const ticker of (state.CURRENT_TICKERS || [])) {
+    const yahoo = state.TICKER_META?.[ticker]?.yahoo || '';
+    const sfx = yahooSuffix(yahoo);
+    if (EXCHANGE_DEFS[sfx] && !seen.has(sfx)) seen.set(sfx, EXCHANGE_DEFS[sfx]);
+  }
+  // Fallback when no tickers loaded yet
+  if (seen.size === 0) {
+    seen.set('', EXCHANGE_DEFS['']);
+    seen.set('.DE', EXCHANGE_DEFS['.DE']);
+  }
+
+  const todayStr = new Date().toLocaleDateString('sv-SE');
+  return [...seen.entries()].map(([sfx, def]) => {
+    let open = null;
+    if (state.intradayData) {
+      for (const [sym, data] of Object.entries(state.intradayData)) {
+        if (!data?.marketState || data.date !== todayStr || sym.endsWith('=X')) continue;
+        if (yahooSuffix(sym) === sfx) { open = data.marketState === 'REGULAR'; break; }
+      }
+    }
+    if (open === null) open = isOpen(def.tz, ...def.open, ...def.close);
+    return badge(def.label, open);
+  }).join('');
 }
 
 export function renderMarketStatus() {
@@ -196,7 +242,7 @@ export function renderIntradaySection() {
     const cls     = pct >= 0 ? 'c-pos' : 'c-neg';
     const todayStr  = new Date().toISOString().slice(0, 10);
     const isStale   = data.date !== todayStr;
-    const isClosed  = !isStale && !isExchangeOpen(yahoo);
+    const isClosed  = !isStale && (data.marketState ? data.marketState !== 'REGULAR' : !isExchangeOpen(yahoo));
     let statusLabel = '';
     if (isStale)       statusLabel = `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(data.date)}</span>`;
     else if (isClosed) statusLabel = `<span style="font-size:9px;color:#64748b;font-family:'JetBrains Mono',monospace;margin-left:auto">gesloten</span>`;

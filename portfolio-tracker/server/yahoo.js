@@ -83,6 +83,7 @@ async function fetchIntraday(yahooSymbol) {
     date: new Date(points[0].ts * 1000).toISOString().slice(0, 10),
     previousClose: meta.chartPreviousClose ?? meta.regularMarketPreviousClose ?? null,
     currency: meta.currency || null,
+    marketState: meta.marketState || null,
     points,
   };
 }

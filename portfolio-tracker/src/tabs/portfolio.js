@@ -423,17 +423,31 @@ export function renderPortfolioChart(visibleTickers) {
   const hasUS = visibleTickers.some(
     (t) => !EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ""),
   );
+  // Convert exchange-local time (hour, min in tz) to a JS Date for today.
+  // Using Intl, this correctly handles DST transitions between US and EU.
+  function exchangeTimeToLocal(tz, hour, min) {
+    const tzDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
+    const [yr, mo, dy] = tzDateStr.split('-').map(Number);
+    const naiveUtc = Date.UTC(yr, mo - 1, dy, hour, min, 0);
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour: 'numeric', minute: 'numeric', hour12: false,
+    }).formatToParts(new Date(naiveUtc));
+    const tzH = Number(parts.find(p => p.type === 'hour').value) % 24;
+    const tzM = Number(parts.find(p => p.type === 'minute').value);
+    return new Date(naiveUtc + ((hour * 60 + min) - (tzH * 60 + tzM)) * 60000);
+  }
+
   const sessionLines = [
     ...(hasEU
       ? [
-          { hour: 9, min: 0, label: "EU opent" },
-          { hour: 17, min: 30, label: "EU sluit" },
+          { date: exchangeTimeToLocal('Europe/Amsterdam', 9, 0),   label: "EU opent" },
+          { date: exchangeTimeToLocal('Europe/Amsterdam', 17, 30),  label: "EU sluit" },
         ]
       : []),
     ...(hasUS
       ? [
-          { hour: 15, min: 30, label: "NYSE opent" },
-          { hour: 22, min: 0, label: "NYSE sluit" },
+          { date: exchangeTimeToLocal('America/New_York', 9, 30),   label: "US opent" },
+          { date: exchangeTimeToLocal('America/New_York', 16, 0),   label: "US sluit" },
         ]
       : []),
   ];
@@ -448,10 +462,8 @@ export function renderPortfolioChart(visibleTickers) {
           } = chart;
           const lines = sessionLines;
           ctx.save();
-          lines.forEach(({ hour, min, label }) => {
-            const t = new Date();
-            t.setHours(hour, min, 0, 0);
-            const xPos = x.getPixelForValue(t.getTime());
+          lines.forEach(({ date, label }) => {
+            const xPos = x.getPixelForValue(date.getTime());
             if (xPos < x.left || xPos > x.right) return;
             ctx.strokeStyle = "rgba(100,116,139,0.4)";
             ctx.lineWidth = 1;
