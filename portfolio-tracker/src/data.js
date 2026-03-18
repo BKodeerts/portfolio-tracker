@@ -34,6 +34,8 @@ export async function loadData(onSuccess) {
     state.realizedPl          = d.realizedPl          ?? 0;
     state.realizedPlPerTicker = d.realizedPlPerTicker ?? {};
     state.usdExposurePct      = d.usdExposurePct      ?? 0;
+    state.currencyExposure    = d.currencyExposure    ?? {};
+    state.baseCurrency        = d.baseCurrency        ?? 'EUR';
     state.twrPct              = d.twrPct              ?? null;
     state.irrPct              = d.irrPct              ?? null;
 

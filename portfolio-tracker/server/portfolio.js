@@ -13,11 +13,61 @@ const TRANSACTIONS_FILE = path.join(DATA_DIR, 'transactions.json');
 const TICKER_META_FILE  = path.join(DATA_DIR, 'ticker_meta.json');
 const STATE_FILE        = path.join(DATA_DIR, 'portfolio_state.json');
 
-const FX_SYMBOL        = 'EURUSD=X';
-const FX_FALLBACK      = 1.09;
+const FX_SYMBOL        = 'EURUSD=X';  // backward compat (HA/MQTT)
+const FX_FALLBACK      = 1.09;        // backward compat
 const BENCHMARK_SYM    = 'VWCE.DE';
 const SP500_SYM        = '^GSPC';
 const SPLIT_CANDIDATES = [2, 3, 4, 5, 8, 10, 20, 25, 50, 100];
+
+// FX definitions: stock currency → { Yahoo FX symbol (EUR-base), fallback rate, optional /scale }
+const FX_DEFS = {
+  USD: { symbol: 'EURUSD=X', fallback: 1.09  },
+  GBP: { symbol: 'EURGBP=X', fallback: 0.86  },
+  GBX: { symbol: 'EURGBP=X', fallback: 0.86, scale: 100 }, // pence sterling
+  CLP: { symbol: 'EURCLP=X', fallback: 1000  },
+  CHF: { symbol: 'EURCHF=X', fallback: 0.95  },
+  SEK: { symbol: 'EURSEK=X', fallback: 11.5  },
+  DKK: { symbol: 'EURDKK=X', fallback: 7.46  },
+  NOK: { symbol: 'EURNOK=X', fallback: 11.5  },
+  CAD: { symbol: 'EURCAD=X', fallback: 1.5   },
+  AUD: { symbol: 'EURAUD=X', fallback: 1.65  },
+  JPY: { symbol: 'EURJPY=X', fallback: 160   },
+  MXN: { symbol: 'EURMXN=X', fallback: 20    },
+  BRL: { symbol: 'EURBRL=X', fallback: 5.5   },
+};
+
+/**
+ * Convert a price in any currency to EUR using a date-keyed fxMaps object.
+ * fxMaps: { [currency]: { [date]: rate } } where rate = EUR-per-unit (e.g. EURUSD=1.09 means 1 EUR = 1.09 USD).
+ */
+function toEur(currency, price, date, fxMaps) {
+  if (!currency || currency === 'EUR') return price;
+  const def = FX_DEFS[currency];
+  if (!def) return price;
+  const rate = fxMaps[currency]?.[date] || def.fallback;
+  return price / rate / (def.scale || 1);
+}
+
+/**
+ * Convert a price to EUR using a flat live-rates object { [currency]: rate }.
+ */
+function toEurAtRate(currency, price, liveRates) {
+  if (!currency || currency === 'EUR') return price;
+  const def = FX_DEFS[currency];
+  if (!def) return price;
+  const rate = liveRates[currency] || def.fallback;
+  return price / rate / (def.scale || 1);
+}
+
+/** Collect all unique non-EUR currencies that need FX data. */
+function nonEurCurrencies(meta) {
+  return [...new Set(Object.values(meta).map(m => m.currency).filter(c => c && c !== 'EUR' && FX_DEFS[c]))];
+}
+
+/** Return deduped Yahoo FX symbols needed for a set of currencies. */
+function fxSymbolsFor(currencies) {
+  return [...new Set(currencies.map(c => FX_DEFS[c]?.symbol).filter(Boolean))];
+}
 
 // ── Data access ───────────────────────────────────────────────────────────────
 
@@ -146,27 +196,33 @@ function buildPriceMaps(rawCandles, sortedDates, manualPrices = {}) {
 }
 
 /**
- * Forward-fill FX rate map over sortedDates.
+ * Build per-currency forward-filled FX rate maps over sortedDates.
+ * Returns { [currency]: { [date]: rate } } where rate = EUR-per-unit.
  */
-function buildFxRateMap(fxCandles, sortedDates) {
-  const raw = {};
-  for (const c of fxCandles) raw[c.date] = c.close;
-  const fxMap = {};
-  let last = FX_FALLBACK;
-  for (const d of sortedDates) {
-    if (raw[d] != null) last = raw[d];
-    fxMap[d] = last;
+function buildFxRateMaps(rawCandles, sortedDates, currencies) {
+  const maps = {};
+  for (const ccy of currencies) {
+    const def = FX_DEFS[ccy];
+    if (!def) continue;
+    const raw = {};
+    for (const c of (rawCandles[def.symbol] || [])) raw[c.date] = c.close;
+    const map = {};
+    let last = def.fallback;
+    for (const d of sortedDates) {
+      if (raw[d] != null) last = raw[d];
+      map[d] = last;
+    }
+    maps[ccy] = map;
   }
-  return fxMap;
+  return maps;
 }
 
 // ── Split detection & share adjustment ───────────────────────────────────────
 
-function detectSplitFactors(meta, transactions, priceMaps, getFxRate) {
+function detectSplitFactors(meta, transactions, priceMaps, fxMaps) {
   const splitFactors = {};
   for (const ticker of Object.keys(meta)) {
     const m = meta[ticker];
-    // Skip tickers with manual prices — no Yahoo data to compare against
     if (m.manualPriceEur) { splitFactors[ticker] = 1; continue; }
     const firstBuy = transactions
       .filter(t => t.ticker === ticker && t.shares > 0)
@@ -174,9 +230,12 @@ function detectSplitFactors(meta, transactions, priceMaps, getFxRate) {
     if (!firstBuy) { splitFactors[ticker] = 1; continue; }
     const yahooPrice = priceMaps[m.yahoo]?.[firstBuy.date];
     if (!yahooPrice) { splitFactors[ticker] = 1; continue; }
-    const fx = getFxRate(firstBuy.date);
-    const txPrice = m.currency === 'USD'
-      ? (firstBuy.costEur / firstBuy.shares) * fx
+    // txPrice: convert EUR cost to the stock's native currency for ratio comparison
+    const def = FX_DEFS[m.currency];
+    const rate  = def ? (fxMaps[m.currency]?.[firstBuy.date] || def.fallback) : 1;
+    const scale = def?.scale || 1;
+    const txPrice = (m.currency && m.currency !== 'EUR' && def)
+      ? (firstBuy.costEur / firstBuy.shares) * rate * scale
       : firstBuy.costEur / firstBuy.shares;
     const ratio = yahooPrice / txPrice;
     splitFactors[ticker] = ratio > 2
@@ -186,16 +245,18 @@ function detectSplitFactors(meta, transactions, priceMaps, getFxRate) {
   return splitFactors;
 }
 
-function makeAdjShares(meta, priceMaps, splitFactors, getFxRate) {
+function makeAdjShares(meta, priceMaps, splitFactors, fxMaps) {
   return function adjShares(tx, ticker) {
     const factor = splitFactors[ticker] || 1;
     if (factor === 1) return tx.shares;
     const m = meta[ticker];
     const yahooPrice = priceMaps[m.yahoo]?.[tx.date];
     if (!yahooPrice) return tx.shares;
-    const fx = getFxRate(tx.date);
-    const txPrice = m.currency === 'USD'
-      ? (Math.abs(tx.costEur) / Math.abs(tx.shares)) * fx
+    const def = FX_DEFS[m.currency];
+    const rate  = def ? (fxMaps[m.currency]?.[tx.date] || def.fallback) : 1;
+    const scale = def?.scale || 1;
+    const txPrice = (m.currency && m.currency !== 'EUR' && def)
+      ? (Math.abs(tx.costEur) / Math.abs(tx.shares)) * rate * scale
       : Math.abs(tx.costEur) / Math.abs(tx.shares);
     return yahooPrice / txPrice > 2 ? tx.shares / factor : tx.shares;
   };
@@ -277,7 +338,7 @@ function computeRealizedPl(txsByTicker, adjSharesFn) {
 /**
  * Build daily portfolio snapshot time series.
  */
-function buildChartData(meta, transactions, priceMaps, fxMap, sortedDates, adjSharesFn) {
+function buildChartData(meta, transactions, priceMaps, fxMaps, sortedDates, adjSharesFn) {
   const txByTicker = {};
   for (const tx of transactions) {
     (txByTicker[tx.ticker] = txByTicker[tx.ticker] || []).push(tx);
@@ -295,8 +356,7 @@ function buildChartData(meta, transactions, priceMaps, fxMap, sortedDates, adjSh
       }
       const price = priceMaps[m.yahoo]?.[date];
       if (sharesHeld > 0 && price != null) {
-        const fxRate = fxMap[date] || FX_FALLBACK;
-        const value = m.currency === 'USD' ? sharesHeld * price / fxRate : sharesHeld * price;
+        const value = toEur(m.currency, sharesHeld * price, date, fxMaps);
         row[ticker]              = Math.round(value);
         row[`${ticker}_shares`] = sharesHeld;
         totalValue += value;
@@ -319,7 +379,7 @@ function buildChartData(meta, transactions, priceMaps, fxMap, sortedDates, adjSh
 /**
  * Append today's row using daily quotes if newer than last candle date.
  */
-async function appendTodaySnapshot(chartData, meta, transactions, fxMap, adjSharesFn) {
+async function appendTodaySnapshot(chartData, meta, transactions, fxMaps, adjSharesFn) {
   const yahooSymbols = [...new Set(Object.values(meta).map(m => m.yahoo))];
 
   const prices = {};
@@ -338,10 +398,21 @@ async function appendTodaySnapshot(chartData, meta, transactions, fxMap, adjShar
     }
   }
 
-  const lastHistoricalFx = fxMap[Object.keys(fxMap).sort().at(-1)] || FX_FALLBACK;
-  let todayFxRate = lastHistoricalFx;
-  const fxQ = await getQuote(FX_SYMBOL);
-  if (fxQ?.close) todayFxRate = fxQ.close;
+  // Fetch live FX rates for all non-EUR currencies
+  const currencies = nonEurCurrencies(meta);
+  const liveRates = {};
+  const seenFxSymbols = new Set();
+  for (const ccy of currencies) {
+    const def = FX_DEFS[ccy];
+    if (!def || seenFxSymbols.has(def.symbol)) { continue; }
+    seenFxSymbols.add(def.symbol);
+    const lastHistorical = Object.values(fxMaps[ccy] || {}).at(-1) || def.fallback;
+    const fxQ = await getQuote(def.symbol);
+    const rate = fxQ?.close || lastHistorical;
+    for (const c of currencies) {
+      if (FX_DEFS[c]?.symbol === def.symbol) liveRates[c] = rate;
+    }
+  }
 
   if (!todayDate || todayDate <= (chartData.at(-1)?.date || '')) return chartData;
 
@@ -361,7 +432,7 @@ async function appendTodaySnapshot(chartData, meta, transactions, fxMap, adjShar
     }
     const price = prices[m.yahoo];
     if (sh > 0 && price) {
-      const val = m.currency === 'USD' ? sh * price / todayFxRate : sh * price;
+      const val = toEurAtRate(m.currency, sh * price, liveRates);
       row[ticker]              = Math.round(val);
       row[`${ticker}_shares`] = sh;
       tv += val;
@@ -387,14 +458,14 @@ async function appendTodaySnapshot(chartData, meta, transactions, fxMap, adjShar
  */
 function buildBenchmarkData(priceMaps, chartData, symbol, fxMap = null) {
   if (!priceMaps[symbol] || !chartData.length) return [];
-  const toEur = (date, price) => fxMap ? price / (fxMap[date] || FX_FALLBACK) : price;
-  const baseEur = toEur(chartData[0].date, priceMaps[symbol][chartData[0].date]);
+  const toEurFx = (date, price) => fxMap ? price / (fxMap[date] || FX_FALLBACK) : price;
+  const baseEur = toEurFx(chartData[0].date, priceMaps[symbol][chartData[0].date]);
   if (!baseEur) return [];
   return chartData
     .map(row => {
       const p = priceMaps[symbol][row.date];
       if (p == null) return null;
-      return { date: row.date, value: Number.parseFloat((toEur(row.date, p) / baseEur * 100).toFixed(2)) };
+      return { date: row.date, value: Number.parseFloat((toEurFx(row.date, p) / baseEur * 100).toFixed(2)) };
     })
     .filter(Boolean);
 }
@@ -642,13 +713,14 @@ async function computeFullPortfolio() {
   // Skip Yahoo fetch for manually-priced symbols
   const fetchSymbols = yahooSymbols.filter(sym => !Object.values(manualPrices).length ||
     !Object.values(meta).find(m => m.yahoo === sym && m.manualPriceEur));
-  const allSymbols   = [...new Set([...fetchSymbols, FX_SYMBOL, BENCHMARK_SYM, SP500_SYM])];
+  const currencies   = nonEurCurrencies(meta);
+  const neededFxSyms = fxSymbolsFor(currencies);
+  const allSymbols   = [...new Set([...fetchSymbols, FX_SYMBOL, ...neededFxSyms, BENCHMARK_SYM, SP500_SYM])];
 
   const rawCandles = {};
   for (const sym of allSymbols) {
     rawCandles[sym] = await getRawCandles(sym, earliestDate);
   }
-  // Empty candle array for manual-price tickers (price injected via manualPrices map)
   for (const sym of yahooSymbols) {
     if (!rawCandles[sym]) rawCandles[sym] = [];
   }
@@ -661,14 +733,16 @@ async function computeFullPortfolio() {
   const sortedDates = [...allDates].sort();
 
   const priceMaps = buildPriceMaps(rawCandles, sortedDates, manualPrices);
-  const fxMap     = buildFxRateMap(rawCandles[FX_SYMBOL] || [], sortedDates);
-  const getFxRate = d => fxMap[d] || FX_FALLBACK;
+  // Always include USD in fxMaps for backward compat (SP500 benchmark conversion)
+  const fxMaps    = buildFxRateMaps(rawCandles, sortedDates, ['USD', ...currencies]);
+  // Legacy scalar getter for buildBenchmarkData (SP500 is USD)
+  const fxMap     = fxMaps.USD || {};
 
-  const splitFactors = detectSplitFactors(meta, transactions, priceMaps, getFxRate);
-  const adjSharesFn  = makeAdjShares(meta, priceMaps, splitFactors, getFxRate);
+  const splitFactors = detectSplitFactors(meta, transactions, priceMaps, fxMaps);
+  const adjSharesFn  = makeAdjShares(meta, priceMaps, splitFactors, fxMaps);
 
-  let chartData = buildChartData(meta, transactions, priceMaps, fxMap, sortedDates, adjSharesFn);
-  chartData = await appendTodaySnapshot(chartData, meta, transactions, fxMap, adjSharesFn);
+  let chartData = buildChartData(meta, transactions, priceMaps, fxMaps, sortedDates, adjSharesFn);
+  chartData = await appendTodaySnapshot(chartData, meta, transactions, fxMaps, adjSharesFn);
 
   const benchmarkData  = buildBenchmarkData(priceMaps, chartData, BENCHMARK_SYM);
   const sp500Data      = buildBenchmarkData(priceMaps, chartData, SP500_SYM, fxMap);
@@ -739,10 +813,20 @@ async function computeFullPortfolio() {
     fs.writeFileSync(TICKER_META_FILE, JSON.stringify(tickerMetaLive, null, 2));
   }
 
-  // Currency exposure
-  const totalValue    = latest?.total || 0;
-  const usdValue      = positions.filter(p => meta[p.ticker].currency === 'USD').reduce((s, p) => s + p.value, 0);
-  const usdExposurePct = totalValue > 0 ? Number.parseFloat((usdValue / totalValue * 100).toFixed(1)) : 0;
+  // Currency exposure per currency
+  const totalValue = latest?.total || 0;
+  const currencyExposure = {};
+  for (const pos of positions) {
+    const ccy = meta[pos.ticker].currency || 'EUR';
+    currencyExposure[ccy] = (currencyExposure[ccy] || 0) + pos.value;
+  }
+  for (const ccy of Object.keys(currencyExposure)) {
+    currencyExposure[ccy] = totalValue > 0
+      ? Number.parseFloat((currencyExposure[ccy] / totalValue * 100).toFixed(1))
+      : 0;
+  }
+  // Backward compat
+  const usdExposurePct = currencyExposure.USD ?? 0;
 
   // Analytics
   const riskMetrics    = computeRiskMetrics(chartData, benchmarkData);
@@ -762,7 +846,7 @@ async function computeFullPortfolio() {
 
   return {
     chartData, benchmarkData, sp500Data, meta, currentTickers, latestFxRate, positions,
-    realizedPl, realizedPlPerTicker, usdExposurePct,
+    realizedPl, realizedPlPerTicker, usdExposurePct, currencyExposure,
     riskMetrics, rollingReturns, twrPct, irrPct,
   };
 }
@@ -780,25 +864,25 @@ function getPrevTradingDate(priceMaps, yahooSymbols) {
   return latest;
 }
 
-function valueAtDate(currentTickers, meta, priceMaps, netShares, fxRate, date) {
+function valueAtDate(currentTickers, meta, priceMaps, netShares, liveRates, date) {
   let total = 0;
   for (const ticker of currentTickers) {
     const m = meta[ticker];
     const price = priceMaps[m.yahoo]?.[date];
     if (!price) continue;
-    total += m.currency === 'USD' ? netShares[ticker] * price / fxRate : netShares[ticker] * price;
+    total += toEurAtRate(m.currency, netShares[ticker] * price, liveRates);
   }
   return total;
 }
 
-function buildSnapshotPositions(currentTickers, meta, prices, netShares, buyInvested, fxRate) {
+function buildSnapshotPositions(currentTickers, meta, prices, netShares, buyInvested, liveRates) {
   let totalValue = 0, totalCost = 0;
   const positions = [];
   for (const ticker of currentTickers) {
     const m = meta[ticker];
     const price = prices[m.yahoo];
     if (!price) continue;
-    const value = m.currency === 'USD' ? netShares[ticker] * price / fxRate : netShares[ticker] * price;
+    const value = toEurAtRate(m.currency, netShares[ticker] * price, liveRates);
     const cost  = buyInvested[ticker] || 0;
     totalValue += value;
     totalCost  += cost;
@@ -827,24 +911,34 @@ async function computeCurrentSnapshot(options = {}) {
   const fetchSymbols = yahooSymbols.filter(sym =>
     !Object.values(meta).find(m => m.yahoo === sym && m.manualPriceEur));
 
-  const needsFx = Object.values(meta).some(m => m.currency === 'USD');
-  let fxRate = FX_FALLBACK;
-  if (needsFx) {
-    fxRate = (await getIntradayPrice(FX_SYMBOL)) ?? (await getQuote(FX_SYMBOL))?.close ?? FX_FALLBACK;
-  }
+  const currencies   = nonEurCurrencies(meta);
+  const neededFxSyms = fxSymbolsFor(currencies);
 
+  // Fetch live FX rates for all non-EUR currencies
+  const liveRates = {};
+  const seenFxSymbols = new Set();
+  for (const ccy of ['USD', ...currencies]) {
+    const def = FX_DEFS[ccy];
+    if (!def || seenFxSymbols.has(def.symbol)) continue;
+    seenFxSymbols.add(def.symbol);
+    const rate = (await getIntradayPrice(def.symbol)) ?? (await getQuote(def.symbol))?.close ?? def.fallback;
+    for (const c of ['USD', ...currencies]) {
+      if (FX_DEFS[c]?.symbol === def.symbol) liveRates[c] = rate;
+    }
+  }
   const rawCandles = {};
-  for (const sym of fetchSymbols) {
-    rawCandles[sym] = await getRawCandles(sym, earliestDate);
+  for (const sym of [...fetchSymbols, ...neededFxSyms]) {
+    if (!rawCandles[sym]) rawCandles[sym] = await getRawCandles(sym, earliestDate);
   }
 
   const allDates    = new Set();
   for (const candles of Object.values(rawCandles)) for (const c of candles) allDates.add(c.date);
   const sortedDates = [...allDates].sort();
   const priceMaps   = buildPriceMaps(rawCandles, sortedDates, manualPrices);
+  const fxMaps      = buildFxRateMaps(rawCandles, sortedDates, ['USD', ...currencies]);
 
-  const splitFactors = detectSplitFactors(meta, transactions, priceMaps, () => fxRate);
-  const adjSharesFn  = makeAdjShares(meta, priceMaps, splitFactors, () => fxRate);
+  const splitFactors = detectSplitFactors(meta, transactions, priceMaps, fxMaps);
+  const adjSharesFn  = makeAdjShares(meta, priceMaps, splitFactors, fxMaps);
 
   const { netShares, buyInvested } = computeNetShares(meta, transactions, adjSharesFn);
   const currentTickers = Object.keys(netShares).filter(t => netShares[t] > 0.0001);
@@ -853,14 +947,14 @@ async function computeCurrentSnapshot(options = {}) {
   const prices = await getLivePrices(yahooSymbols, manualPrices);
 
   const { totalValue, totalCost, positions } = buildSnapshotPositions(
-    currentTickers, meta, prices, netShares, buyInvested, fxRate,
+    currentTickers, meta, prices, netShares, buyInvested, liveRates,
   );
 
   if (!positions.length) return null;
 
   const prevDate  = getPrevTradingDate(priceMaps, fetchSymbols.length ? fetchSymbols : yahooSymbols);
   const prevValue = prevDate
-    ? valueAtDate(currentTickers, meta, priceMaps, netShares, fxRate, prevDate)
+    ? valueAtDate(currentTickers, meta, priceMaps, netShares, liveRates, prevDate)
     : totalValue;
   const dailyPl = totalValue - prevValue;
 
@@ -874,13 +968,23 @@ async function computeCurrentSnapshot(options = {}) {
   // Currency exposure
   const usdValue       = positions.filter(p => meta[p.ticker].currency === 'USD').reduce((s, p) => s + p.value, 0);
   const usdExposurePct = totalValue > 0 ? Number.parseFloat((usdValue / totalValue * 100).toFixed(1)) : 0;
+  const currencyExposure = {};
+  for (const pos of positions) {
+    const ccy = meta[pos.ticker].currency || 'EUR';
+    currencyExposure[ccy] = (currencyExposure[ccy] || 0) + pos.value;
+  }
+  for (const ccy of Object.keys(currencyExposure)) {
+    currencyExposure[ccy] = totalValue > 0
+      ? Number.parseFloat((currencyExposure[ccy] / totalValue * 100).toFixed(1))
+      : 0;
+  }
 
   // Watchlist
   const watchlistData = options.watchlist?.length
     ? await fetchWatchlistPrices(options.watchlist)
     : [];
 
-  return { totalValue, totalCost, dailyPl, positions, realizedPl, usdExposurePct, watchlistData };
+  return { totalValue, totalCost, dailyPl, positions, realizedPl, usdExposurePct, currencyExposure, watchlistData };
 }
 
 module.exports = { computeFullPortfolio, computeCurrentSnapshot };

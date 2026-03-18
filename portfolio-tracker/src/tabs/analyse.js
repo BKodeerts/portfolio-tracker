@@ -159,11 +159,22 @@ export function renderBarChart(latest) {
 export function renderCurrencyDonut() {
   const el = document.getElementById('chartCurrencyDonut');
   if (!el) return;
-  const usd    = state.usdExposurePct ?? 0;
-  const eur    = 100 - usd;
-  const labels = ['USD', 'EUR'];
-  const values = [usd, eur];
-  const colors = ['#fbbf24', '#818cf8'];
+
+  // Use per-currency breakdown when available, else fall back to usdExposurePct
+  const exposure = state.currencyExposure;
+  let labels, values;
+  if (exposure && Object.keys(exposure).length) {
+    const sorted = Object.entries(exposure).sort((a, b) => b[1] - a[1]);
+    labels = sorted.map(([c]) => c);
+    values = sorted.map(([, v]) => v);
+  } else {
+    const usd = state.usdExposurePct ?? 0;
+    labels = ['USD', 'EUR'];
+    values = [usd, 100 - usd];
+  }
+
+  const PALETTE = ['#fbbf24','#818cf8','#34d399','#f87171','#60a5fa','#a78bfa','#fb923c','#4ade80','#f472b6','#22d3ee'];
+  const colors  = labels.map((_, i) => PALETTE[i % PALETTE.length]);
   const ct     = chartTheme();
 
   const legendEl = document.getElementById('chartCurrencyDonutLegend');

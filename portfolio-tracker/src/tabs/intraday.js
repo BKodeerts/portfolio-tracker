@@ -1,6 +1,6 @@
 import { state } from '../state.js';
 import { fetchIntraday } from '../api.js';
-import { FX_FALLBACK, FX_SYMBOL } from '../constants.js';
+import { FX_DEFS, FX_FALLBACK, FX_SYMBOL } from '../constants.js';
 import { fmt } from '../utils.js';
 
 function staleDayLabel(dateStr) {
@@ -34,6 +34,11 @@ const EXCHANGE_DEFS = {
   '.HE': { label: 'OMX',   tz: 'Europe/Helsinki',    open: [9,0],   close: [17,30] },
   '.CO': { label: 'KFX',   tz: 'Europe/Copenhagen',  open: [9,0],   close: [17,30] },
   '.OL': { label: 'OSE',   tz: 'Europe/Oslo',        open: [9,0],   close: [17,30] },
+  '.CL': { label: 'SCL',   tz: 'America/Santiago',   open: [9,30],  close: [17,0]  },
+  '.TO': { label: 'TSX',   tz: 'America/Toronto',    open: [9,30],  close: [16,0]  },
+  '.AX': { label: 'ASX',   tz: 'Australia/Sydney',   open: [10,0],  close: [16,0]  },
+  '.T':  { label: 'TSE',   tz: 'Asia/Tokyo',         open: [9,0],   close: [15,30] },
+  '.MX': { label: 'BMV',   tz: 'America/Mexico_City',open: [8,30],  close: [15,0]  },
 };
 
 function yahooSuffix(symbol) {
@@ -152,12 +157,17 @@ export function computeTodayPL() {
   const latest = state.chartData.at(-1);
   if (!latest) return null;
 
-  // Current live FX rate (EUR/USD), and the rate at the previous close.
-  // Use the intraday endpoint's previousClose for EURUSD — it's the actual last
-  // trading day close, whereas state.latestFxRate comes from historical chart data
-  // and may be stale (causing artificial FX P&L).
-  const currentFx = state.liveEurUsd || FX_FALLBACK;
-  const prevFx    = state.intradayData[FX_SYMBOL]?.previousClose || state.latestFxRate || currentFx;
+  // Helper: get current + previous FX rate for a given currency from intraday data
+  function getFxForCcy(currency) {
+    const def = FX_DEFS[currency];
+    if (!def) return { current: 1, prev: 1, scale: 1 };
+    const fxData = state.intradayData[def.symbol];
+    const current = fxData?.points?.length
+      ? fxData.points[fxData.points.length - 1].close
+      : (def.fallback);
+    const prev = fxData?.previousClose || state.latestFxRate || current;
+    return { current, prev, scale: def.scale || 1 };
+  }
 
   state.CURRENT_TICKERS.forEach(ticker => {
     const meta = state.TICKER_META[ticker];
@@ -166,14 +176,14 @@ export function computeTodayPL() {
     const shares = latest?.[`${ticker}_shares`];
     if (!shares) return;
 
-    if (meta.currency === 'USD') {
-      // For USD positions: apply FX impact even when markets are closed.
-      // Use today's intraday price if available, otherwise previousClose (stock unchanged).
+    if (meta.currency && meta.currency !== 'EUR') {
+      // Non-EUR positions: apply both price and FX impact, even when market is closed.
+      const { current: currentFx, prev: prevFx, scale } = getFxForCcy(meta.currency);
       const todayPrice = (data.date === today && data.points?.length)
         ? data.points[data.points.length - 1].close
         : data.previousClose;
-      const prevEur  = data.previousClose / prevFx;
-      const todayEur = todayPrice / currentFx;
+      const prevEur  = data.previousClose / prevFx / scale;
+      const todayEur = todayPrice / currentFx / scale;
       plEur   += shares * (todayEur - prevEur);
       baseEur += shares * prevEur;
     } else {
@@ -297,7 +307,10 @@ export async function loadIntradayData(force = false, onDone = null) {
   const statusEl = document.getElementById('intradayStatus');
   if (statusEl) statusEl.textContent = 'laden…';
   try {
-    const allSymbols = [...new Set([...yahooSymbols, FX_SYMBOL])];
+    // Collect FX symbols for all non-EUR currencies in the current portfolio
+    const currencies = [...new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META[t]?.currency).filter(c => c && c !== 'EUR'))];
+    const fxSymbols  = [...new Set(currencies.map(c => FX_DEFS[c]?.symbol).filter(Boolean))];
+    const allSymbols = [...new Set([...yahooSymbols, FX_SYMBOL, ...fxSymbols])];
     const json = await fetchIntraday(allSymbols, force);
     if (json.status !== 'ok') throw new Error(json.message);
     state.intradayData = json.data;

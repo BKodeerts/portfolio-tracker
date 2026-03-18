@@ -1,6 +1,6 @@
 name: "Portfolio Tracker"
 description: "Self-hosted stock portfolio tracker with Yahoo Finance data"
-version: "0.4.39"
+version: "0.5.0-beta.01"
 slug: "portfolio_tracker"
 init: false
 arch:
@@ -30,6 +30,7 @@ options:
   drawdown_alert_pct: 10
   target_value: 0
   push_positions: false
+  base_currency: "EUR"
   watchlist: []
 schema:
   enable_ha_sensors: bool
@@ -39,6 +40,7 @@ schema:
   drawdown_alert_pct: int(1,50)
   target_value: float
   push_positions: bool
+  base_currency: str?
   watchlist:
     - str
   mqtt_broker: str?

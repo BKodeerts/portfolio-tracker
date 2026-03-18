@@ -19,9 +19,10 @@ function addTxForm() {
         <div class="tx-add-form-field"><label>Aandelen *</label><input id="addShares" type="number" step="any" placeholder="10" style="width:80px"></div>
         <div class="tx-add-form-field"><label>Kosten € *</label><input id="addCostEur" type="number" step="any" min="0" placeholder="1234.56" style="width:92px"></div>
         <div class="tx-add-form-field"><label>Munt</label>
-          <select id="addCurrency" style="width:62px">
-            <option value="EUR">EUR</option>
-            <option value="USD">USD</option>
+          <select id="addCurrency" style="width:64px">
+            ${['EUR','USD','GBP','GBX','CLP','CHF','SEK','DKK','NOK','CAD','AUD','JPY','MXN','BRL'].map(c =>
+              `<option value="${c}">${c}</option>`
+            ).join('')}
           </select>
         </div>
         <div class="tx-add-form-field" style="justify-content:flex-end">
@@ -75,8 +76,9 @@ function buildTxTable() {
         <td class="tx-col-cost"><span class="tx-cell" contenteditable="true" data-field="costEur" inputmode="decimal">${Number.parseFloat(t.costEur).toFixed(2)}</span></td>
         <td class="tx-col-ccy">
           <select class="tx-ccy" data-field="currency">
-            <option value="EUR"${t.currency === 'USD' ? '' : ' selected'}>EUR</option>
-            <option value="USD"${t.currency === 'USD' ? ' selected' : ''}>USD</option>
+            ${['EUR','USD','GBP','GBX','CLP','CHF','SEK','DKK','NOK','CAD','AUD','JPY','MXN','BRL'].map(c =>
+              `<option value="${c}"${t.currency === c ? ' selected' : ''}>${c}</option>`
+            ).join('')}
           </select>
         </td>
         <td class="tx-col-note"><span class="tx-cell" contenteditable="true" data-field="note" inputmode="text">${t.note || ''}</span></td>

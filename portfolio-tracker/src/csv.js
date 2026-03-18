@@ -10,6 +10,14 @@ export const EXCHANGE_SUFFIXES = {
   XETRA:'.DE', XET:'.DE', GER:'.DE', XAMS:'.AS', AMS:'.AS',
   XPAR:'.PA', EPA:'.PA', XLON:'.L', LSE:'.L', XMIL:'.MI', MIL:'.MI',
   XBRU:'.BR', BRU:'.BR', XSWX:'.SW', SWX:'.SW',
+  XSTO:'.ST', STO:'.ST', XCSE:'.CO', CSE:'.CO', XHEL:'.HE', XOSL:'.OL',
+  XSGO:'.CL', SCL:'.CL',          // Santiago (Chile)
+  XTSE:'.TO', TSE:'.TO',           // Toronto
+  XASX:'.AX', ASX:'.AX',           // Australia
+  XTKS:'.T',  TKS:'.T',            // Tokyo
+  XMEX:'.MX', BMV:'.MX',           // Mexico
+  XBOM:'.BO', BSE:'.BO',           // Bombay
+  XNSE:'.NS', NSE:'.NS',           // National Stock Exchange India
   NSQ:'', NYSE:'', XNAS:'', XNYS:'',
 };
 
@@ -48,6 +56,9 @@ export function parseDeGiroCSV(text) {
   const iTotaal  = headers.findIndex((h, i) => h.includes('totaal') && i > 10);
   const iOrderId = headers.findIndex(h => h.includes('order'));
   const iOrderId2 = iOrderId >= 0 ? iOrderId + 1 : -1;
+  // Column after "koers" holds the stock's native trading currency (e.g. USD, EUR, CLP)
+  const iKoers   = headers.indexOf('koers');
+  const iKoersCcy = iKoers >= 0 ? iKoers + 1 : -1;
 
   if (iDatum < 0 || iAantal < 0) throw new Error('Onverwacht CSV-formaat: kolomkoppen niet herkend');
 
@@ -70,7 +81,9 @@ export function parseDeGiroCSV(text) {
     const parts = datum.split('-');
     if (parts.length !== 3) continue;
     const date = `${parts[2]}-${parts[1]}-${parts[0]}`;
-    const currency = (!isNaN(wissel) && Math.abs(wissel - 1) > 0.01) ? 'USD' : 'EUR';
+    // Prefer the explicit currency column; fall back to wisselkoers heuristic (USD vs EUR only)
+    const rawCcy   = iKoersCcy >= 0 ? (cols[iKoersCcy] || '').trim().toUpperCase() : '';
+    const currency = rawCcy || ((!isNaN(wissel) && Math.abs(wissel - 1) > 0.01) ? 'USD' : 'EUR');
     rows.push({ date, datum, product, isin, beurs, shares: aantal, wisselkoers: wissel, totaalEur: totaal, orderId, currency });
   }
   return rows;

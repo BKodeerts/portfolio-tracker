@@ -15,6 +15,8 @@ export const state = {
   realizedPl:          0,
   realizedPlPerTicker: {},
   usdExposurePct:      0,
+  currencyExposure:    {},
+  baseCurrency:        'EUR',
   twrPct:              null,
   irrPct:              null,
 

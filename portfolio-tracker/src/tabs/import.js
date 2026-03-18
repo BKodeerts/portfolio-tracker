@@ -127,9 +127,10 @@ export function renderMappingTable(rows, resolved = {}) {
       <td style="color:#94a3b8;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${info.product}</td>
       <td><input id="ticker_${isin}" value="${ticker}" placeholder="bv. ASTS" style="width:76px" oninput="window._updateYahooGuess('${isin}','${sfx}')"></td>
       <td><input id="yahoo_${isin}"  value="${yahoo}"  placeholder="bv. ASTS of VWCE.DE"></td>
-      <td><select id="ccy_${isin}" style="width:58px">
-        <option value="EUR" ${info.currency !== 'USD' ? 'selected' : ''}>EUR</option>
-        <option value="USD" ${info.currency === 'USD' ? 'selected' : ''}>USD</option>
+      <td><select id="ccy_${isin}" style="width:64px">
+        ${['EUR','USD','GBP','GBX','CLP','CHF','SEK','DKK','NOK','CAD','AUD','JPY','MXN','BRL'].map(c =>
+          `<option value="${c}"${info.currency === c ? ' selected' : ''}>${c}</option>`
+        ).join('')}
       </select></td>
       <td style="color:#475569;font-size:11px;text-align:right">${info.count}</td>
     </tr>`;

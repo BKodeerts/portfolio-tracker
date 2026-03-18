@@ -1,7 +1,7 @@
 import Chart from "chart.js/auto";
 import "chartjs-adapter-date-fns";
 import { state } from "../state.js";
-import { FX_FALLBACK, FX_SYMBOL } from "../constants.js";
+import { FX_DEFS, FX_FALLBACK, FX_SYMBOL } from "../constants.js";
 import {
   fmt,
   fmtPct,
@@ -72,20 +72,40 @@ function buildIntradayChartData(visibleTickers) {
     }
 
     const prevClose = data?.previousClose || 0;
-    const prevValueEur =
-      currency === "USD" ? (shares * prevClose) / prevFx : shares * prevClose;
+    const fxDef = FX_DEFS[currency];
+    const fxScale = fxDef?.scale || 1;
+    // For non-EUR currencies: get intraday FX data for this currency
+    const fxSymbol = fxDef?.symbol || FX_SYMBOL;
+    const fxPtMapCcy = {};
+    if (currency !== "EUR" && fxDef) {
+      const fxDataCcy = state.intradayData[fxSymbol];
+      if (fxDataCcy?.points)
+        fxDataCcy.points.forEach((p) => { fxPtMapCcy[p.ts] = p.close; });
+    }
+
+    // Build per-timestamp FX rate for this currency (forward-fill)
+    let lastFxCcy = currency !== "EUR" && fxDef
+      ? (state.intradayData[fxSymbol]?.previousClose || fxDef.fallback)
+      : 1;
+    const fxAtTsCcy = {};
+    for (const ts of timestamps) {
+      if (fxPtMapCcy[ts] !== undefined) lastFxCcy = fxPtMapCcy[ts];
+      fxAtTsCcy[ts] = lastFxCcy;
+    }
+
+    const prevValueEur = currency !== "EUR" && fxDef
+      ? (shares * prevClose) / (fxAtTsCcy[timestamps[0]] || fxDef.fallback) / fxScale
+      : shares * prevClose;
 
     const ptMap = {};
     if (data?.points)
-      data.points.forEach((p) => {
-        ptMap[p.ts] = p.close;
-      });
+      data.points.forEach((p) => { ptMap[p.ts] = p.close; });
 
     let lastClose = prevClose;
     const values = timestamps.map((ts) => {
       if (ptMap[ts] !== undefined) lastClose = ptMap[ts];
-      return currency === "USD"
-        ? (shares * lastClose) / fxAtTs[ts]
+      return currency !== "EUR" && fxDef
+        ? (shares * lastClose) / fxAtTsCcy[ts] / fxScale
         : shares * lastClose;
     });
 
