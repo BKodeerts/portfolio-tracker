@@ -261,12 +261,12 @@ export function renderPortfolioChart(visibleTickers) {
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.save();
-        ctx.translate(xPos, y.bottom);
-        ctx.rotate(-Math.PI / 2);
+        ctx.translate(xPos, y.top);
+        ctx.rotate(Math.PI / 2);
         ctx.fillStyle = '#64748b';
         ctx.font = `9px 'JetBrains Mono', monospace`;
         ctx.textAlign = 'left';
-        ctx.fillText(label, 4, 3);
+        ctx.fillText(label, 4, -3);
         ctx.restore();
       });
       ctx.restore();
@@ -310,7 +310,7 @@ export function renderPortfolioChart(visibleTickers) {
                callback: v => {
                  if (state.currentView === 'pct') return `${+v.toFixed(2)}%`;
                  if (state.privacyMode) return '●●';
-                 return Math.abs(v) < 1000 ? `€${Math.round(v)}` : `€${+(v / 1000).toFixed(1)}k`;
+                 const n = Number(v); return Math.abs(n) < 1000 ? `€${Math.round(n)}` : `€${+(n / 1000).toFixed(1)}k`;
                } } },
       },
     },
