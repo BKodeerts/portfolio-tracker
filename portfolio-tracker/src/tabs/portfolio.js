@@ -166,6 +166,41 @@ export function renderPortfolioChart(visibleTickers) {
     }
   }
 
+  const xDayStart = new Date(); xDayStart.setHours(0, 0, 0, 0);
+  const xDayEnd   = new Date(); xDayEnd.setHours(23, 59, 59, 999);
+
+  const marketCloseLines = useIntraday ? {
+    id: 'marketCloseLines',
+    afterDraw(chart) {
+      const { ctx, scales: { x, y } } = chart;
+      const lines = [
+        { hour:  9, min:  0, label: 'XETRA opent' },
+        { hour: 15, min: 30, label: 'NYSE opent'  },
+        { hour: 17, min: 30, label: 'XETRA sluit' },
+        { hour: 22, min:  0, label: 'NYSE sluit'  },
+      ];
+      ctx.save();
+      lines.forEach(({ hour, min, label }) => {
+        const t = new Date(); t.setHours(hour, min, 0, 0);
+        const xPos = x.getPixelForValue(t.getTime());
+        if (xPos < x.left || xPos > x.right) return;
+        ctx.strokeStyle = 'rgba(100,116,139,0.4)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(xPos, y.top);
+        ctx.lineTo(xPos, y.bottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#64748b';
+        ctx.font = `9px 'JetBrains Mono', monospace`;
+        ctx.textAlign = 'left';
+        ctx.fillText(label, xPos + 4, y.top + 12);
+      });
+      ctx.restore();
+    },
+  } : null;
+
   state.chartInstances.main = new Chart(ctx, {
     type: 'line', data: { labels, datasets },
     options: {
@@ -195,6 +230,7 @@ export function renderPortfolioChart(visibleTickers) {
       scales: {
         x: { type: 'time',
              time: { unit: useIntraday ? 'hour' : 'month', tooltipFormat: useIntraday ? 'HH:mm' : 'dd MMM yyyy' },
+             ...(useIntraday ? { min: xDayStart, max: xDayEnd } : {}),
              grid: { color: chartTheme().gridColor }, ticks: { color: chartTheme().tickColor, font: { size: 10 } } },
         y: { beginAtZero: false, ...yBounds, grid: { color: chartTheme().gridColor },
              ticks: { color: chartTheme().tickColor, font: { size: 10 },
@@ -204,6 +240,7 @@ export function renderPortfolioChart(visibleTickers) {
                } } },
       },
     },
+    plugins: marketCloseLines ? [marketCloseLines] : [],
   });
 }
 
