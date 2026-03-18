@@ -390,13 +390,13 @@ export function renderPortfolioChart(visibleTickers) {
   const labels = useIntraday
     ? intra.labels
     : getFilteredData().map((d) => d.date);
-  const datasets = useIntraday
+  let datasets = useIntraday
     ? buildIntradayDatasets(visibleTickers, intra)
     : buildHistoricalDatasets(visibleTickers);
 
   // Tight y-axis bounds for intraday — only for non-stacked views, since stacking makes
   // individual dataset max != visible chart max (fill: true also forces axis to include 0)
-  const stackedView = state.currentView === "individual";
+  const stackedView = state.currentView === "individual" || state.currentView === "pl";
   const yBounds =
     useIntraday && !stackedView
       ? buildYBounds(
@@ -487,6 +487,23 @@ export function renderPortfolioChart(visibleTickers) {
       }
     : null;
 
+  const prevCloseRef = useIntraday && intra
+    ? visibleTickers.reduce((s, t) => s + (intra.tickerVals[t]?.prevValueEur || 0), 0)
+    : 0;
+
+  // Phantom dataset for diff tooltip line (colored separately from Portefeuille)
+  if (useIntraday && state.currentView === "total" && prevCloseRef > 0) {
+    const portfolio = datasets.find((d) => d.label === "Portefeuille");
+    if (portfolio) {
+      datasets = [...datasets, {
+        label: "__diff",
+        data: portfolio.data.map((v) => v - prevCloseRef),
+        borderWidth: 0, pointRadius: 0, fill: false, tension: 0, spanGaps: true,
+        borderColor: "transparent",
+      }];
+    }
+  }
+
   state.chartInstances.main = new Chart(ctx, {
     type: "line",
     data: { labels, datasets },
@@ -519,12 +536,32 @@ export function renderPortfolioChart(visibleTickers) {
                     year: "numeric",
                   }),
             label: (item) => {
+              if (item.dataset.label === "__diff") {
+                const diff = item.parsed.y;
+                const ds = diff >= 0 ? "+" : "";
+                const pct = prevCloseRef > 0 ? ((diff / prevCloseRef) * 100).toFixed(2) : "0.00";
+                return state.privacyMode
+                  ? ` ${ds}●●● (${ds}${pct}%)`
+                  : ` ${ds}€${Math.round(Math.abs(diff)).toLocaleString("nl-BE")} (${ds}${pct}%)`;
+              }
               const val = item.parsed.y;
               const sign = val >= 0 ? "+" : "";
               if (state.currentView === "pct")
                 return ` ${item.dataset.label}: ${sign}${val}%`;
+              if (useIntraday && state.currentView === "total" && item.dataset.label === "Vorige slotkoers")
+                return null;
               if (state.privacyMode) return ` ${item.dataset.label}: ●●●`;
               return ` ${item.dataset.label}: ${sign}€${Math.round(val).toLocaleString("nl-BE")}`;
+            },
+            labelTextColor: (item) => {
+              if (item.dataset.label === "__diff")
+                return item.parsed.y >= 0 ? "#4ade80" : "#f87171";
+              return chartTheme().bodyColor;
+            },
+            labelColor: (item) => {
+              if (item.dataset.label === "__diff")
+                return { borderColor: "transparent", backgroundColor: "transparent" };
+              return { borderColor: item.dataset.borderColor, backgroundColor: item.dataset.borderColor };
             },
           },
         },
@@ -568,10 +605,10 @@ export function renderLegend(visibleTickers) {
   if (!el) return;
   if (state.currentView === "total") {
     const useIntraday = state.currentPeriod === "1d" && state.intradayLoaded;
-    const refLabel = useIntraday ? "Vorige slotkoers" : "Kostprijs";
+    const refEntry = useIntraday ? "" : `
+      <div class="legend-item"><div class="legend-line" style="background:#334155;border-top:2px dashed #334155;height:0;width:16px;margin-top:1px"></div>Kostprijs</div>`;
     el.innerHTML = `
-      <div class="legend-item"><div class="legend-line" style="background:#818cf8"></div>Portefeuille</div>
-      <div class="legend-item"><div class="legend-line" style="background:#334155;border-top:2px dashed #334155;height:0;width:16px;margin-top:1px"></div>${refLabel}</div>`;
+      <div class="legend-item"><div class="legend-line" style="background:#818cf8"></div>Portefeuille</div>${refEntry}`;
   } else {
     el.innerHTML = visibleTickers
       .map(
