@@ -4,7 +4,7 @@ import { state } from '../state.js';
 import { FX_FALLBACK, FX_SYMBOL } from '../constants.js';
 import { fmt, fmtPct, getColor, getFilteredData, destroyAllCharts, chartTheme } from '../utils.js';
 import { renderAppHeader } from '../components/header.js';
-import { renderMarketStatus, renderIntradaySection, loadIntradayData, computeTodayPL } from './intraday.js';
+import { renderMarketStatus, renderIntradaySection, loadIntradayData, computeTodayPL, EU_EXCHANGE_RE } from './intraday.js';
 
 function buildIntradayChartData(visibleTickers) {
   const latest = state.chartData.at(-1);
@@ -18,15 +18,15 @@ function buildIntradayChartData(visibleTickers) {
   const fxPtMap = {};
   if (fxData?.points) fxData.points.forEach(p => { fxPtMap[p.ts] = p.close; });
 
-  // Collect today-only timestamps from visible tickers
+  // Collect today-only timestamps from equity tickers + FX (FX covers overnight)
   const todayLocal = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
+  const isToday = p => new Date(p.ts * 1000).toLocaleDateString('sv-SE') === todayLocal;
   const tsSet = new Set();
   visibleTickers.forEach(ticker => {
     const data = state.intradayData[state.TICKER_META[ticker]?.yahoo];
-    if (data?.points) data.points
-      .filter(p => new Date(p.ts * 1000).toLocaleDateString('sv-SE') === todayLocal)
-      .forEach(p => tsSet.add(p.ts));
+    if (data?.points) data.points.filter(isToday).forEach(p => tsSet.add(p.ts));
   });
+  if (fxData?.points) fxData.points.filter(isToday).forEach(p => tsSet.add(p.ts));
 
   const timestamps = [...tsSet].sort((a, b) => a - b);
   if (timestamps.length === 0) return null;
@@ -66,90 +66,109 @@ function buildIntradayChartData(visibleTickers) {
   return { labels, timestamps, tickerVals };
 }
 
+function makeSegment(color, hasEU, hasUS) {
+  return {
+    borderColor: ctx => {
+      const mins = new Date(ctx.p0.parsed.x).getHours() * 60 + new Date(ctx.p0.parsed.x).getMinutes();
+      const active = (hasEU && mins >= 540 && mins < 1050) || (hasUS && mins >= 930 && mins < 1320);
+      return active ? color : color + '35';
+    },
+  };
+}
+
+function buildIntradayDatasets(visibleTickers, intra) {
+  const { tickerVals, timestamps } = intra;
+  const view = state.currentView;
+  const hasEU = visibleTickers.some(t => EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ''));
+  const hasUS = visibleTickers.some(t => !EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ''));
+  if (view === 'total') {
+    const totals = timestamps.map((_, i) =>
+      visibleTickers.reduce((sum, t) => sum + (tickerVals[t]?.values[i] || 0), 0));
+    const prevCloseTotal = visibleTickers.reduce((sum, t) => sum + (tickerVals[t]?.prevValueEur || 0), 0);
+    return [
+      { label: 'Portefeuille', data: totals,
+        borderColor: '#818cf8', backgroundColor: 'rgba(99,102,241,0.1)',
+        fill: true, borderWidth: 2, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone',
+        segment: makeSegment('#818cf8', hasEU, hasUS) },
+      { label: 'Vorige slotkoers', data: timestamps.map(() => prevCloseTotal),
+        borderColor: chartTheme().costLine, backgroundColor: 'transparent',
+        fill: false, borderWidth: 1, borderDash: [4, 4], pointRadius: 0, tension: 0 },
+    ];
+  }
+  if (view === 'individual') {
+    return [...visibleTickers].reverse().map(t => ({
+      label: t, data: tickerVals[t]?.values || [],
+      borderColor: getColor(t), backgroundColor: getColor(t) + '28',
+      fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', stack: 'stack',
+      segment: makeSegment(getColor(t), hasEU, hasUS),
+    }));
+  }
+  if (view === 'pct') {
+    return visibleTickers.map(t => {
+      const tv = tickerVals[t];
+      return {
+        label: t,
+        data: tv ? tv.values.map(v => tv.prevValueEur > 0 ? parseFloat(((v - tv.prevValueEur) / tv.prevValueEur * 100).toFixed(2)) : null) : [],
+        borderColor: getColor(t), fill: false, borderWidth: 2, pointRadius: 0, tension: 0, spanGaps: true,
+        segment: makeSegment(getColor(t), hasEU, hasUS),
+      };
+    });
+  }
+  return [...visibleTickers].reverse().map(t => {
+    const tv = tickerVals[t];
+    return {
+      label: t,
+      data: tv ? tv.values.map(v => v - tv.prevValueEur) : [],
+      borderColor: getColor(t), backgroundColor: getColor(t) + '28',
+      fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', stack: 'stack', spanGaps: true,
+      segment: makeSegment(getColor(t), hasEU, hasUS),
+    };
+  });
+}
+
+function buildHistoricalDatasets(visibleTickers) {
+  const filtered = getFilteredData();
+  const view = state.currentView;
+  if (view === 'total') {
+    return [
+      { label: 'Portefeuille', data: filtered.map(d => d.total),
+        borderColor: '#818cf8', backgroundColor: 'rgba(99,102,241,0.1)',
+        fill: true, borderWidth: 2, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone' },
+      { label: 'Kostprijs', data: filtered.map(d => d.totalCost),
+        borderColor: chartTheme().costLine, backgroundColor: chartTheme().costFill,
+        fill: true, borderWidth: 1, borderDash: [4, 4], pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone' },
+    ];
+  }
+  if (view === 'individual') {
+    return [...visibleTickers].reverse().map(ticker => ({
+      label: ticker, data: filtered.map(d => d[ticker] || 0),
+      borderColor: getColor(ticker), backgroundColor: getColor(ticker) + '28',
+      fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', stack: 'stack',
+    }));
+  }
+  if (view === 'pct') {
+    return visibleTickers.map(ticker => ({
+      label: ticker,
+      data: filtered.map(d => d[`${ticker}_pct`] != null ? parseFloat(d[`${ticker}_pct`]) : null),
+      borderColor: getColor(ticker), fill: false, borderWidth: 2, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', spanGaps: true,
+    }));
+  }
+  return [...visibleTickers].reverse().map(ticker => ({
+    label: ticker,
+    data: filtered.map(d => d[ticker] != null && d[`${ticker}_cost`] != null ? d[ticker] - d[`${ticker}_cost`] : null),
+    borderColor: getColor(ticker), backgroundColor: getColor(ticker) + '28',
+    fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', stack: 'stack', spanGaps: true,
+  }));
+}
+
 export function renderPortfolioChart(visibleTickers) {
-  const ctx        = document.getElementById('mainChart').getContext('2d');
-  const isIntraday = state.currentPeriod === '1d' && state.intradayLoaded;
-  const intra      = isIntraday ? buildIntradayChartData(visibleTickers) : null;
+  const ctx         = document.getElementById('mainChart').getContext('2d');
+  const isIntraday  = state.currentPeriod === '1d' && state.intradayLoaded;
+  const intra       = isIntraday ? buildIntradayChartData(visibleTickers) : null;
   const useIntraday = isIntraday && intra !== null;
 
-  let labels, datasets;
-
-  if (useIntraday) {
-    labels = intra.labels;
-    const { tickerVals, timestamps } = intra;
-
-    if (state.currentView === 'total') {
-      const totals = timestamps.map((_, i) =>
-        visibleTickers.reduce((sum, t) => sum + (tickerVals[t]?.values[i] || 0), 0));
-      const prevCloseTotal = visibleTickers.reduce((sum, t) => sum + (tickerVals[t]?.prevValueEur || 0), 0);
-      datasets = [
-        { label: 'Portefeuille', data: totals,
-          borderColor: '#818cf8', backgroundColor: 'rgba(99,102,241,0.1)',
-          fill: true, borderWidth: 2, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone' },
-        { label: 'Vorige slotkoers', data: timestamps.map(() => prevCloseTotal),
-          borderColor: chartTheme().costLine, backgroundColor: 'transparent',
-          fill: false, borderWidth: 1, borderDash: [4, 4], pointRadius: 0, tension: 0 },
-      ];
-    } else if (state.currentView === 'individual') {
-      datasets = [...visibleTickers].reverse().map(t => ({
-        label: t, data: tickerVals[t]?.values || [],
-        borderColor: getColor(t), backgroundColor: getColor(t) + '28',
-        fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', stack: 'stack',
-      }));
-    } else if (state.currentView === 'pct') {
-      datasets = visibleTickers.map(t => {
-        const tv = tickerVals[t];
-        return {
-          label: t,
-          data: tv ? tv.values.map(v => tv.prevValueEur > 0 ? parseFloat(((v - tv.prevValueEur) / tv.prevValueEur * 100).toFixed(2)) : null) : [],
-          borderColor: getColor(t), fill: false, borderWidth: 2, pointRadius: 0, tension: 0, spanGaps: true,
-        };
-      });
-    } else {
-      datasets = [...visibleTickers].reverse().map(t => {
-        const tv = tickerVals[t];
-        return {
-          label: t,
-          data: tv ? tv.values.map(v => v - tv.prevValueEur) : [],
-          borderColor: getColor(t), backgroundColor: getColor(t) + '28',
-          fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', stack: 'stack', spanGaps: true,
-        };
-      });
-    }
-  } else {
-    const filtered = getFilteredData();
-    labels = filtered.map(d => d.date);
-
-    if (state.currentView === 'total') {
-      datasets = [
-        { label: 'Portefeuille', data: filtered.map(d => d.total),
-          borderColor: '#818cf8', backgroundColor: 'rgba(99,102,241,0.1)',
-          fill: true, borderWidth: 2, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone' },
-        { label: 'Kostprijs', data: filtered.map(d => d.totalCost),
-          borderColor: chartTheme().costLine, backgroundColor: chartTheme().costFill,
-          fill: true, borderWidth: 1, borderDash: [4, 4], pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone' },
-      ];
-    } else if (state.currentView === 'individual') {
-      datasets = [...visibleTickers].reverse().map(ticker => ({
-        label: ticker, data: filtered.map(d => d[ticker] || 0),
-        borderColor: getColor(ticker), backgroundColor: getColor(ticker) + '28',
-        fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', stack: 'stack',
-      }));
-    } else if (state.currentView === 'pct') {
-      datasets = visibleTickers.map(ticker => ({
-        label: ticker,
-        data: filtered.map(d => d[`${ticker}_pct`] != null ? parseFloat(d[`${ticker}_pct`]) : null),
-        borderColor: getColor(ticker), fill: false, borderWidth: 2, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', spanGaps: true,
-      }));
-    } else {
-      datasets = [...visibleTickers].reverse().map(ticker => ({
-        label: ticker,
-        data: filtered.map(d => d[ticker] != null && d[`${ticker}_cost`] != null ? d[ticker] - d[`${ticker}_cost`] : null),
-        borderColor: getColor(ticker), backgroundColor: getColor(ticker) + '28',
-        fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', stack: 'stack', spanGaps: true,
-      }));
-    }
-  }
+  const labels   = useIntraday ? intra.labels : getFilteredData().map(d => d.date);
+  const datasets = useIntraday ? buildIntradayDatasets(visibleTickers, intra) : buildHistoricalDatasets(visibleTickers);
 
   // Tight y-axis bounds for intraday — only for non-stacked views, since stacking makes
   // individual dataset max != visible chart max (fill: true also forces axis to include 0)
@@ -169,16 +188,20 @@ export function renderPortfolioChart(visibleTickers) {
   const xDayStart = new Date(); xDayStart.setHours(0, 0, 0, 0);
   const xDayEnd   = new Date(); xDayEnd.setHours(23, 59, 59, 999);
 
+  const hasEU = visibleTickers.some(t => EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ''));
+  const hasUS = visibleTickers.some(t => !EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ''));
+  const sessionLines = [
+    ...(hasEU ? [{ hour:  9, min:  0, label: 'EU opent'  },
+                 { hour: 17, min: 30, label: 'EU sluit'  }] : []),
+    ...(hasUS ? [{ hour: 15, min: 30, label: 'NYSE opent' },
+                 { hour: 22, min:  0, label: 'NYSE sluit' }] : []),
+  ];
+
   const marketCloseLines = useIntraday ? {
     id: 'marketCloseLines',
     afterDraw(chart) {
       const { ctx, scales: { x, y } } = chart;
-      const lines = [
-        { hour:  9, min:  0, label: 'XETRA opent' },
-        { hour: 15, min: 30, label: 'NYSE opent'  },
-        { hour: 17, min: 30, label: 'XETRA sluit' },
-        { hour: 22, min:  0, label: 'NYSE sluit'  },
-      ];
+      const lines = sessionLines;
       ctx.save();
       lines.forEach(({ hour, min, label }) => {
         const t = new Date(); t.setHours(hour, min, 0, 0);

@@ -11,8 +11,10 @@ function staleDayLabel(dateStr) {
   return d.toLocaleDateString('nl-BE', { weekday: 'long' });
 }
 
+export const EU_EXCHANGE_RE = /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i;
+
 export function getTradingMins(yahooSymbol) {
-  return /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i.test(yahooSymbol || '') ? 510 : 390;
+  return EU_EXCHANGE_RE.test(yahooSymbol || '') ? 510 : 390;
 }
 
 function isOpen(tz, openH, openM, closeH, closeM) {
