@@ -159,25 +159,42 @@ export function renderBarChart(latest) {
 export function renderCurrencyDonut() {
   const el = document.getElementById('chartCurrencyDonut');
   if (!el) return;
-  const usd = state.usdExposurePct ?? 0;
-  const eur = 100 - usd;
-  el.innerHTML = `
-    <div class="currency-split">
-      <div class="currency-labels">
-        <div class="currency-label">
-          <div class="currency-label-name">USD</div>
-          <div class="currency-label-pct" style="color:#fbbf24">${usd.toFixed(1)}%</div>
-        </div>
-        <div class="currency-label" style="text-align:right">
-          <div class="currency-label-name">EUR</div>
-          <div class="currency-label-pct" style="color:#818cf8">${eur.toFixed(1)}%</div>
-        </div>
-      </div>
-      <div class="currency-bar">
-        <div style="width:${usd}%;background:#fbbf24"></div>
-        <div style="flex:1;background:#818cf8"></div>
-      </div>
-    </div>`;
+  const usd    = state.usdExposurePct ?? 0;
+  const eur    = 100 - usd;
+  const labels = ['USD', 'EUR'];
+  const values = [usd, eur];
+  const colors = ['#fbbf24', '#818cf8'];
+  const ct     = chartTheme();
+
+  const legendEl = document.getElementById('chartCurrencyDonutLegend');
+  if (legendEl) {
+    legendEl.innerHTML = labels.map((l, i) =>
+      `<div class="donut-legend-item">
+        <span class="donut-legend-dot" style="background:${colors[i]}"></span>
+        <span class="donut-legend-ticker">${l}</span>
+        <span class="donut-legend-pct">${values[i].toFixed(1)}%</span>
+      </div>`
+    ).join('');
+  }
+
+  state.chartInstances.currencyDonut = new Chart(el.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: colors, borderColor: ct.donutBorder, borderWidth: 2, hoverOffset: 5 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
+          bodyColor: ct.bodyColor, bodyFont: { family: "'JetBrains Mono'", size: 11 }, padding: 12, cornerRadius: 10,
+          callbacks: { label: item => ` ${item.label}: ${item.raw.toFixed(1)}%` },
+        },
+      },
+    },
+  });
 }
 
 export function renderSectorDonut(latest) {
@@ -678,7 +695,7 @@ function renderBreakdownContent(latest) {
   if (!el) return;
 
   // Destroy any previous breakdown chart instances
-  ['donut', 'sectorDonut', 'industryDonut', 'typeDonut'].forEach(key => {
+  ['donut', 'sectorDonut', 'industryDonut', 'typeDonut', 'currencyDonut'].forEach(key => {
     if (state.chartInstances[key]) { state.chartInstances[key].destroy(); delete state.chartInstances[key]; }
   });
 
@@ -696,7 +713,7 @@ function renderBreakdownContent(latest) {
     el.innerHTML = `<div class="donut-with-legend"><div class="donut-canvas-wrap"><canvas id="chartTypeDonut"></canvas></div><div id="chartTypeDonutLegend" class="donut-legend-list"></div></div>`;
     renderAssetTypeDonut(latest);
   } else {
-    el.innerHTML = `<div id="chartCurrencyDonut"></div>`;
+    el.innerHTML = `<div class="donut-with-legend"><div class="donut-canvas-wrap"><canvas id="chartCurrencyDonut"></canvas></div><div id="chartCurrencyDonutLegend" class="donut-legend-list"></div></div>`;
     renderCurrencyDonut();
   }
 }
