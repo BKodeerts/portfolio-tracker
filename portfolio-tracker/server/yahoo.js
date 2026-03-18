@@ -79,12 +79,17 @@ async function fetchIntraday(yahooSymbol) {
   const meta       = result.meta || {};
   const points     = timestamps.map((ts, i) => ({ ts, close: closes[i] ?? null })).filter(d => d.close !== null);
   if (points.length === 0) return null;
+  // Derive marketState from currentTradingPeriod (accounts for holidays + DST)
+  const now = Date.now() / 1000;
+  const regular = meta.currentTradingPeriod?.regular;
+  let marketState = null;
+  if (regular) marketState = (now >= regular.start && now < regular.end) ? 'REGULAR' : 'CLOSED';
   return {
     date: new Date(points[0].ts * 1000).toISOString().slice(0, 10),
     previousClose: meta.chartPreviousClose ?? meta.regularMarketPreviousClose ?? null,
     currency: meta.currency || null,
-    marketState: meta.marketState || null,
-    exchange: meta.exchange || null,
+    marketState,
+    exchange: meta.exchangeName || null,
     points,
   };
 }
