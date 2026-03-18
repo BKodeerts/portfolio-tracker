@@ -2,6 +2,9 @@ body.theme-dark #top-bar {
   background: rgba(18, 18, 20, 0.9);
   border-bottom-color: rgba(255,255,255,0.08);
 }
+@media (max-width: 640px) {
+  body.theme-dark .summary-bar-grid .metric-card { border-right-color: rgba(255,255,255,0.1); }
+}
 
 body.theme-dark {
   background: linear-gradient(145deg, #18181b 0%, #1f1f23 50%, #18181b 100%);

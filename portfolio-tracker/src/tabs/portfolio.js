@@ -312,6 +312,7 @@ export function renderPortfolioChart(visibleTickers) {
     },
     plugins: marketCloseLines ? [marketCloseLines] : [],
   });
+
 }
 
 export function renderLegend(visibleTickers) {

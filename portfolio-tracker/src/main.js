@@ -1,4 +1,5 @@
 import 'chartjs-adapter-date-fns';
+import Chart from 'chart.js/auto';
 import './styles/base.css';
 import './styles/components.css';
 import './styles/themes.css';
@@ -136,6 +137,16 @@ window._saveTickerMetaUI    = saveTickerMetaUI;
 window._resetSectorsUI      = resetSectorsUI;
 window._setBreakdownTab     = setBreakdownTab;
 window._setBenchmark        = setBenchmark;
+
+// Dismiss chart tooltips on mobile when finger lifts (works for all canvases)
+document.addEventListener('touchend', e => {
+  const canvas = e.target.closest('canvas');
+  if (!canvas) return;
+  const chart = Chart.getChart(canvas);
+  if (!chart) return;
+  chart.tooltip.setActiveElements([], {});
+  chart.update('none');
+}, { passive: true });
 
 // Boot
 document.body.classList.toggle('privacy', state.privacyMode);

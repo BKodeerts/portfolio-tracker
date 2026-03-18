@@ -1,7 +1,20 @@
 .chart-controls-mobile { display: none; }
 
 @media (max-width: 640px) {
-  .top-bar-inner { padding: 8px 12px 10px; }
+  .top-bar-inner { padding: 6px 12px 8px; }
+
+  /* Summary bar: strip cards, show as compact inline row */
+  .summary-bar-grid { display: flex; gap: 0; margin-bottom: 4px; }
+  .summary-bar-grid .metric-card {
+    background: none; border: none; box-shadow: none; border-radius: 0;
+    border-right: 1px solid rgba(0,0,0,0.1);
+    padding: 0 10px; flex: 1; min-width: 0;
+  }
+  .summary-bar-grid .metric-card:first-child { padding-left: 0; }
+  .summary-bar-grid .metric-card:last-child  { border-right: none; padding-right: 0; }
+  .summary-bar-grid .metric-label { font-size: 8px; margin-bottom: 2px; }
+  .summary-bar-grid .metric-value { font-size: 13px !important; }
+  .summary-bar-grid .metric-sub   { font-size: 9px; margin-top: 1px; }
 
   .metrics-grid       { grid-template-columns: 1fr 1fr; }
   .risk-metrics-grid  { grid-template-columns: 1fr 1fr; }
