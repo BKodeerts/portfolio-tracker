@@ -2,7 +2,7 @@
  * portfolio-tracker-card — Lovelace card for the Portfolio Tracker HA addon
  *
  * Install as a Lovelace resource (Settings → Dashboards → Resources):
- *   URL:  /api/hassio_ingress/portfolio_tracker/portfolio-card.js
+ *   URL:  /local/portfolio-tracker/portfolio-card.js
  *   Type: JavaScript module
  *
  * Card YAML:
@@ -79,13 +79,43 @@ class PortfolioTrackerCard extends HTMLElement {
     </svg>`;
   }
 
+  _readSensors() {
+    const st = id => this._hass.states[id];
+    const val = st('sensor.portfolio_value');
+    if (!val || val.state === 'unavailable' || val.state === 'unknown') return null;
+
+    const pl     = st('sensor.portfolio_pl');
+    const plPct  = st('sensor.portfolio_pl_pct');
+    const day    = st('sensor.portfolio_daily_pl');
+    const dayPct = st('sensor.portfolio_daily_pl_pct');
+    const health = st('sensor.portfolio_health');
+
+    return {
+      totalVal:   Number.parseFloat(val.state),
+      totalPl:    Number.parseFloat(pl?.state    ?? 0),
+      plPctVal:   Number.parseFloat(plPct?.state ?? 0),
+      dailyPl:    day?.state    === 'unavailable' ? null : Number.parseFloat(day?.state    ?? 0),
+      dailyPlPct: dayPct?.state === 'unavailable' ? null : Number.parseFloat(dayPct?.state ?? 0),
+      healthVal:  health ? Number.parseInt(health.state, 10) : null,
+      ddPct:      Number.parseFloat(val.attributes?.drawdown_pct ?? 0),
+      nyseOn:     st('binary_sensor.portfolio_nyse_open')?.state    === 'on',
+      euOn:       st('binary_sensor.portfolio_eu_markets_open')?.state === 'on',
+      ddWarnOn:   st('binary_sensor.portfolio_drawdown_warning')?.state === 'on',
+      targetOn:   st('binary_sensor.portfolio_target_hit')?.state === 'on',
+    };
+  }
+
+  _buildDailyHtml(dailyBig, dailySub, dailyColor) {
+    if (dailyBig === null) return '';
+    const subSpan = dailySub === null ? '' : ` <span class="sub">(${dailySub})</span>`;
+    return `<span class="stat" style="color:${dailyColor}">${dailyBig}${subSpan} <span class="sub">vandaag</span></span>`;
+  }
+
   async _render() {
     if (!this._hass || !this.shadowRoot) return;
 
-    const st = id => this._hass.states[id];
-    const val = st('sensor.portfolio_value');
-
-    if (!val || val.state === 'unavailable' || val.state === 'unknown') {
+    const s = this._readSensors();
+    if (!s) {
       this.shadowRoot.innerHTML = `
         <ha-card>
           <div style="padding:16px;font-size:13px;color:var(--secondary-text-color)">
@@ -96,19 +126,7 @@ class PortfolioTrackerCard extends HTMLElement {
       return;
     }
 
-    const pl      = st('sensor.portfolio_pl');
-    const plPct   = st('sensor.portfolio_pl_pct');
-    const day     = st('sensor.portfolio_daily_pl');
-    const nyse    = st('binary_sensor.portfolio_nyse_open');
-    const xetra   = st('binary_sensor.portfolio_xetra_open');
-    const ddWarn  = st('binary_sensor.portfolio_drawdown_warning');
-    const target  = st('binary_sensor.portfolio_target_hit');
-
-    const totalVal  = Number.parseFloat(val.state);
-    const totalPl   = Number.parseFloat(pl?.state   ?? 0);
-    const plPctVal  = Number.parseFloat(plPct?.state ?? 0);
-    const dailyPl   = day?.state === 'unavailable' ? null : Number.parseFloat(day?.state ?? 0);
-    const ddPct     = Number.parseFloat(val.attributes?.drawdown_pct ?? 0);
+    const { totalVal, totalPl, plPctVal, dailyPl, dailyPlPct, healthVal, ddPct, nyseOn, euOn, ddWarnOn, targetOn } = s;
 
     const eur = v => new Intl.NumberFormat('nl-NL', {
       style: 'currency', currency: 'EUR',
@@ -117,20 +135,32 @@ class PortfolioTrackerCard extends HTMLElement {
     const sign    = v => (v >= 0 ? '+' : '') + eur(v);
     const signPct = v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
 
-    const plColor    = totalPl >= 0  ? '#10b981' : '#ef4444';
+    const plColor    = totalPl >= 0        ? '#10b981' : '#ef4444';
     const dailyColor = (dailyPl ?? 0) >= 0 ? '#10b981' : '#ef4444';
+    let healthColor = '#ef4444';
+    if (healthVal >= 80) healthColor = '#10b981';
+    else if (healthVal >= 50) healthColor = '#f59e0b';
 
     const dot = on => `<span style="
         display:inline-block;width:7px;height:7px;border-radius:50%;
         background:${on ? '#10b981' : '#6b7280'};margin-right:3px;vertical-align:middle">
       </span>`;
 
-    const history   = await this._loadHistory();
-    const sparkline = this._sparklineSvg(history);
+    let dailyBig = null;
+    if (dailyPlPct !== null) dailyBig = signPct(dailyPlPct);
+    else if (dailyPl !== null) dailyBig = sign(dailyPl);
+    const dailySub = dailyPlPct !== null && dailyPl !== null ? sign(dailyPl) : null;
+
+    const history    = await this._loadHistory();
+    const sparkline  = this._sparklineSvg(history);
+    const dailyHtml  = this._buildDailyHtml(dailyBig, dailySub, dailyColor);
+    const healthHtml = healthVal === null
+      ? ''
+      : `&thinsp;<span style="color:${healthColor};font-size:10px">● ${healthVal}</span>`;
 
     const alerts = [
-      ddWarn?.state  === 'on' ? `⚠ Drawdown ${ddPct.toFixed(1)}%` : null,
-      target?.state  === 'on' ? `✓ Doelwaarde bereikt`            : null,
+      ddWarnOn ? `⚠ Drawdown ${ddPct.toFixed(1)}%` : null,
+      targetOn ? `✓ Doelwaarde bereikt`             : null,
     ].filter(Boolean);
 
     this.shadowRoot.innerHTML = `
@@ -142,27 +172,24 @@ class PortfolioTrackerCard extends HTMLElement {
                  color:var(--secondary-text-color) }
         .mkts  { font-size:11px; color:var(--secondary-text-color); user-select:none }
         .val   { font-size:30px; font-weight:700; color:var(--primary-text-color); line-height:1.15; margin:4px 0 2px }
-        .row   { display:flex; gap:12px; flex-wrap:wrap }
-        .stat  { font-size:13px; font-weight:500 }
+        .row   { display:flex; gap:12px; flex-wrap:wrap; align-items:baseline }
+        .stat  { font-size:16px; font-weight:600 }
+        .sub   { font-size:11px; font-weight:400; color:var(--secondary-text-color) }
+        .total { font-size:12px; color:var(--secondary-text-color); margin-top:2px }
         .alert { font-size:11px; margin-top:6px; color:#f59e0b }
       </style>
       <ha-card>
         <div class="top">
           <span class="title">${this._config.title}</span>
           <span class="mkts">
-            ${dot(nyse?.state  === 'on')}NYSE
-            &thinsp;${dot(xetra?.state === 'on')}XETRA
+            ${dot(nyseOn)}NYSE
+            &thinsp;${dot(euOn)}EU
+            ${healthHtml}
           </span>
         </div>
         <div class="val">${eur(totalVal)}</div>
-        <div class="row">
-          <span class="stat" style="color:${plColor}">
-            ${sign(totalPl)} (${signPct(plPctVal)})
-          </span>
-          ${dailyPl !== null
-            ? `<span class="stat" style="color:${dailyColor}">Vandaag ${sign(dailyPl)}</span>`
-            : ''}
-        </div>
+        <div class="row">${dailyHtml}</div>
+        <div class="total" style="color:${plColor}">${sign(totalPl)} (${signPct(plPctVal)}) totaal</div>
         ${alerts.map(a => `<div class="alert">${a}</div>`).join('')}
         ${sparkline}
       </ha-card>`;

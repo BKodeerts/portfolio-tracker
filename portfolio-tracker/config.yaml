@@ -1,6 +1,6 @@
 name: "Portfolio Tracker"
 description: "Self-hosted stock portfolio tracker with Yahoo Finance data"
-version: "0.4.26"
+version: "0.4.27"
 slug: "portfolio_tracker"
 init: false
 arch:
