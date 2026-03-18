@@ -18,11 +18,14 @@ function buildIntradayChartData(visibleTickers) {
   const fxPtMap = {};
   if (fxData?.points) fxData.points.forEach(p => { fxPtMap[p.ts] = p.close; });
 
-  // Collect all timestamps from visible tickers
+  // Collect today-only timestamps from visible tickers
+  const todayLocal = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
   const tsSet = new Set();
   visibleTickers.forEach(ticker => {
     const data = state.intradayData[state.TICKER_META[ticker]?.yahoo];
-    if (data?.points) data.points.forEach(p => tsSet.add(p.ts));
+    if (data?.points) data.points
+      .filter(p => new Date(p.ts * 1000).toLocaleDateString('sv-SE') === todayLocal)
+      .forEach(p => tsSet.add(p.ts));
   });
 
   const timestamps = [...tsSet].sort((a, b) => a - b);
