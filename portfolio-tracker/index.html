@@ -13,8 +13,8 @@
       <div class="summary-with-controls">
         <div id="summary-bar"></div>
         <div class="display-controls">
-          <button class="privacy-btn theme-btn" onclick="globalThis._toggleTheme()" title="Thema wisselen">◑</button>
-          <button class="privacy-btn" onclick="globalThis._togglePrivacy()" title="Privacy mode">👁</button>
+          <button class="icon-toggle theme-btn" onclick="globalThis._toggleTheme()" title="Thema wisselen">◑</button>
+          <button class="icon-toggle privacy-btn" onclick="globalThis._togglePrivacy()" title="Privacy mode"><span class="eye-icon">👁</span></button>
         </div>
       </div>
       <div id="app-header"></div>
@@ -22,7 +22,7 @@
   </div>
   <div id="root"></div>
   <!-- Position detail modal (static overlay, filled by showPosModal) -->
-  <div id="posModal" onclick="if(event.target===this)window._closePosModal()" onkeydown="if(event.key==='Escape')window._closePosModal()"></div>
+  <dialog id="posModal"></dialog>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

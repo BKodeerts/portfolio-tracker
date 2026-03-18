@@ -23,7 +23,7 @@ export function sortPos(col) {
 
 export function closePosModal() {
   const el = document.getElementById('posModal');
-  if (el) el.style.display = 'none';
+  if (el?.open) el.close();
   if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
 }
 
@@ -73,7 +73,7 @@ export function showPosModal(ticker) {
       <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></span>
       <span style="font-size:16px;font-weight:700;flex-shrink:0">${ticker}</span>
       <span class="pos-modal-header-label" style="font-size:13px;color:#888">${meta.label || ''}</span>
-      <button class="pos-modal-close" onclick="window._closePosModal()">✕</button>
+      <button class="pos-modal-close" onclick="globalThis._closePosModal()">✕</button>
     </div>
     <div class="pos-modal-stats">
       <div class="pos-modal-stat"><div class="pos-modal-stat-label">Aandelen</div><div class="pos-modal-stat-val">${sh.toLocaleString('nl-BE', { maximumFractionDigits: 4 })}</div></div>
@@ -90,7 +90,7 @@ export function showPosModal(ticker) {
     </table>
   </div>`;
 
-  modal.style.display = 'block';
+  modal.showModal();
 
   if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
 

@@ -13,7 +13,7 @@
 /* ── Summary + display controls row ── */
 .summary-with-controls { display: flex; align-items: flex-start; gap: 8px; }
 #summary-bar { flex: 1; min-width: 0; }
-.display-controls { display: flex; gap: 4px; flex-shrink: 0; padding-top: 2px; }
+.display-controls { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; padding-top: 2px; }
 
 /* ── App header ── */
 .app-header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -132,9 +132,11 @@
 
 /* Position detail modal */
 #posModal {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,0.4); z-index: 999; overflow-y: auto;
+  position: fixed; inset: 0; width: 100%; max-width: 100%;
+  height: 100%; max-height: 100%; border: none; padding: 0;
+  background: transparent; overflow-y: auto; z-index: 999;
 }
+#posModal::backdrop { background: rgba(0,0,0,0.4); }
 .pos-modal-inner {
   max-width: 680px; margin: 48px auto 48px;
   background: rgba(255,255,255,0.97); border: 1px solid rgba(0,0,0,0.1);
@@ -308,14 +310,25 @@
 }
 .market-badge .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
 
-/* Privacy mode */
-.privacy-btn {
-  background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 8px; color: #777; cursor: pointer; font-size: 15px;
-  padding: 5px 9px; line-height: 1; transition: color 0.15s, background 0.15s;
+/* Display control icon toggles (theme + privacy) */
+.icon-toggle {
+  background: none; border: none; padding: 4px; cursor: pointer;
+  font-size: 18px; line-height: 1; display: block;
+  opacity: 0.3; transition: opacity 0.2s; color: inherit;
 }
-.privacy-btn:hover { background: rgba(0,0,0,0.08); color: #444; }
-.privacy-btn.on { color: #1c1c1c; border-color: rgba(0,0,0,0.2); }
+.icon-toggle:hover { opacity: 0.7; }
+.icon-toggle.on    { opacity: 1; }
+
+/* Closed-eye slash drawn over the emoji when privacy is active */
+.eye-icon { position: relative; display: inline-block; }
+.privacy-btn.on .eye-icon::after {
+  content: ''; position: absolute;
+  top: 48%; left: -2px; right: -2px; height: 2px;
+  background: currentColor; transform: rotate(-35deg);
+}
+
+/* Keep .privacy-btn as a hook for JS state queries only */
+.privacy-btn { color: inherit; }
 body.privacy .privacy-val,
 body.privacy .pos-row-val,
 body.privacy .pos-table td:nth-child(n+4):not(:last-child),

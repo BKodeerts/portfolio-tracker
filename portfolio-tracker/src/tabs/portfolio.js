@@ -260,10 +260,14 @@ export function renderPortfolioChart(visibleTickers) {
         ctx.lineTo(xPos, y.bottom);
         ctx.stroke();
         ctx.setLineDash([]);
+        ctx.save();
+        ctx.translate(xPos, y.bottom);
+        ctx.rotate(-Math.PI / 2);
         ctx.fillStyle = '#64748b';
         ctx.font = `9px 'JetBrains Mono', monospace`;
         ctx.textAlign = 'left';
-        ctx.fillText(label, xPos + 4, y.top + 12);
+        ctx.fillText(label, 4, 3);
+        ctx.restore();
       });
       ctx.restore();
     },

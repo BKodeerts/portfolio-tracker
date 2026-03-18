@@ -150,6 +150,11 @@ document.addEventListener('touchend', e => {
   });
 }, { passive: true });
 
+// Modal: close on backdrop click or native Escape (dialog close event)
+const posModalEl = document.getElementById('posModal');
+posModalEl.addEventListener('click', e => { if (e.target === posModalEl) closePosModal(); });
+posModalEl.addEventListener('close', () => closePosModal());
+
 // Boot
 document.body.classList.toggle('privacy', state.privacyMode);
 document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('on', state.currentTheme === 'dark'));
