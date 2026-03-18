@@ -85,12 +85,14 @@ function buildIntradayDatasets(visibleTickers, intra) {
     const totals = timestamps.map((_, i) =>
       visibleTickers.reduce((sum, t) => sum + (tickerVals[t]?.values[i] || 0), 0));
     const prevCloseTotal = visibleTickers.reduce((sum, t) => sum + (tickerVals[t]?.prevValueEur || 0), 0);
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd   = new Date(); dayEnd.setHours(23, 59, 59, 999);
     return [
       { label: 'Portefeuille', data: totals,
         borderColor: '#818cf8', backgroundColor: 'rgba(99,102,241,0.1)',
         fill: true, borderWidth: 2, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone',
         segment: makeSegment('#818cf8', hasEU, hasUS) },
-      { label: 'Vorige slotkoers', data: timestamps.map(() => prevCloseTotal),
+      { label: 'Vorige slotkoers', data: [{ x: dayStart, y: prevCloseTotal }, { x: dayEnd, y: prevCloseTotal }],
         borderColor: chartTheme().costLine, backgroundColor: 'transparent',
         fill: false, borderWidth: 1, borderDash: [4, 4], pointRadius: 0, tension: 0 },
     ];
@@ -108,7 +110,7 @@ function buildIntradayDatasets(visibleTickers, intra) {
       const tv = tickerVals[t];
       return {
         label: t,
-        data: tv ? tv.values.map(v => tv.prevValueEur > 0 ? parseFloat(((v - tv.prevValueEur) / tv.prevValueEur * 100).toFixed(2)) : null) : [],
+        data: tv ? tv.values.map(v => tv.prevValueEur > 0 ? Number.parseFloat(((v - tv.prevValueEur) / tv.prevValueEur * 100).toFixed(2)) : null) : [],
         borderColor: getColor(t), fill: false, borderWidth: 2, pointRadius: 0, tension: 0, spanGaps: true,
         segment: makeSegment(getColor(t), hasEU, hasUS),
       };
@@ -149,7 +151,7 @@ function buildHistoricalDatasets(visibleTickers) {
   if (view === 'pct') {
     return visibleTickers.map(ticker => ({
       label: ticker,
-      data: filtered.map(d => d[`${ticker}_pct`] != null ? parseFloat(d[`${ticker}_pct`]) : null),
+      data: filtered.map(d => d[`${ticker}_pct`] != null ? Number.parseFloat(d[`${ticker}_pct`]) : null),
       borderColor: getColor(ticker), fill: false, borderWidth: 2, pointRadius: 0, tension: 0, cubicInterpolationMode: 'monotone', spanGaps: true,
     }));
   }
@@ -242,10 +244,11 @@ export function renderPortfolioChart(visibleTickers) {
               ? new Date(items[0].parsed.x).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })
               : new Date(items[0].label).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }),
             label: item => {
-              const sign = item.raw >= 0 ? '+' : '';
-              if (state.currentView === 'pct') return ` ${item.dataset.label}: ${sign}${item.raw}%`;
+              const val  = item.parsed.y;
+              const sign = val >= 0 ? '+' : '';
+              if (state.currentView === 'pct') return ` ${item.dataset.label}: ${sign}${val}%`;
               if (state.privacyMode) return ` ${item.dataset.label}: ●●●`;
-              return ` ${item.dataset.label}: ${sign}€${Math.round(item.raw).toLocaleString('nl-BE')}`;
+              return ` ${item.dataset.label}: ${sign}€${Math.round(val).toLocaleString('nl-BE')}`;
             },
           },
         },
@@ -295,7 +298,7 @@ export function renderApp() {
   const first    = filtered[0];
 
   const periodProfit = latest.profit - first.profit;
-  const periodPct    = (Number.parseFloat(latest.pctReturn) - Number.parseFloat(first.pctReturn)).toFixed(1);
+  const periodPct    = (Number.Number.parseFloat(latest.pctReturn) - Number.Number.parseFloat(first.pctReturn)).toFixed(1);
   const hasPeriod    = state.currentPeriod !== 'total';
 
   const plClass  = latest.profit >= 0 ? 'c-pos' : 'c-neg';
