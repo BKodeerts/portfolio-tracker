@@ -2,6 +2,7 @@
 
 @media (max-width: 640px) {
   .top-bar-inner { padding: 10px 14px 10px; }
+  .display-controls { padding-top: 0; align-self: center; }
 
   /* Summary bar: strip cards, show as compact inline row */
   .summary-bar-grid { display: flex; gap: 0; margin-bottom: 8px; }
@@ -26,7 +27,6 @@
   .metric-value  { font-size: 16px; }
   .intraday-grid { grid-template-columns: repeat(2, 1fr); }
   .app-nav       { width: 100%; flex: none; }
-  .header-actions { margin-left: auto; }
 
   .desktop-only          { display: none !important; }
   .chart-controls-mobile { display: flex; gap: 6px; flex: 1; }

@@ -10,7 +10,13 @@
 <body>
   <div id="top-bar">
     <div class="top-bar-inner">
-      <div id="summary-bar"></div>
+      <div class="summary-with-controls">
+        <div id="summary-bar"></div>
+        <div class="display-controls">
+          <button class="privacy-btn theme-btn" onclick="globalThis._toggleTheme()" title="Thema wisselen">◑</button>
+          <button class="privacy-btn" onclick="globalThis._togglePrivacy()" title="Privacy mode">👁</button>
+        </div>
+      </div>
       <div id="app-header"></div>
     </div>
   </div>

@@ -71,6 +71,7 @@ function toggleTheme() {
   state.currentTheme = state.currentTheme === 'dark' ? 'default' : 'dark';
   localStorage.setItem('theme', state.currentTheme);
   applyTheme();
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('on', state.currentTheme === 'dark'));
   if      (state.currentTab === 'portefeuille') renderAppKeepScroll();
   else if (state.currentTab === 'analyse')      renderAnalyse();
   else if (state.currentTab === 'transacties')  renderTransacties();
@@ -151,5 +152,7 @@ document.addEventListener('touchend', e => {
 
 // Boot
 document.body.classList.toggle('privacy', state.privacyMode);
+document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('on', state.currentTheme === 'dark'));
+document.querySelectorAll('.privacy-btn').forEach(b => b.classList.toggle('on', state.privacyMode));
 applyTheme();
 init();
