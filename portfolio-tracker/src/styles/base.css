@@ -1,5 +1,5 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { overflow-x: hidden; }
+html, body { overflow-x: clip; }
 body {
   min-height: 100vh;
   background: linear-gradient(145deg, #eef0f3 0%, #f3f5f8 50%, #eef1f4 100%);
