@@ -259,6 +259,9 @@ export function renderIntradaySection() {
     </div>`;
   })() : '';
 
+  // Preserve bonus cards — they are appended separately and must survive a full grid re-render
+  const bonusCards = [...gridEl.querySelectorAll('.bonus-card')];
+
   gridEl.innerHTML = fxCard + entries.map(({ ticker, yahoo, data }) => {
     const hasData = data?.points?.length > 0;
     if (!hasData) {
@@ -296,6 +299,8 @@ export function renderIntradaySection() {
       <div class="metric-sub">${nativeCcy} ${displayPrice.toFixed(2)}</div>
     </div>`;
   }).join('');
+
+  bonusCards.forEach(c => gridEl.appendChild(c));
 
   renderMarketStatus();
   renderTodayMetric();
