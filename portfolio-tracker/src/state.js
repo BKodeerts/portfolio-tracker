@@ -17,6 +17,7 @@ export const state = {
   usdExposurePct:      0,
   currencyExposure:    {},
   baseCurrency:        'EUR',
+  bonusItems:          [],
   twrPct:              null,
   irrPct:              null,
 

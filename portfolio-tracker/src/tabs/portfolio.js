@@ -19,6 +19,7 @@ import {
   renderTodayMetric,
   EU_EXCHANGE_RE,
 } from "./intraday.js";
+import { initBonus, reloadBonusCards } from "./bonus.js";
 
 function buildIntradayChartData(visibleTickers) {
   const latest = state.chartData.at(-1);
@@ -689,6 +690,7 @@ export function renderApp() {
         <button class="refresh-btn" onclick="window._refreshIntraday()" title="Intraday verversen">↻</button>
       </div>
       <div id="intradayGrid" class="intraday-grid"></div>
+      <div id="bonusCards" class="intraday-grid" style="margin-top:0;padding-top:0"></div>
     </div>
 
     <div class="chart-card">
@@ -745,6 +747,8 @@ export function renderApp() {
   renderLegend(visibleTickers);
   renderMarketStatus();
   renderIntradaySection();
+  initBonus();
+  reloadBonusCards();
   if (!state.intradayLoaded) {
     loadIntradayData(false, () => {
       renderTodayMetric();

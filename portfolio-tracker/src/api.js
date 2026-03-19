@@ -54,6 +54,24 @@ export async function fetchTickerMeta() {
   return res.json();
 }
 
+export async function fetchBonus() {
+  const res = await fetch(`${SERVER_BASE}/api/bonus`);
+  return res.json();
+}
+
+export async function saveBonus(entry) {
+  const res = await fetch(`${SERVER_BASE}/api/bonus`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  });
+  return res.json();
+}
+
+export async function deleteBonus(id) {
+  return fetch(`${SERVER_BASE}/api/bonus/${id}`, { method: 'DELETE' });
+}
+
 export async function saveTickerMeta(meta) {
   const res = await fetch(`${SERVER_BASE}/api/ticker-meta`, {
     method: 'POST',

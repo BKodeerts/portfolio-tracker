@@ -13,6 +13,7 @@ app.use(express.json({ limit: '10mb' }));
 
 const PORT = process.env.PORT || 3069;
 
+app.use('/api', require('./routes/bonus.js'));
 app.use('/api', require('./routes/candles.js'));
 app.use('/api', require('./routes/transactions.js'));
 app.use('/api', require('./routes/cache-routes.js'));
