@@ -74,7 +74,7 @@ body.theme-dark .privacy-btn.on                        { color: #e2e2e2; border-
 body.theme-dark .pos-table th:hover                    { color: #c8c8c8; }
 body.theme-dark .pos-table th.sort-active              { color: #e2e2e2; }
 body.theme-dark .pos-table tbody tr:hover td           { background: rgba(255,255,255,0.04); }
-body.theme-dark .pos-modal-inner                       { background: rgba(24,24,27,0.99); border-color: rgba(255,255,255,0.11); box-shadow: 0 8px 40px rgba(0,0,0,0.6); }
+body.theme-dark .pos-modal-inner                       { background: rgba(24,24,27,0.99); border-color: rgba(255,255,255,0.11); box-shadow: 0 8px 40px rgba(0,0,0,0.6); color: #e2e2e2; }
 body.theme-dark .pos-modal-close                       { color: #909090; }
 body.theme-dark .pos-modal-close:hover                 { color: #b0b0b0; background: rgba(255,255,255,0.08); }
 body.theme-dark .pos-modal-stat                        { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); }
@@ -103,6 +103,9 @@ body.theme-dark .tx-add-form-field select option       { background: #222226; }
 body.theme-dark .meta-input                            { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.13); color: #e2e2e2; }
 body.theme-dark .meta-input:focus                      { border-color: rgba(255,255,255,0.28); }
 body.theme-dark .meta-input::placeholder               { color: #606060; }
+body.theme-dark #bonusEditDlg input                    { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.13); color: #e2e2e2; }
+body.theme-dark #bonusEditDlg input:focus              { border-color: rgba(255,255,255,0.28); }
+body.theme-dark #bonusEditDlg input::placeholder       { color: #606060; }
 body.theme-dark .donut-legend-pct                      { color: #808080; }
 body.theme-dark .donut-legend-val                      { color: #808080; }
 body.theme-dark .currency-label-name                   { color: #808080; }
