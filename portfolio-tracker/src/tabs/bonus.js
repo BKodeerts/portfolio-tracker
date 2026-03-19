@@ -2,64 +2,156 @@ import { state } from '../state.js';
 import { fetchBonus, saveBonus, deleteBonus } from '../api.js';
 import { sparklineSVG } from './intraday.js';
 import { fmt } from '../utils.js';
+import { chartTheme } from '../utils.js';
+import Chart from 'chart.js/auto';
+import 'chartjs-adapter-date-fns';
 
-// ── Modal ─────────────────────────────────────────────────────────────────────
+// ── Detail modal (reuses #posModal + pos-modal-inner styling) ─────────────────
 
-function openBonusModal(existing = null) {
-  const id        = existing?.id        || '';
-  const label     = existing?.label     || '';
-  const symbol    = existing?.symbol    || '^STOXX50E';
-  const quantity  = existing?.quantity  || '';
-  const grantDate = existing?.grantDate || '';
+function showBonusDetail(item) {
+  const pct   = item.changeSinceGrantPct ?? 0;
+  const cls   = pct >= 0 ? 'c-pos' : 'c-neg';
+  const sign  = pct >= 0 ? '+' : '';
+  const priceChange = (item.currentWarrantPrice ?? item.grantPrice) - item.grantPrice;
+  const priceCls  = priceChange >= 0 ? 'c-pos' : 'c-neg';
+  const priceSign = priceChange >= 0 ? '+' : '';
+
+  const modal = document.getElementById('posModal');
+  modal.innerHTML = `<div class="pos-modal-inner">
+    <div class="pos-modal-header">
+      <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#a78bfa;flex-shrink:0"></span>
+      <span style="font-size:16px;font-weight:700;flex-shrink:0">${item.label}</span>
+      <span class="pos-modal-header-label" style="font-size:13px;color:#888">${item.symbol}</span>
+      <button class="btn" style="margin-left:auto;font-size:11px;padding:4px 10px" onclick="globalThis._openBonusEdit(${JSON.stringify(JSON.stringify(item))})">Bewerken</button>
+      <button class="pos-modal-close" onclick="globalThis._closePosModal()">✕</button>
+    </div>
+    <div class="pos-modal-stats">
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Aantal warrants</div>
+        <div class="pos-modal-stat-val">${item.quantity}</div>
+      </div>
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Prijs bij toekenning</div>
+        <div class="pos-modal-stat-val">€${item.grantPrice.toFixed(2)}</div>
+        <div class="pos-modal-stat-sub" style="color:#888">${item.grantDate}</div>
+      </div>
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Prijs nu</div>
+        <div class="pos-modal-stat-val ${priceCls}">€${(item.currentWarrantPrice ?? item.grantPrice).toFixed(2)}</div>
+        <div class="pos-modal-stat-sub ${priceCls}">${priceSign}€${Math.abs(priceChange).toFixed(2)}</div>
+      </div>
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Totale waarde</div>
+        <div class="pos-modal-stat-val privacy-val">${fmt(item.totalValue ?? 0)}</div>
+        <div class="pos-modal-stat-sub ${cls}">${sign}${pct.toFixed(2)}%</div>
+      </div>
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Index bij toekenning</div>
+        <div class="pos-modal-stat-val">${item.grantIndexPrice?.toFixed(0) ?? '—'}</div>
+      </div>
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Index nu</div>
+        <div class="pos-modal-stat-val">${item.currentIndexPrice?.toFixed(0) ?? '—'}</div>
+      </div>
+    </div>
+    <div class="pos-modal-chart-wrap"><canvas id="posModalChart"></canvas></div>
+  </div>`;
+
+  modal.showModal();
+
+  if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
+
+  // Draw intraday chart of the tracking index
+  const data = state.intradayData[item.symbol];
+  if (data?.points?.length) {
+    const ct = chartTheme();
+    const points = data.points.map(p => ({ x: new Date(p.ts * 1000), y: p.close }));
+    state.chartInstances.__posModal = new Chart(document.getElementById('posModalChart').getContext('2d'), {
+      type: 'line',
+      data: { datasets: [{ data: points, borderColor: '#a78bfa', borderWidth: 2, fill: true, backgroundColor: '#a78bfa22', tension: 0.3, pointRadius: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
+          titleColor: ct.titleColor, bodyColor: ct.bodyColor,
+          bodyFont: { family: "'JetBrains Mono'", size: 11 }, padding: 10, cornerRadius: 8,
+          callbacks: { label: i => ` ${item.symbol} ${i.parsed.y.toFixed(2)}` },
+        }},
+        scales: {
+          x: { type: 'time', display: false },
+          y: { display: false },
+        },
+      },
+    });
+  }
+}
+
+// ── Edit / add form (small dialog) ────────────────────────────────────────────
+
+function openBonusEdit(existing = null) {
+  // Close detail modal if open
+  const posModal = document.getElementById('posModal');
+  if (posModal?.open) posModal.close();
+
+  const id         = existing?.id         || '';
+  const label      = existing?.label      || '';
+  const symbol     = existing?.symbol     || '^STOXX50E';
+  const quantity   = existing?.quantity   || '';
+  const grantDate  = existing?.grantDate  || '';
   const grantPrice = existing?.grantPrice || 10;
 
-  const modal = document.createElement('div');
-  modal.id = 'bonusModal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center';
-  modal.innerHTML = `
-    <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px;width:340px;max-width:90vw">
-      <h3 style="margin:0 0 18px;font-size:14px;color:#e2e8f0;font-weight:600">${existing ? 'Bonus bewerken' : 'Bonus toevoegen'}</h3>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <label style="font-size:11px;color:#64748b">Naam
-          <input id="bLabel" value="${label}" placeholder="Warrants EuroStoxx" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
-        </label>
-        <label style="font-size:11px;color:#64748b">Volgindex (Yahoo symbool)
-          <input id="bSymbol" value="${symbol}" placeholder="^STOXX50E" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
-        </label>
-        <div style="display:flex;gap:10px">
-          <label style="font-size:11px;color:#64748b;flex:1">Aantal warrants
-            <input id="bQty" type="number" value="${quantity}" placeholder="250" step="1" min="1" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
-          </label>
-          <label style="font-size:11px;color:#64748b;flex:1">Prijs bij toekenning (€)
-            <input id="bPrice" type="number" value="${grantPrice}" placeholder="10" step="0.01" min="0.01" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
-          </label>
-        </div>
-        <label style="font-size:11px;color:#64748b">Toekenningsdatum
-          <input id="bDate" type="date" value="${grantDate}" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
-        </label>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
-        ${existing ? `<button class="btn" id="bDelete" style="margin-right:auto;color:#f87171">Verwijderen</button>` : ''}
-        <button class="btn" id="bCancel">Annuleren</button>
-        <button class="btn success" id="bSave">Opslaan</button>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
+  let dlg = document.getElementById('bonusEditDlg');
+  if (!dlg) {
+    dlg = document.createElement('dialog');
+    dlg.id = 'bonusEditDlg';
+    document.body.appendChild(dlg);
+  }
 
-  document.getElementById('bCancel').onclick = () => modal.remove();
-  modal.onclick = e => { if (e.target === modal) modal.remove(); };
+  dlg.innerHTML = `<div class="pos-modal-inner" style="max-width:360px">
+    <div class="pos-modal-header">
+      <span style="font-size:15px;font-weight:700">${existing ? 'Bonus bewerken' : 'Bonus toevoegen'}</span>
+      <button class="pos-modal-close" onclick="document.getElementById('bonusEditDlg').close()">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
+      <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Naam
+        <input id="bLabel" value="${label}" placeholder="Warrants EuroStoxx" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
+      </label>
+      <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Yahoo volgindex
+        <input id="bSymbol" value="${symbol}" placeholder="^STOXX50E" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
+      </label>
+      <div style="display:flex;gap:10px">
+        <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.06em;flex:1">Aantal
+          <input id="bQty" type="number" value="${quantity}" placeholder="250" step="1" min="1" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
+        </label>
+        <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.06em;flex:1">Prijs bij toekenning
+          <input id="bPrice" type="number" value="${grantPrice}" placeholder="10" step="0.01" min="0.01" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
+        </label>
+      </div>
+      <label style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Toekenningsdatum
+        <input id="bDate" type="date" value="${grantDate}" style="display:block;width:100%;margin-top:4px;box-sizing:border-box">
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      ${existing ? `<button class="btn" id="bDelete" style="margin-right:auto;color:#ef4444">Verwijderen</button>` : ''}
+      <button class="btn" onclick="document.getElementById('bonusEditDlg').close()">Annuleren</button>
+      <button class="btn success" id="bSave">Opslaan</button>
+    </div>
+  </div>`;
+
+  dlg.showModal();
+  dlg.onclick = e => { if (e.target === dlg) dlg.close(); };
 
   if (existing) {
     document.getElementById('bDelete').onclick = async () => {
       await deleteBonus(existing.id);
-      modal.remove();
+      dlg.close();
       await reloadBonusCards();
     };
   }
 
   document.getElementById('bSave').onclick = async () => {
     const entry = {
-      id:         id || undefined,
+      ...(id ? { id } : {}),
       label:      document.getElementById('bLabel').value.trim() || document.getElementById('bSymbol').value.trim(),
       symbol:     document.getElementById('bSymbol').value.trim(),
       quantity:   Number(document.getElementById('bQty').value),
@@ -72,7 +164,7 @@ function openBonusModal(existing = null) {
     const btn = document.getElementById('bSave');
     btn.textContent = 'Opslaan…'; btn.disabled = true;
     await saveBonus(entry);
-    modal.remove();
+    dlg.close();
     await reloadBonusCards();
   };
 }
@@ -86,34 +178,30 @@ function bonusCard(item) {
   const cls      = pct >= 0 ? 'c-pos' : 'c-neg';
   const sign     = pct >= 0 ? '+' : '';
 
-  // Today's intraday change (from the tracking index)
-  let todayPct = null;
-  if (data?.points?.length && data.previousClose && data.date === todayStr) {
-    const last = data.points[data.points.length - 1].close;
-    todayPct = (last - data.previousClose) / data.previousClose * 100;
+  const hasToday  = data?.points?.length > 0 && data.previousClose && data.date === todayStr;
+  const last      = hasToday ? data.points[data.points.length - 1].close : null;
+  const todayPct  = hasToday ? (last - data.previousClose) / data.previousClose * 100 : null;
+  let todaySub;
+  if (todayPct === null) {
+    todaySub = `<span>${sign}${pct.toFixed(2)}% v.a. toekenning</span>`;
+  } else {
+    const color = todayPct >= 0 ? '#4ade80' : '#f87171';
+    const todaySign = todayPct >= 0 ? '+' : '';
+    todaySub = `<span style="color:${color}">${todaySign}${todayPct.toFixed(2)}% vandaag</span>`;
   }
-  const todaySub = todayPct !== null
-    ? `<span style="color:${todayPct >= 0 ? '#4ade80' : '#f87171'}">${todayPct >= 0 ? '+' : ''}${todayPct.toFixed(2)}% vandaag</span>`
-    : `<span style="color:#64748b">${sign}${pct.toFixed(2)}% v.a. toekenning</span>`;
 
   const sparkline = data?.points?.length
     ? sparklineSVG(data.points, data.previousClose, 510)
     : '';
 
-  return `<div class="intraday-card" style="cursor:pointer" onclick="window._openBonusModal(${JSON.stringify(JSON.stringify(item))})">
+  return `<div class="intraday-card" style="cursor:pointer" onclick="globalThis._showBonusDetail(${JSON.stringify(JSON.stringify(item))})">
     <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
       <span class="pos-dot" style="background:#a78bfa"></span>${item.label}
-      <span style="font-size:9px;color:#64748b;font-family:'JetBrains Mono',monospace;margin-left:auto">bonus</span>
+      <span style="font-size:9px;color:#a78bfa;font-family:'JetBrains Mono',monospace;margin-left:auto">bonus</span>
     </div>
-    <div class="metric-value ${cls} privacy-val" style="font-size:16px;margin-top:5px">${fmt(item.totalValue)}</div>
+    <div class="metric-value ${cls} privacy-val" style="font-size:16px;margin-top:5px">${fmt(item.totalValue ?? 0)}</div>
     ${sparkline}
     <div class="metric-sub">${todaySub}</div>
-  </div>`;
-}
-
-function addCard() {
-  return `<div class="intraday-card" style="cursor:pointer;border:1px dashed #334155;display:flex;align-items:center;justify-content:center;gap:6px;color:#475569;font-size:12px" onclick="window._openBonusModal(null)">
-    <span style="font-size:18px;line-height:1">+</span> Bonus
   </div>`;
 }
 
@@ -123,28 +211,41 @@ export async function reloadBonusCards() {
   const json = await fetchBonus();
   state.bonusItems = json.data || [];
 
-  // Ensure intraday data is fetched for bonus symbols
   const bonusSymbols = [...new Set(state.bonusItems.map(b => b.symbol))];
   if (bonusSymbols.length) {
     const { fetchIntraday } = await import('../api.js');
     const json2 = await fetchIntraday(bonusSymbols);
-    if (json2.status === 'ok') {
-      Object.assign(state.intradayData, json2.data);
-    }
+    if (json2.status === 'ok') Object.assign(state.intradayData, json2.data);
   }
 
   renderBonusCards();
 }
 
 export function renderBonusCards() {
-  const container = document.getElementById('bonusCards');
-  if (!container) return;
-  container.innerHTML = state.bonusItems.map(bonusCard).join('') + addCard();
+  const grid    = document.getElementById('intradayGrid');
+  const addLink = document.getElementById('bonusAddLink');
+  if (!grid) return;
+
+  // Remove any previously injected bonus cards from the grid
+  grid.querySelectorAll('.bonus-card').forEach(el => el.remove());
+
+  // Append bonus cards directly into the intraday grid so they share the same row
+  const fragment = document.createDocumentFragment();
+  for (const item of state.bonusItems) {
+    const div = document.createElement('div');
+    div.innerHTML = bonusCard(item);
+    const card = div.firstElementChild;
+    card.classList.add('bonus-card');
+    fragment.appendChild(card);
+  }
+  grid.appendChild(fragment);
+
+  if (addLink) {
+    addLink.innerHTML = `<button onclick="globalThis._openBonusEdit(null)" style="background:none;border:none;cursor:pointer;font-size:11px;color:#64748b;padding:2px 4px">＋ bonus toevoegen</button>`;
+  }
 }
 
 export function initBonus() {
-  window._openBonusModal = (jsonStr) => {
-    const item = jsonStr ? JSON.parse(jsonStr) : null;
-    openBonusModal(item);
-  };
+  globalThis._showBonusDetail = (jsonStr) => showBonusDetail(JSON.parse(jsonStr));
+  globalThis._openBonusEdit   = (jsonStr) => openBonusEdit(jsonStr ? JSON.parse(jsonStr) : null);
 }
