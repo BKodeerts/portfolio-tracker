@@ -22,7 +22,7 @@ function showBonusDetail(item) {
       <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#a78bfa;flex-shrink:0"></span>
       <span style="font-size:16px;font-weight:700;flex-shrink:0">${item.label}</span>
       <span class="pos-modal-header-label" style="font-size:13px;color:#888">${item.symbol}</span>
-      <button class="btn" style="margin-left:auto;font-size:11px;padding:4px 10px" onclick="globalThis._openBonusEdit(${JSON.stringify(JSON.stringify(item))})">Bewerken</button>
+      <button class="btn" style="margin-left:auto;font-size:11px;padding:4px 10px" onclick="globalThis._openBonusEdit('${item.id}')">Bewerken</button>
       <button class="pos-modal-close" onclick="globalThis._closePosModal()">✕</button>
     </div>
     <div class="pos-modal-stats">
@@ -194,7 +194,7 @@ function bonusCard(item) {
     ? sparklineSVG(data.points, data.previousClose, 510)
     : '';
 
-  return `<div class="intraday-card" style="cursor:pointer" onclick="globalThis._showBonusDetail(${JSON.stringify(JSON.stringify(item))})">
+  return `<div class="intraday-card" style="cursor:pointer" onclick="globalThis._showBonusDetail('${item.id}')">
     <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
       <span class="pos-dot" style="background:#a78bfa"></span>${item.label}
       <span style="font-size:9px;color:#a78bfa;font-family:'JetBrains Mono',monospace;margin-left:auto">bonus</span>
@@ -246,6 +246,12 @@ export function renderBonusCards() {
 }
 
 export function initBonus() {
-  globalThis._showBonusDetail = (jsonStr) => showBonusDetail(JSON.parse(jsonStr));
-  globalThis._openBonusEdit   = (jsonStr) => openBonusEdit(jsonStr ? JSON.parse(jsonStr) : null);
+  globalThis._showBonusDetail = (id) => {
+    const item = state.bonusItems.find(b => b.id === id);
+    if (item) showBonusDetail(item);
+  };
+  globalThis._openBonusEdit = (id) => {
+    const item = id ? state.bonusItems.find(b => b.id === id) : null;
+    openBonusEdit(item ?? null);
+  };
 }
