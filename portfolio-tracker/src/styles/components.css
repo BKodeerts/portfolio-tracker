@@ -205,6 +205,13 @@
 }
 .meta-input:focus { border-color: rgba(0,0,0,0.3); }
 
+#bonusEditDlg input {
+  padding: 7px 10px; width: 100%; box-sizing: border-box; margin-top: 4px;
+  background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 7px; color: #1c1c1c; font-size: 12px; font-family: inherit; outline: none;
+}
+#bonusEditDlg input:focus { border-color: rgba(0,0,0,0.28); }
+
 /* Rolling returns table */
 .perf-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .perf-table th {

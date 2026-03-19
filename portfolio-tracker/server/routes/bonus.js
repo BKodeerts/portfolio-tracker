@@ -21,7 +21,8 @@ function saveBonus(items) {
 }
 
 async function getPriceAtDate(symbol, date) {
-  const cacheKey = `candles_bonus_${symbol}`;
+  const today    = new Date().toISOString().slice(0, 10);
+  const cacheKey = `candles_bonus_${symbol}_${today}`;
   let candles = readCache(cacheKey, 24 * 60 * 60 * 1000);
   if (!candles) {
     candles = await fetchCandles(symbol, date);

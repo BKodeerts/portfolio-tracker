@@ -1,14 +1,13 @@
 import { state } from '../state.js';
-import { fetchBonus, saveBonus, deleteBonus } from '../api.js';
+import { fetchBonus, saveBonus, deleteBonus, fetchBatch } from '../api.js';
 import { sparklineSVG } from './intraday.js';
-import { fmt } from '../utils.js';
-import { chartTheme } from '../utils.js';
+import { fmt, chartTheme } from '../utils.js';
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 
 // ── Detail modal (reuses #posModal + pos-modal-inner styling) ─────────────────
 
-function showBonusDetail(item) {
+async function showBonusDetail(item) {
   const pct   = item.changeSinceGrantPct ?? 0;
   const cls   = pct >= 0 ? 'c-pos' : 'c-neg';
   const sign  = pct >= 0 ? '+' : '';
@@ -61,28 +60,36 @@ function showBonusDetail(item) {
 
   if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
 
-  // Draw intraday chart of the tracking index
-  const data = state.intradayData[item.symbol];
-  if (data?.points?.length) {
-    const ct = chartTheme();
-    const points = data.points.map(p => ({ x: new Date(p.ts * 1000), y: p.close }));
-    state.chartInstances.__posModal = new Chart(document.getElementById('posModalChart').getContext('2d'), {
-      type: 'line',
-      data: { datasets: [{ data: points, borderColor: '#a78bfa', borderWidth: 2, fill: true, backgroundColor: '#a78bfa22', tension: 0.3, pointRadius: 0 }] },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: {
-          backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
-          titleColor: ct.titleColor, bodyColor: ct.bodyColor,
-          bodyFont: { family: "'JetBrains Mono'", size: 11 }, padding: 10, cornerRadius: 8,
-          callbacks: { label: i => ` ${item.symbol} ${i.parsed.y.toFixed(2)}` },
-        }},
-        scales: {
-          x: { type: 'time', display: false },
-          y: { display: false },
+  // Draw historical warrant value chart: grantPrice * (indexClose / grantIndexPrice)
+  try {
+    const json    = await fetchBatch([item.symbol], [item.grantDate]);
+    const candles = json.data?.[item.symbol] || [];
+    if (candles.length && item.grantIndexPrice) {
+      const ct     = chartTheme();
+      const points = candles.map(c => ({
+        x: new Date(c.date),
+        y: item.grantPrice * (c.close / item.grantIndexPrice),
+      }));
+      state.chartInstances.__posModal = new Chart(document.getElementById('posModalChart').getContext('2d'), {
+        type: 'line',
+        data: { datasets: [{ data: points, borderColor: '#a78bfa', borderWidth: 2, fill: true, backgroundColor: '#a78bfa22', tension: 0.3, pointRadius: 0 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: {
+            backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
+            titleColor: ct.titleColor, bodyColor: ct.bodyColor,
+            bodyFont: { family: "'JetBrains Mono'", size: 11 }, padding: 10, cornerRadius: 8,
+            callbacks: { label: i => ` €${i.parsed.y.toFixed(2)} per warrant` },
+          }},
+          scales: {
+            x: { type: 'time', display: false },
+            y: { display: false },
+          },
         },
-      },
-    });
+      });
+    }
+  } catch (e) {
+    console.warn('Bonus chart load failed:', e.message);
   }
 }
 
