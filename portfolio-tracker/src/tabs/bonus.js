@@ -111,7 +111,7 @@ async function showBonusDetail(item) {
       data: { datasets: [
         { data: points,       borderColor: '#a78bfa',   borderWidth: 2,   fill: true,  backgroundColor: '#a78bfa22', tension: 0.3, pointRadius: 0 },
         { data: priorPoints,  borderColor: '#a78bfa55', borderWidth: 1.5, fill: false, tension: 0.3, pointRadius: 0, borderDash: [4, 3] },
-        { data: fcastPoints,  borderColor: '#a78bfa33', borderWidth: 1,   fill: false, tension: 0.3, pointRadius: 0, borderDash: [2, 5] },
+        { data: fcastPoints,  borderColor: '#a78bfa88', borderWidth: 1.5, fill: true,  backgroundColor: '#a78bfa11', tension: 0.3, pointRadius: 0, borderDash: [3, 4] },
       ]},
       options: {
         responsive: true, maintainAspectRatio: false,
