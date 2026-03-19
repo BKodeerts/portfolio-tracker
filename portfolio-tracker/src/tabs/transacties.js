@@ -2,6 +2,7 @@ import { state } from '../state.js';
 import { getColor, destroyAllCharts } from '../utils.js';
 import { saveTransactions } from '../api.js';
 import { renderAppHeader } from '../components/header.js';
+import { initBonus } from './bonus.js';
 
 let txSearchVal = '';
 let addTxVisible = false;
@@ -38,6 +39,7 @@ function addTxForm() {
 export function renderTransacties() {
   destroyAllCharts();
   state.currentTab = 'transacties';
+  initBonus();
   document.getElementById('root').innerHTML = `
     ${renderAppHeader()}
     <div class="tx-wrap">
@@ -45,6 +47,7 @@ export function renderTransacties() {
         <input class="tx-search" id="txSearch" type="text" placeholder="Zoeken op ticker, datum…"
           value="${txSearchVal}" oninput="window._filterTx(this.value)">
         <button class="btn" onclick="window._toggleAddTx()">+ Transactie</button>
+        <button class="btn" onclick="globalThis._openBonusEdit(null)">+ Bonus</button>
         <button class="btn" onclick="window._saveTxAll()">Opslaan</button>
       </div>
       ${addTxForm()}

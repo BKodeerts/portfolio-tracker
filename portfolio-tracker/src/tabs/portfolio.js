@@ -690,7 +690,6 @@ export function renderApp() {
         <button class="refresh-btn" onclick="window._refreshIntraday()" title="Intraday verversen">↻</button>
       </div>
       <div id="intradayGrid" class="intraday-grid"></div>
-      <div id="bonusAddLink" style="margin-top:8px;text-align:right"></div>
     </div>
 
     <div class="chart-card">

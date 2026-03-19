@@ -279,8 +279,7 @@ export async function reloadBonusCards() {
 }
 
 export function renderBonusCards() {
-  const grid    = document.getElementById('intradayGrid');
-  const addLink = document.getElementById('bonusAddLink');
+  const grid = document.getElementById('intradayGrid');
   if (!grid) return;
 
   // Remove any previously injected bonus cards from the grid
@@ -296,10 +295,6 @@ export function renderBonusCards() {
     fragment.appendChild(card);
   }
   grid.appendChild(fragment);
-
-  if (addLink) {
-    addLink.innerHTML = `<button onclick="globalThis._openBonusEdit(null)" style="background:none;border:none;cursor:pointer;font-size:11px;color:#64748b;padding:2px 4px">＋ bonus toevoegen</button>`;
-  }
 }
 
 export function initBonus() {
