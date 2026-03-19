@@ -90,7 +90,7 @@ async function showBonusDetail(item) {
           },
           scales: {
             x: { type: 'time', time: { unit: 'month' }, grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 } } },
-            y: { grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 }, callback: v => '€' + Math.round(Number(v)).toLocaleString('nl-BE') } },
+            y: { grid: { color: ct.gridColor }, ticks: { display: !state.privacyMode, color: ct.tickColor, font: { size: 9 }, callback: v => '€' + Math.round(Number(v)).toLocaleString('nl-BE') } },
           },
         },
       });
