@@ -60,41 +60,84 @@ async function showBonusDetail(item) {
 
   if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
 
-  // Draw historical warrant value chart: grantPrice * (indexClose / grantIndexPrice)
+  // Draw historical warrant value chart with YoY comparison + forecast
   try {
-    const json    = await fetchBatch([item.symbol], [item.grantDate]);
+    const yearAgoGrant = (() => { const d = new Date(item.grantDate); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10); })();
+    const yearAgoToday = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10); })();
+
+    // Single fetch from 1y before grant covers current period, overlap AND forecast window
+    const json    = await fetchBatch([item.symbol], [yearAgoGrant]);
     const candles = json.data?.[item.symbol] || [];
-    if (candles.length && item.grantIndexPrice) {
-      const ct     = chartTheme();
-      const points = candles.map(c => ({
-        x: new Date(c.date),
-        y: item.quantity * item.grantPrice * (c.close / item.grantIndexPrice),
-      }));
-      state.chartInstances.__posModal = new Chart(document.getElementById('posModalChart').getContext('2d'), {
-        type: 'line',
-        data: { datasets: [{ data: points, borderColor: '#a78bfa', borderWidth: 2, fill: true, backgroundColor: '#a78bfa22', tension: 0.3, pointRadius: 0 }] },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
-              titleColor: ct.titleColor, bodyColor: ct.bodyColor,
-              titleFont: { family: "'DM Sans'", size: 11, weight: 700 }, bodyFont: { family: "'JetBrains Mono'", size: 11 },
-              padding: 10, cornerRadius: 8,
-              callbacks: {
-                title: items => new Date(items[0].parsed.x).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }),
-                label: i => ` ${fmt(i.parsed.y)}`,
+    if (!candles.length || !item.grantIndexPrice) return;
+
+    const ct = chartTheme();
+
+    // How far to extend the forecast: enough that the prior-year line is always ≥60 days total
+    const daysSinceGrant  = Math.floor((Date.now() - new Date(item.grantDate)) / 86_400_000);
+    const forecastDays    = Math.max(14, 60 - daysSinceGrant);
+    const forecastEnd     = (() => { const d = new Date(yearAgoToday); d.setDate(d.getDate() + forecastDays); return d.toISOString().slice(0, 10); })();
+
+    const current      = candles.filter(c => c.date >= item.grantDate);
+    const priorOverlap = candles.filter(c => c.date >= yearAgoGrant && c.date <= yearAgoToday);
+    const priorFcast   = candles.filter(c => c.date > yearAgoToday && c.date <= forecastEnd);
+
+    const currentFirst = current[0];
+    const priorFirst   = priorOverlap[0];
+    if (!currentFirst || !priorFirst) return;
+
+    const currentStartY = item.quantity * item.grantPrice * (currentFirst.close / item.grantIndexPrice);
+
+    const toPoint = (c, shiftYears = 0) => {
+      const d = new Date(c.date);
+      if (shiftYears) d.setFullYear(d.getFullYear() + shiftYears);
+      return { x: d, y: item.quantity * item.grantPrice * (c.close / item.grantIndexPrice) };
+    };
+    const toPriorPoint = c => {
+      const d = new Date(c.date);
+      d.setFullYear(d.getFullYear() + 1);
+      return { x: d, y: currentStartY * (c.close / priorFirst.close) };
+    };
+
+    const points        = current.map(c => toPoint(c));
+    const priorPoints   = priorOverlap.map(toPriorPoint);
+    // Prepend last overlap point so forecast line connects seamlessly
+    const fcastPoints   = [
+      ...(priorOverlap.length ? [toPriorPoint(priorOverlap[priorOverlap.length - 1])] : []),
+      ...priorFcast.map(toPriorPoint),
+    ];
+
+    state.chartInstances.__posModal = new Chart(document.getElementById('posModalChart').getContext('2d'), {
+      type: 'line',
+      data: { datasets: [
+        { data: points,       borderColor: '#a78bfa',   borderWidth: 2,   fill: true,  backgroundColor: '#a78bfa22', tension: 0.3, pointRadius: 0 },
+        { data: priorPoints,  borderColor: '#a78bfa55', borderWidth: 1.5, fill: false, tension: 0.3, pointRadius: 0, borderDash: [4, 3] },
+        { data: fcastPoints,  borderColor: '#a78bfa33', borderWidth: 1,   fill: false, tension: 0.3, pointRadius: 0, borderDash: [2, 5] },
+      ]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
+            titleColor: ct.titleColor, bodyColor: ct.bodyColor,
+            titleFont: { family: "'DM Sans'", size: 11, weight: 700 }, bodyFont: { family: "'JetBrains Mono'", size: 11 },
+            padding: 10, cornerRadius: 8,
+            callbacks: {
+              title: items => new Date(items[0].parsed.x).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }),
+              label: i => {
+                if (i.datasetIndex === 1) return ` vorig jaar: ${fmt(i.parsed.y)}`;
+                if (i.datasetIndex === 2) return ` prognose (vorig jaar): ${fmt(i.parsed.y)}`;
+                return ` ${fmt(i.parsed.y)}`;
               },
             },
           },
-          scales: {
-            x: { type: 'time', time: { unit: 'month' }, grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 } } },
-            y: { grid: { color: ct.gridColor }, ticks: { display: !state.privacyMode, color: ct.tickColor, font: { size: 9 }, callback: v => '€' + Math.round(Number(v)).toLocaleString('nl-BE') } },
-          },
         },
-      });
-    }
+        scales: {
+          x: { type: 'time', time: { unit: 'month' }, grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 } } },
+          y: { grid: { color: ct.gridColor }, ticks: { display: !state.privacyMode, color: ct.tickColor, font: { size: 9 }, callback: v => '€' + Math.round(Number(v)).toLocaleString('nl-BE') } },
+        },
+      },
+    });
   } catch (e) {
     console.warn('Bonus chart load failed:', e.message);
   }
