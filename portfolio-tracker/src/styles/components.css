@@ -338,7 +338,9 @@
 .privacy-btn { color: inherit; }
 body.privacy .privacy-val,
 body.privacy .pos-row-val,
-body.privacy .pos-table td:nth-child(n+4):not(:last-child),
-body.privacy .pos-table tfoot td:nth-child(n+2):not(:last-child) {
+body.privacy .pos-table td:nth-child(n+3):not(:last-child),
+body.privacy .pos-table tfoot td:nth-child(n+2):not(:last-child),
+body.privacy .pos-modal-tx-table td:nth-child(3),
+body.privacy .pos-modal-tx-table td:nth-child(4) {
   filter: blur(7px); user-select: none;
 }

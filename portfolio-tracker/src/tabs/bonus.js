@@ -27,7 +27,7 @@ async function showBonusDetail(item) {
     <div class="pos-modal-stats">
       <div class="pos-modal-stat">
         <div class="pos-modal-stat-label">Aantal warrants</div>
-        <div class="pos-modal-stat-val">${item.quantity}</div>
+        <div class="pos-modal-stat-val privacy-val">${item.quantity}</div>
       </div>
       <div class="pos-modal-stat">
         <div class="pos-modal-stat-label">Prijs bij toekenning</div>
@@ -68,22 +68,29 @@ async function showBonusDetail(item) {
       const ct     = chartTheme();
       const points = candles.map(c => ({
         x: new Date(c.date),
-        y: item.grantPrice * (c.close / item.grantIndexPrice),
+        y: item.quantity * item.grantPrice * (c.close / item.grantIndexPrice),
       }));
       state.chartInstances.__posModal = new Chart(document.getElementById('posModalChart').getContext('2d'), {
         type: 'line',
         data: { datasets: [{ data: points, borderColor: '#a78bfa', borderWidth: 2, fill: true, backgroundColor: '#a78bfa22', tension: 0.3, pointRadius: 0 }] },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: {
-            backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
-            titleColor: ct.titleColor, bodyColor: ct.bodyColor,
-            bodyFont: { family: "'JetBrains Mono'", size: 11 }, padding: 10, cornerRadius: 8,
-            callbacks: { label: i => ` €${i.parsed.y.toFixed(2)} per warrant` },
-          }},
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
+              titleColor: ct.titleColor, bodyColor: ct.bodyColor,
+              titleFont: { family: "'DM Sans'", size: 11, weight: 700 }, bodyFont: { family: "'JetBrains Mono'", size: 11 },
+              padding: 10, cornerRadius: 8,
+              callbacks: {
+                title: items => new Date(items[0].parsed.x).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }),
+                label: i => ` ${fmt(i.parsed.y)}`,
+              },
+            },
+          },
           scales: {
-            x: { type: 'time', display: false },
-            y: { display: false },
+            x: { type: 'time', time: { unit: 'month' }, grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 } } },
+            y: { grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 }, callback: v => '€' + Math.round(Number(v)).toLocaleString('nl-BE') } },
           },
         },
       });

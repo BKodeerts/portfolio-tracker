@@ -76,7 +76,7 @@ export function showPosModal(ticker) {
       <button class="pos-modal-close" onclick="globalThis._closePosModal()">✕</button>
     </div>
     <div class="pos-modal-stats">
-      <div class="pos-modal-stat"><div class="pos-modal-stat-label">Aandelen</div><div class="pos-modal-stat-val">${sh.toLocaleString('nl-BE', { maximumFractionDigits: 4 })}</div></div>
+      <div class="pos-modal-stat"><div class="pos-modal-stat-label">Aandelen</div><div class="pos-modal-stat-val privacy-val">${sh.toLocaleString('nl-BE', { maximumFractionDigits: 4 })}</div></div>
       <div class="pos-modal-stat"><div class="pos-modal-stat-label">Geïnvesteerd</div><div class="pos-modal-stat-val privacy-val">${fmt(cost)}</div></div>
       <div class="pos-modal-stat"><div class="pos-modal-stat-label">Huidig</div><div class="pos-modal-stat-val privacy-val">${fmt(val)}</div></div>
       <div class="pos-modal-stat"><div class="pos-modal-stat-label">Ongerealiseerd</div><div class="pos-modal-stat-val ${cls} privacy-val">${sign}${fmt(pl)}</div><div class="pos-modal-stat-sub ${cls}">${sign}${pct.toFixed(1)}%</div></div>
