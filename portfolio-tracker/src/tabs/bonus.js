@@ -83,7 +83,7 @@ async function showBonusDetail(item) {
 
     const currentFirst = current[0];
     const priorFirst   = priorOverlap[0];
-    if (!currentFirst || !priorFirst) return;
+    if (!currentFirst) return; // need at least current data to draw anything
 
     const currentStartY = item.quantity * item.grantPrice * (currentFirst.close / item.grantIndexPrice);
 
@@ -99,12 +99,12 @@ async function showBonusDetail(item) {
     };
 
     const points        = current.map(c => toPoint(c));
-    const priorPoints   = priorOverlap.map(toPriorPoint);
+    const priorPoints = priorFirst ? priorOverlap.map(toPriorPoint) : [];
     // Prepend last overlap point so forecast line connects seamlessly
-    const fcastPoints   = [
-      ...(priorOverlap.length ? [toPriorPoint(priorOverlap[priorOverlap.length - 1])] : []),
+    const fcastPoints = priorFirst ? [
+      toPriorPoint(priorOverlap[priorOverlap.length - 1]),
       ...priorFcast.map(toPriorPoint),
-    ];
+    ] : [];
 
     state.chartInstances.__posModal = new Chart(document.getElementById('posModalChart').getContext('2d'), {
       type: 'line',

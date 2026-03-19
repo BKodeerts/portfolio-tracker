@@ -41,9 +41,13 @@ router.get('/batch', async (req, res) => {
   const toFetch = [];
 
   for (const symbol of symbols) {
-    const cached = readCache(symbol);
-    if (cached) { console.log(`[CACHE HIT] ${symbol}`); results[symbol] = cached; }
-    else toFetch.push({ symbol, from: froms[symbols.indexOf(symbol)] || '2021-01-01' });
+    const from       = froms[symbols.indexOf(symbol)] || '2021-01-01';
+    const cached     = readCache(symbol);
+    // If cached data doesn't reach back to the requested from date, treat as miss
+    const cacheStart = cached?.[0]?.date;
+    const cacheValid = cached && (!cacheStart || cacheStart <= from);
+    if (cacheValid) { console.log(`[CACHE HIT] ${symbol}`); results[symbol] = cached; }
+    else toFetch.push({ symbol, from });
   }
 
   for (let i = 0; i < toFetch.length; i++) {
