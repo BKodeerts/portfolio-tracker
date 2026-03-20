@@ -575,6 +575,10 @@ function computeRollingReturns(chartData, benchmarkData, sp500Data, twrPct = nul
   const vwceMap  = Object.fromEntries(benchmarkData.map(b => [b.date, b.value]));
   const sp500Map = Object.fromEntries(sp500Data.map(b => [b.date, b.value]));
 
+  // Benchmark candles may not include today's snapshot date — use the last available date
+  const lastVwceDate  = benchmarkData.length ? benchmarkData.at(-1).date : null;
+  const lastSp500Date = sp500Data.length     ? sp500Data.at(-1).date     : null;
+
   function findStartRow(daysAgo) {
     const cutoff = new Date(today);
     cutoff.setDate(cutoff.getDate() - daysAgo);
@@ -593,8 +597,8 @@ function computeRollingReturns(chartData, benchmarkData, sp500Data, twrPct = nul
     return chartData[0];
   }
 
-  const benchReturn = (map, startRow) => {
-    const s = map[startRow.date], l = map[latest.date];
+  const benchReturn = (map, lastDate, startRow) => {
+    const s = map[startRow.date], l = lastDate ? map[lastDate] : null;
     return s && l ? Number.parseFloat(((l / s - 1) * 100).toFixed(2)) : null;
   };
 
@@ -603,7 +607,11 @@ function computeRollingReturns(chartData, benchmarkData, sp500Data, twrPct = nul
     const portfolio = startRow.total > 0
       ? Number.parseFloat(((latest.total / startRow.total - 1) * 100).toFixed(2))
       : null;
-    return { portfolio, vwce: benchReturn(vwceMap, startRow), sp500: benchReturn(sp500Map, startRow) };
+    return {
+      portfolio,
+      vwce:  benchReturn(vwceMap,  lastVwceDate,  startRow),
+      sp500: benchReturn(sp500Map, lastSp500Date, startRow),
+    };
   }
 
   const inception0 = calcReturn(chartData[0]);

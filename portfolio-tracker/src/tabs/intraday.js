@@ -311,17 +311,35 @@ export function renderIntradaySection() {
     gridEl.appendChild(divider);
 
     for (const item of watchlist) {
-      const pct = item.change1dPct ?? null;
-      const cls = pct == null ? 'c-neutral' : (pct >= 0 ? 'c-pos' : 'c-neg');
+      const data      = state.intradayData?.[item.symbol];
+      const hasData   = data?.points?.length > 0;
+      const prev      = data?.previousClose;
+      const last      = hasData ? data.points[data.points.length - 1] : null;
+      const pct       = hasData && prev ? ((last.close - prev) / prev * 100) : (item.change1dPct ?? null);
+      let cls;
+      if (pct == null)  cls = 'c-neutral';
+      else if (pct >= 0) cls = 'c-pos';
+      else               cls = 'c-neg';
+      const todayStr  = new Date().toISOString().slice(0, 10);
+      const isStale   = data && data.date !== todayStr;
+      let priceStr;
+      if (last)                priceStr = last.close.toFixed(2);
+      else if (item.price != null) priceStr = item.price.toFixed(2);
+      else                     priceStr = '—';
+      let pctStr;
+      if (pct == null)  pctStr = '—';
+      else              pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
       const card = document.createElement('div');
       card.className = 'intraday-card';
-      card.style.opacity = '0.85';
+      if (isStale) card.style.opacity = '0.5';
       card.innerHTML = `
         <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
           <span class="pos-dot" style="background:#64748b"></span>${item.symbol}
+          ${isStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(data.date)}</span>` : ''}
         </div>
-        <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct != null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%` : '—'}</div>
-        <div class="metric-sub">${item.price != null ? item.price.toFixed(2) : '—'}</div>`;
+        <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pctStr}</div>
+        ${hasData ? sparklineSVG(data.points, prev, getTradingMins(item.symbol)) : ''}
+        <div class="metric-sub">${priceStr}</div>`;
       gridEl.appendChild(card);
     }
   }
@@ -337,9 +355,10 @@ export async function loadIntradayData(force = false, onDone = null) {
   if (statusEl) statusEl.textContent = 'laden…';
   try {
     // Collect FX symbols for all non-EUR currencies in the current portfolio
-    const currencies = [...new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META[t]?.currency).filter(c => c && c !== 'EUR'))];
-    const fxSymbols  = [...new Set(currencies.map(c => FX_DEFS[c]?.symbol).filter(Boolean))];
-    const allSymbols = [...new Set([...yahooSymbols, FX_SYMBOL, ...fxSymbols])];
+    const currencies    = [...new Set(state.CURRENT_TICKERS.map(t => state.TICKER_META[t]?.currency).filter(c => c && c !== 'EUR'))];
+    const fxSymbols     = [...new Set(currencies.map(c => FX_DEFS[c]?.symbol).filter(Boolean))];
+    const watchSymbols  = (state.watchlistData || []).map(w => w.symbol).filter(Boolean);
+    const allSymbols = [...new Set([...yahooSymbols, FX_SYMBOL, ...fxSymbols, ...watchSymbols])];
     const json = await fetchIntraday(allSymbols, force);
     if (json.status !== 'ok') throw new Error(json.message);
     state.intradayData = json.data;

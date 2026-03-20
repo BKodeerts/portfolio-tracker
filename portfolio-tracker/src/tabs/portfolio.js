@@ -706,7 +706,7 @@ export function renderSummaryBar() {
     <div class="metric-card">
       <div class="metric-label">Kostprijs</div>
       <div class="metric-value c-neutral privacy-val">${fmt(latest.totalCost)}</div>
-      ${state.totalInvested > 0 ? `<div class="metric-sub c-neutral">${fmt(state.totalInvested)} ingelegd</div>` : ""}
+      ${state.totalInvested > 0 ? `<div class="metric-sub c-neutral privacy-val">${fmt(state.totalInvested)} ingelegd</div>` : ""}
     </div>
     <div class="metric-card">
       <div class="metric-label">Portefeuille</div>
