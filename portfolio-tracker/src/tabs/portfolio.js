@@ -81,26 +81,34 @@ function buildIntradayChartData(visibleTickers) {
     if (currency !== "EUR" && fxDef) {
       const fxDataCcy = state.intradayData[fxSymbol];
       if (fxDataCcy?.points)
-        fxDataCcy.points.forEach((p) => { fxPtMapCcy[p.ts] = p.close; });
+        fxDataCcy.points.forEach((p) => {
+          fxPtMapCcy[p.ts] = p.close;
+        });
     }
 
     // Build per-timestamp FX rate for this currency (forward-fill)
-    let lastFxCcy = currency !== "EUR" && fxDef
-      ? (state.intradayData[fxSymbol]?.previousClose || fxDef.fallback)
-      : 1;
+    let lastFxCcy =
+      currency !== "EUR" && fxDef
+        ? state.intradayData[fxSymbol]?.previousClose || fxDef.fallback
+        : 1;
     const fxAtTsCcy = {};
     for (const ts of timestamps) {
       if (fxPtMapCcy[ts] !== undefined) lastFxCcy = fxPtMapCcy[ts];
       fxAtTsCcy[ts] = lastFxCcy;
     }
 
-    const prevValueEur = currency !== "EUR" && fxDef
-      ? (shares * prevClose) / (fxAtTsCcy[timestamps[0]] || fxDef.fallback) / fxScale
-      : shares * prevClose;
+    const prevValueEur =
+      currency !== "EUR" && fxDef
+        ? (shares * prevClose) /
+          (fxAtTsCcy[timestamps[0]] || fxDef.fallback) /
+          fxScale
+        : shares * prevClose;
 
     const ptMap = {};
     if (data?.points)
-      data.points.forEach((p) => { ptMap[p.ts] = p.close; });
+      data.points.forEach((p) => {
+        ptMap[p.ts] = p.close;
+      });
 
     let lastClose = prevClose;
     const values = timestamps.map((ts) => {
@@ -417,7 +425,8 @@ export function renderPortfolioChart(visibleTickers) {
 
   // Tight y-axis bounds for intraday — only for non-stacked views, since stacking makes
   // individual dataset max != visible chart max (fill: true also forces axis to include 0)
-  const stackedView = state.currentView === "individual" || state.currentView === "pl";
+  const stackedView =
+    state.currentView === "individual" || state.currentView === "pl";
   const yBounds =
     useIntraday && !stackedView
       ? buildYBounds(
@@ -447,28 +456,45 @@ export function renderPortfolioChart(visibleTickers) {
   // Convert exchange-local time (hour, min in tz) to a JS Date for today.
   // Using Intl, this correctly handles DST transitions between US and EU.
   function exchangeTimeToLocal(tz, hour, min) {
-    const tzDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
-    const [yr, mo, dy] = tzDateStr.split('-').map(Number);
+    const tzDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(
+      new Date(),
+    );
+    const [yr, mo, dy] = tzDateStr.split("-").map(Number);
     const naiveUtc = Date.UTC(yr, mo - 1, dy, hour, min, 0);
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz, hour: 'numeric', minute: 'numeric', hour12: false,
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false,
     }).formatToParts(new Date(naiveUtc));
-    const tzH = Number(parts.find(p => p.type === 'hour').value) % 24;
-    const tzM = Number(parts.find(p => p.type === 'minute').value);
-    return new Date(naiveUtc + ((hour * 60 + min) - (tzH * 60 + tzM)) * 60000);
+    const tzH = Number(parts.find((p) => p.type === "hour").value) % 24;
+    const tzM = Number(parts.find((p) => p.type === "minute").value);
+    return new Date(naiveUtc + (hour * 60 + min - (tzH * 60 + tzM)) * 60000);
   }
 
   const sessionLines = [
     ...(hasEU
       ? [
-          { date: exchangeTimeToLocal('Europe/Amsterdam', 9, 0),   label: "EU opent" },
-          { date: exchangeTimeToLocal('Europe/Amsterdam', 17, 30),  label: "EU sluit" },
+          {
+            date: exchangeTimeToLocal("Europe/Amsterdam", 9, 0),
+            label: "EU opent",
+          },
+          {
+            date: exchangeTimeToLocal("Europe/Amsterdam", 17, 30),
+            label: "EU sluit",
+          },
         ]
       : []),
     ...(hasUS
       ? [
-          { date: exchangeTimeToLocal('America/New_York', 9, 30),   label: "US opent" },
-          { date: exchangeTimeToLocal('America/New_York', 16, 0),   label: "US sluit" },
+          {
+            date: exchangeTimeToLocal("America/New_York", 9, 30),
+            label: "US opent",
+          },
+          {
+            date: exchangeTimeToLocal("America/New_York", 16, 0),
+            label: "US sluit",
+          },
         ]
       : []),
   ];
@@ -508,20 +534,31 @@ export function renderPortfolioChart(visibleTickers) {
       }
     : null;
 
-  const prevCloseRef = useIntraday && intra
-    ? visibleTickers.reduce((s, t) => s + (intra.tickerVals[t]?.prevValueEur || 0), 0)
-    : 0;
+  const prevCloseRef =
+    useIntraday && intra
+      ? visibleTickers.reduce(
+          (s, t) => s + (intra.tickerVals[t]?.prevValueEur || 0),
+          0,
+        )
+      : 0;
 
   // Phantom dataset for diff tooltip line (colored separately from Portefeuille)
   if (useIntraday && state.currentView === "total" && prevCloseRef > 0) {
     const portfolio = datasets.find((d) => d.label === "Portefeuille");
     if (portfolio) {
-      datasets = [...datasets, {
-        label: "__diff",
-        data: portfolio.data.map((v) => v - prevCloseRef),
-        borderWidth: 0, pointRadius: 0, fill: false, tension: 0, spanGaps: true,
-        borderColor: "transparent",
-      }];
+      datasets = [
+        ...datasets,
+        {
+          label: "__diff",
+          data: portfolio.data.map((v) => v - prevCloseRef),
+          borderWidth: 0,
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          spanGaps: true,
+          borderColor: "transparent",
+        },
+      ];
     }
   }
 
@@ -560,7 +597,10 @@ export function renderPortfolioChart(visibleTickers) {
               if (item.dataset.label === "__diff") {
                 const diff = item.parsed.y;
                 const ds = diff >= 0 ? "+" : "";
-                const pct = prevCloseRef > 0 ? ((diff / prevCloseRef) * 100).toFixed(2) : "0.00";
+                const pct =
+                  prevCloseRef > 0
+                    ? ((diff / prevCloseRef) * 100).toFixed(2)
+                    : "0.00";
                 return state.privacyMode
                   ? ` ${ds}●●● (${ds}${pct}%)`
                   : ` ${ds}€${Math.round(Math.abs(diff)).toLocaleString("nl-BE")} (${ds}${pct}%)`;
@@ -569,7 +609,11 @@ export function renderPortfolioChart(visibleTickers) {
               const sign = val >= 0 ? "+" : "";
               if (state.currentView === "pct")
                 return ` ${item.dataset.label}: ${sign}${val}%`;
-              if (useIntraday && state.currentView === "total" && item.dataset.label === "Vorige slotkoers")
+              if (
+                useIntraday &&
+                state.currentView === "total" &&
+                item.dataset.label === "Vorige slotkoers"
+              )
                 return null;
               if (state.privacyMode) return ` ${item.dataset.label}: ●●●`;
               return ` ${item.dataset.label}: ${sign}€${Math.round(val).toLocaleString("nl-BE")}`;
@@ -581,8 +625,14 @@ export function renderPortfolioChart(visibleTickers) {
             },
             labelColor: (item) => {
               if (item.dataset.label === "__diff")
-                return { borderColor: "transparent", backgroundColor: "transparent" };
-              return { borderColor: item.dataset.borderColor, backgroundColor: item.dataset.borderColor };
+                return {
+                  borderColor: "transparent",
+                  backgroundColor: "transparent",
+                };
+              return {
+                borderColor: item.dataset.borderColor,
+                backgroundColor: item.dataset.borderColor,
+              };
             },
           },
         },
@@ -626,7 +676,9 @@ export function renderLegend(visibleTickers) {
   if (!el) return;
   if (state.currentView === "total") {
     const useIntraday = state.currentPeriod === "1d" && state.intradayLoaded;
-    const refEntry = useIntraday ? "" : `
+    const refEntry = useIntraday
+      ? ""
+      : `
       <div class="legend-item"><div class="legend-line" style="background:#334155;border-top:2px dashed #334155;height:0;width:16px;margin-top:1px"></div>Kostprijs</div>`;
     el.innerHTML = `
       <div class="legend-item"><div class="legend-line" style="background:#818cf8"></div>Portefeuille</div>${refEntry}`;
@@ -654,7 +706,7 @@ export function renderSummaryBar() {
     <div class="metric-card">
       <div class="metric-label">Kostprijs</div>
       <div class="metric-value c-neutral privacy-val">${fmt(latest.totalCost)}</div>
-      ${state.totalInvested > 0 ? `<div class="metric-sub c-neutral">netto ${fmt(state.totalInvested)} ingelegd</div>` : ''}
+      ${state.totalInvested > 0 ? `<div class="metric-sub c-neutral">${fmt(state.totalInvested)} ingelegd</div>` : ""}
     </div>
     <div class="metric-card">
       <div class="metric-label">Portefeuille</div>
