@@ -8,8 +8,6 @@ import { SUPPORTED_CURRENCIES } from '../constants.js';
 let _baseCurrency              = 'EUR';
 let _watchlist                 = [];
 let _intradayDuringMarketHours = false;
-let _drawdownAlertPct          = 10;
-let _targetValue               = 0;
 let _pushInterval              = 15;
 let _ppMode          = 'none';  // 'none' | 'all' | 'select' — explicit, not inferred
 let _selectedTickers = [];      // tickers checked when _ppMode === 'select'
@@ -115,8 +113,6 @@ async function doSaveSettings() {
       baseCurrency:              _baseCurrency,
       watchlist:                 _watchlist,
       intradayDuringMarketHours: _intradayDuringMarketHours,
-      drawdownAlertPct:          _drawdownAlertPct,
-      targetValue:               _targetValue,
       pushInterval:              _pushInterval,
       pushPositions:             buildPushPositions(),
     });
@@ -147,8 +143,6 @@ export async function renderSettings() {
     _baseCurrency              = d.baseCurrency              ?? 'EUR';
     _watchlist                 = [...(d.watchlist            ?? [])];
     _intradayDuringMarketHours = d.intradayDuringMarketHours ?? false;
-    _drawdownAlertPct          = d.drawdownAlertPct          ?? 10;
-    _targetValue               = d.targetValue               ?? 0;
     _pushInterval              = d.pushInterval              ?? 15;
     const pp = Array.isArray(d.pushPositions) ? d.pushPositions : [];
     if (pp.includes('*'))   { _ppMode = 'all';    _selectedTickers = []; }
@@ -229,19 +223,7 @@ export async function renderSettings() {
             <span class="c-neutral" style="font-size:12px">minuten</span>
           </div>`)}
 
-        ${field('Drawdown alarm',
-          `<div style="display:flex;align-items:center;gap:8px">
-            ${inp('settingsDrawdown', _drawdownAlertPct, 'number', 'min="1" max="50" onchange="globalThis._onDrawdownChange(+this.value)"')}
-            <span class="c-neutral" style="font-size:12px">% drempelwaarde</span>
-          </div>`)}
-
-        ${field('Doelwaarde',
-          `<div style="display:flex;align-items:center;gap:8px">
-            ${inp('settingsTarget', _targetValue, 'number', 'min="0" step="100" onchange="globalThis._onTargetChange(+this.value)"')}
-            <span class="c-neutral" style="font-size:12px">€ &nbsp;(0 = uitgeschakeld)</span>
-          </div>`)}
-
-        ${field('Positie sensors',
+${field('Positie sensors',
           `<div id="pushPositionsSection"></div>`)}
       </section>
 
@@ -259,8 +241,6 @@ globalThis._addWatchlistItem    = addWatchlistItem;
 globalThis._removeWatchlistItem = removeWatchlistItem;
 globalThis._onCurrencyChange    = v => { _baseCurrency = v; };
 globalThis._onIntradayChange    = v => { _intradayDuringMarketHours = v; };
-globalThis._onDrawdownChange    = v => { _drawdownAlertPct = Math.max(1, Math.min(50, v || 10)); };
-globalThis._onTargetChange      = v => { _targetValue = Math.max(0, v || 0); };
 globalThis._onPushIntervalChange = v => { _pushInterval = Math.max(1, Math.min(60, v || 15)); };
 globalThis._setPpMode           = setPpMode;
 globalThis._togglePushTicker    = togglePushTicker;

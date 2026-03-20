@@ -11,7 +11,7 @@ import { fetchTransactions, clearCacheApi } from './api.js';
 import { loadData } from './data.js';
 import { renderApp, renderPortfolioChart } from './tabs/portfolio.js';
 import { renderAnalyse, renderAnalyseCharts, sortPos, showPosModal, closePosModal, saveTickerMetaUI, resetSectorsUI, setBreakdownTab, setBenchmark, exportPositionsCsv, exportTransactionsCsv } from './tabs/analyse.js';
-import { renderImport, handleCSVFile, updateYahooGuess, saveImport, saveTickerRenames } from './tabs/import.js';
+import { handleCSVFile, updateYahooGuess, saveImport, saveTickerRenames } from './tabs/import.js';
 import { renderTransacties, filterTx, deleteTx, saveTxAll, toggleAddTx, addManualTx, onAddTypeChange } from './tabs/transacties.js';
 import { renderSettings } from './tabs/settings.js';
 import { loadIntradayData } from './tabs/intraday.js';
@@ -60,7 +60,7 @@ async function init() {
       state.RAW_TRANSACTIONS = [];
       state.TICKER_META      = {};
       state.CURRENT_TICKERS  = [];
-      renderImport();
+      renderTransacties();
       return;
     }
 
@@ -82,7 +82,7 @@ function setTab(t) {
   if      (t === 'portefeuille') renderApp();
   else if (t === 'analyse')      renderAnalyse();
   else if (t === 'transacties')  renderTransacties();
-  else if (t === 'import')       renderImport();
+  else if (t === 'import')       renderTransacties();
   else if (t === 'instellingen') renderSettings();
 }
 

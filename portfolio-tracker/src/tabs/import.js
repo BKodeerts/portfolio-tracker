@@ -4,7 +4,7 @@ import { parseDeGiroCSV, parseBoleroXLSX, aggregateOrders, buildIsinLookup, gues
 import { renderAppHeader } from '../components/header.js';
 import { destroyAllCharts } from '../utils.js';
 
-function buildTickerRows() {
+export function buildTickerRows() {
   const byTicker = {};
   state.RAW_TRANSACTIONS.forEach(t => {
     if (!byTicker[t.ticker]) byTicker[t.ticker] = { yahoo: t.yahoo, label: t.label || '', count: 0 };

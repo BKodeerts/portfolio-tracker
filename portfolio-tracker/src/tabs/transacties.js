@@ -3,9 +3,11 @@ import { getColor, destroyAllCharts } from '../utils.js';
 import { saveTransactions } from '../api.js';
 import { renderAppHeader } from '../components/header.js';
 import { initBonus } from './bonus.js';
+import { buildTickerRows } from './import.js';
 
-let txSearchVal = '';
-let addTxVisible = false;
+let txSearchVal   = '';
+let addTxVisible  = false;
+let _importOpen   = false;
 
 function addTxForm() {
   const today = new Date().toISOString().split('T')[0];
@@ -43,25 +45,65 @@ function addTxForm() {
     </div>`;
 }
 
-export function onAddTypeChange(type) {
-  const sharesField = document.getElementById('addSharesField');
-  const costLabel   = document.getElementById('addCostLabel');
-  if (type === 'dividend') {
-    if (sharesField) sharesField.style.display = 'none';
-    if (costLabel) costLabel.textContent = 'Bedrag € *';
-  } else {
-    if (sharesField) sharesField.style.display = '';
-    if (costLabel) costLabel.textContent = 'Kosten € *';
-  }
+function importSection() {
+  const txCount   = state.RAW_TRANSACTIONS.length;
+  const dateRange = txCount > 0
+    ? `${state.RAW_TRANSACTIONS[0].date} → ${state.RAW_TRANSACTIONS.at(-1).date}`
+    : '—';
+
+  const tickerRenameBlock = txCount > 0 ? `
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border)">
+      <h3 style="font-size:13px;margin:0 0 4px;font-weight:600">Tickers hernoemen</h3>
+      <p class="c-neutral" style="font-size:12px;margin-bottom:8px;line-height:1.5">
+        Wijzig ticker of Yahoo-symbool. Wordt toegepast op alle bijbehorende transacties.
+      </p>
+      <table class="map-table">
+        <thead><tr><th>Ticker</th><th>Yahoo symbool</th><th>Label</th><th>#</th></tr></thead>
+        <tbody>${buildTickerRows()}</tbody>
+      </table>
+      <div class="import-actions" style="margin-top:8px">
+        <button class="btn success" onclick="window._saveTickerRenames()">Tickers opslaan</button>
+      </div>
+    </div>` : '';
+
+  return `
+    <div style="margin-top:28px;border-top:1px solid var(--border);padding-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${_importOpen ? '14px' : '0'}">
+        <h3 style="font-size:13px;font-weight:600;margin:0">Importeren</h3>
+        <button class="btn" style="font-size:11px;padding:4px 10px" onclick="globalThis._toggleImportSection()">
+          ${_importOpen ? 'Inklappen ↑' : 'Uitklappen ↓'}
+        </button>
+      </div>
+      <div id="importSectionBody" style="display:${_importOpen ? 'block' : 'none'}">
+        <div class="import-info">
+          <strong>${txCount} transacties opgeslagen</strong>${txCount > 0 ? ` · ${dateRange}` : ''}<br>
+          Upload een DeGiro <em>Transacties.csv</em> of Bolero <em>portfolio_…xlsx</em>. Bestaande data kun je behouden of vervangen.
+        </div>
+        <div class="drop-zone" id="dropZone"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="event.preventDefault();this.classList.remove('drag-over');window._handleCSVFile(event.dataTransfer.files[0])">
+          <strong>Sleep bestand hierheen</strong>
+          <p>of <label for="csvInput">klik om te bladeren</label></p>
+          <input type="file" id="csvInput" accept=".csv,.xlsx,text/csv,text/plain" style="display:none" onchange="window._handleCSVFile(this.files[0])">
+        </div>
+        <div id="mappingSection" style="display:none"></div>
+        ${tickerRenameBlock}
+      </div>
+    </div>`;
 }
 
 export function renderTransacties() {
   destroyAllCharts();
   state.currentTab = 'transacties';
+  const noTx = state.RAW_TRANSACTIONS.length === 0;
+  if (noTx) _importOpen = true;
   initBonus();
+
   document.getElementById('root').innerHTML = `
     ${renderAppHeader()}
     <div class="tx-wrap">
+      ${noTx ? '' : `
       <div class="tx-toolbar">
         <input class="tx-search" id="txSearch" type="text" placeholder="Zoeken op ticker, datum…"
           value="${txSearchVal}" oninput="window._filterTx(this.value)">
@@ -75,6 +117,8 @@ export function renderTransacties() {
         <span style="font-size:11px;color:#888">${state.RAW_TRANSACTIONS.length} transacties</span>
         <button class="btn" onclick="window._saveTxAll()">Opslaan</button>
       </div>
+      `}
+      ${importSection()}
     </div>`;
 }
 
@@ -148,6 +192,14 @@ export function toggleAddTx() {
   if (form) form.style.display = addTxVisible ? 'block' : 'none';
 }
 
+export function toggleImportSection() {
+  _importOpen = !_importOpen;
+  const body = document.getElementById('importSectionBody');
+  const btn  = document.querySelector('[onclick="globalThis._toggleImportSection()"]');
+  if (body) body.style.display = _importOpen ? 'block' : 'none';
+  if (btn)  btn.textContent = _importOpen ? 'Inklappen ↑' : 'Uitklappen ↓';
+}
+
 export async function addManualTx() {
   const type     = document.getElementById('addType')?.value || 'buy';
   const date     = (document.getElementById('addDate')?.value    || '').trim();
@@ -213,3 +265,17 @@ export async function saveTxAll() {
     globalThis._setTab('transacties');
   } catch (e) { alert('Opslaan mislukt: ' + e.message); }
 }
+
+export function onAddTypeChange(type) {
+  const sharesField = document.getElementById('addSharesField');
+  const costLabel   = document.getElementById('addCostLabel');
+  if (type === 'dividend') {
+    if (sharesField) sharesField.style.display = 'none';
+    if (costLabel) costLabel.textContent = 'Bedrag € *';
+  } else {
+    if (sharesField) sharesField.style.display = '';
+    if (costLabel) costLabel.textContent = 'Kosten € *';
+  }
+}
+
+globalThis._toggleImportSection = toggleImportSection;

@@ -11,8 +11,6 @@ const DEFAULTS = {
   baseCurrency:              'EUR',
   watchlist:                 [],
   intradayDuringMarketHours: false,
-  drawdownAlertPct:          10,
-  targetValue:               0,
   pushInterval:              15,
   pushPositions:             false,
 };
@@ -37,7 +35,7 @@ router.get('/settings', (req, res) => {
 router.post('/settings', (req, res) => {
   try {
     const { baseCurrency, watchlist, intradayDuringMarketHours,
-            drawdownAlertPct, targetValue, pushInterval, pushPositions } = req.body;
+            pushInterval, pushPositions } = req.body;
     const current = readSettings();
 
     if (typeof baseCurrency === 'string')
@@ -46,10 +44,6 @@ router.post('/settings', (req, res) => {
       current.watchlist = watchlist.map(s => String(s).trim().toUpperCase()).filter(Boolean);
     if (typeof intradayDuringMarketHours === 'boolean')
       current.intradayDuringMarketHours = intradayDuringMarketHours;
-    if (typeof drawdownAlertPct === 'number')
-      current.drawdownAlertPct = Math.max(1, Math.min(50, Math.round(drawdownAlertPct)));
-    if (typeof targetValue === 'number')
-      current.targetValue = Math.max(0, targetValue);
     if (typeof pushInterval === 'number')
       current.pushInterval = Math.max(1, Math.min(60, Math.round(pushInterval)));
     // pushPositions: false | ["*"] | ["TICKER", ...]
