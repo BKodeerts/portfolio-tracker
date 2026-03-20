@@ -72,6 +72,20 @@ export async function deleteBonus(id) {
   return fetch(`${SERVER_BASE}/api/bonus/${id}`, { method: 'DELETE' });
 }
 
+export async function fetchSettings() {
+  const res = await fetch(`${SERVER_BASE}/api/settings`);
+  return res.json();
+}
+
+export async function saveSettings(settings) {
+  const res = await fetch(`${SERVER_BASE}/api/settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+  return res.json();
+}
+
 export async function saveTickerMeta(meta) {
   const res = await fetch(`${SERVER_BASE}/api/ticker-meta`, {
     method: 'POST',

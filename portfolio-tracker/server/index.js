@@ -1,5 +1,5 @@
 const express = require('express');
-const path    = require('path');
+const path    = require('node:path');
 
 const app = express();
 app.use((req, res, next) => {
@@ -19,6 +19,7 @@ app.use('/api', require('./routes/transactions.js'));
 app.use('/api', require('./routes/cache-routes.js'));
 app.use('/api', require('./routes/ha.js'));
 app.use('/api', require('./routes/portfolio.js'));
+app.use('/api', require('./routes/settings.js'));
 app.use('/api/ticker-meta', require('./routes/ticker-meta.js'));
 
 // Serve built frontend

@@ -13,11 +13,35 @@ import { renderApp, renderPortfolioChart } from './tabs/portfolio.js';
 import { renderAnalyse, renderAnalyseCharts, sortPos, showPosModal, closePosModal, saveTickerMetaUI, resetSectorsUI, setBreakdownTab, setBenchmark, exportPositionsCsv, exportTransactionsCsv } from './tabs/analyse.js';
 import { renderImport, handleCSVFile, updateYahooGuess, saveImport, saveTickerRenames } from './tabs/import.js';
 import { renderTransacties, filterTx, deleteTx, saveTxAll, toggleAddTx, addManualTx, onAddTypeChange } from './tabs/transacties.js';
+import { renderSettings } from './tabs/settings.js';
 import { loadIntradayData } from './tabs/intraday.js';
 import { renderAppHeader } from './components/header.js';
 
+const _systemMq = globalThis.matchMedia('(prefers-color-scheme: dark)');
+let   _systemMqListener = null;
+
 function applyTheme() {
-  document.body.classList.toggle('theme-dark', state.currentTheme === 'dark');
+  const dark = state.currentTheme === 'dark' ||
+               (state.currentTheme === 'system' && _systemMq.matches);
+  document.body.classList.toggle('theme-dark', dark);
+}
+
+function syncSystemListener() {
+  if (_systemMqListener) {
+    _systemMq.removeEventListener('change', _systemMqListener);
+    _systemMqListener = null;
+  }
+  if (state.currentTheme === 'system') {
+    _systemMqListener = () => applyTheme();
+    _systemMq.addEventListener('change', _systemMqListener);
+  }
+}
+
+function setTheme(t) {
+  state.currentTheme = t;
+  localStorage.setItem('theme', t);
+  applyTheme();
+  syncSystemListener();
 }
 
 async function init() {
@@ -59,6 +83,7 @@ function setTab(t) {
   else if (t === 'analyse')      renderAnalyse();
   else if (t === 'transacties')  renderTransacties();
   else if (t === 'import')       renderImport();
+  else if (t === 'instellingen') renderSettings();
 }
 
 function renderAppKeepScroll() { const y = globalThis.scrollY; renderApp(); globalThis.scrollTo(0, y); }
@@ -67,16 +92,6 @@ function setPeriod(p)        { state.currentPeriod = p; renderAppKeepScroll(); }
 function setPeriodAnalyse(p) { const y = globalThis.scrollY; state.analysePeriod = p; renderAnalyse(); globalThis.scrollTo(0, y); }
 function toggleClosed()      { state.showClosed = !state.showClosed; renderAppKeepScroll(); }
 
-function toggleTheme() {
-  state.currentTheme = state.currentTheme === 'dark' ? 'default' : 'dark';
-  localStorage.setItem('theme', state.currentTheme);
-  applyTheme();
-  document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('on', state.currentTheme === 'dark'));
-  if      (state.currentTab === 'portefeuille') renderAppKeepScroll();
-  else if (state.currentTab === 'analyse')      renderAnalyse();
-  else if (state.currentTab === 'transacties')  renderTransacties();
-  else if (state.currentTab === 'import')       renderImport();
-}
 
 function togglePrivacy() {
   state.privacyMode = !state.privacyMode;
@@ -115,7 +130,7 @@ globalThis._setView          = setView;
 globalThis._setPeriod        = setPeriod;
 globalThis._setPeriodAnalyse = setPeriodAnalyse;
 globalThis._toggleClosed     = toggleClosed;
-globalThis._toggleTheme      = toggleTheme;
+globalThis._setTheme         = setTheme;
 globalThis._togglePrivacy    = togglePrivacy;
 globalThis._clearCache       = clearCache;
 globalThis._refreshIntraday  = refreshIntraday;
@@ -160,7 +175,7 @@ posModalEl.addEventListener('close', () => closePosModal());
 
 // Boot
 document.body.classList.toggle('privacy', state.privacyMode);
-document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('on', state.currentTheme === 'dark'));
 document.querySelectorAll('.privacy-btn').forEach(b => b.classList.toggle('on', state.privacyMode));
 applyTheme();
+syncSystemListener();
 init();

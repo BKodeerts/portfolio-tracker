@@ -294,7 +294,12 @@ export function renderBonusCards() {
     card.classList.add('bonus-card');
     fragment.appendChild(card);
   }
-  grid.appendChild(fragment);
+  const watchlistStart = grid.querySelector('.watchlist-section-start');
+  if (watchlistStart) {
+    grid.insertBefore(fragment, watchlistStart);
+  } else {
+    grid.appendChild(fragment);
+  }
 }
 
 export function initBonus() {

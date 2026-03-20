@@ -6,24 +6,51 @@
 const fs   = require('node:fs');
 const path = require('node:path');
 
-const DATA_DIR   = process.env.DATA_DIR || '/data';
-const STATE_FILE = path.join(DATA_DIR, 'portfolio_state.json');
+const DATA_DIR      = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+const STATE_FILE    = path.join(DATA_DIR, 'portfolio_state.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 
 // ── Options ───────────────────────────────────────────────────────────────────
 
-function getOptions() {
+/** Read in-app settings (written by /api/settings UI). Returns {} if not found. */
+function readAppSettings() {
   try {
-    const raw = JSON.parse(fs.readFileSync('/data/options.json', 'utf8'));
+    return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Convert options.json push_positions bool + in-app settings to a normalised string[].
+ * Empty array = push nothing. ['*'] = push all. ['AAPL', ...] = push specific tickers.
+ */
+function normalisePushPositions(appVal, rawBool) {
+  if (appVal !== undefined && appVal !== null) {
+    if (appVal === false) return [];
+    if (Array.isArray(appVal)) return appVal;
+  }
+  return rawBool ? ['*'] : [];
+}
+
+function getOptions() {
+  // In-app settings take precedence over HA options.json for UI-manageable fields.
+  const app = readAppSettings();
+
+  try {
+    const raw      = JSON.parse(fs.readFileSync('/data/options.json', 'utf8'));
+    let watchlist = app.watchlist ?? [];
+    if (!Array.isArray(app.watchlist)) watchlist = Array.isArray(raw.watchlist) ? raw.watchlist : [];
     return {
       enableHaSensors:           Boolean(raw.enable_ha_sensors          ?? false),
-      pushInterval:              Number(raw.push_interval               ?? process.env.HA_PUSH_INTERVAL ?? 15),
+      pushInterval:              Number(app.pushInterval                ?? raw.push_interval ?? process.env.HA_PUSH_INTERVAL ?? 15),
       useMqttDiscovery:          Boolean(raw.use_mqtt_discovery          ?? false),
-      drawdownAlertPct:          Number(raw.drawdown_alert_pct           ?? 10),
-      targetValue:               Number(raw.target_value                 ?? 0),
-      pushPositions:             Boolean(raw.push_positions              ?? false),
-      intradayDuringMarketHours: Boolean(raw.intraday_during_market_hours ?? false),
-      baseCurrency:              String(raw.base_currency                ?? process.env.BASE_CURRENCY ?? 'EUR').toUpperCase(),
-      watchlist:                 Array.isArray(raw.watchlist) ? raw.watchlist : [],
+      drawdownAlertPct:          Number(app.drawdownAlertPct            ?? raw.drawdown_alert_pct  ?? 10),
+      targetValue:               Number(app.targetValue                 ?? raw.target_value        ?? 0),
+      pushPositions:             normalisePushPositions(app.pushPositions, raw.push_positions),
+      intradayDuringMarketHours: app.intradayDuringMarketHours ?? Boolean(raw.intraday_during_market_hours ?? false),
+      baseCurrency:              String(app.baseCurrency ?? raw.base_currency ?? process.env.BASE_CURRENCY ?? 'EUR').toUpperCase(),
+      watchlist,
       mqttBroker:                raw.mqtt_broker   ?? null,
       mqttPort:                  raw.mqtt_port     ?? 1883,
       mqttUsername:              raw.mqtt_username ?? null,
@@ -32,14 +59,14 @@ function getOptions() {
   } catch {
     return {
       enableHaSensors:           false,
-      pushInterval:              Number(process.env.HA_PUSH_INTERVAL ?? 15),
+      pushInterval:              Number(app.pushInterval ?? process.env.HA_PUSH_INTERVAL ?? 15),
       useMqttDiscovery:          false,
-      drawdownAlertPct:          10,
-      targetValue:               0,
-      pushPositions:             false,
-      intradayDuringMarketHours: false,
-      baseCurrency:              String(process.env.BASE_CURRENCY ?? 'EUR').toUpperCase(),
-      watchlist:                 [],
+      drawdownAlertPct:          Number(app.drawdownAlertPct ?? 10),
+      targetValue:               Number(app.targetValue ?? 0),
+      pushPositions:             normalisePushPositions(app.pushPositions, false),
+      intradayDuringMarketHours: app.intradayDuringMarketHours ?? false,
+      baseCurrency:              String(app.baseCurrency ?? process.env.BASE_CURRENCY ?? 'EUR').toUpperCase(),
+      watchlist:                 Array.isArray(app.watchlist) ? app.watchlist : [],
       mqttBroker:                null,
       mqttPort:                  1883,
       mqttUsername:              null,
@@ -346,7 +373,16 @@ async function pushAll(token, snapshot, options) {
 
   await pushCoreSensors(token, m);
   await pushBinarySensors(token, m, options);
-  if (options.pushPositions) await pushPositionSensors(token, snapshot.positions);
+
+  const pp = options.pushPositions; // string[] — empty = none, ['*'] = all, else specific tickers
+  let pushedPositions = [];
+  if (pp.length > 0) {
+    pushedPositions = pp.includes('*')
+      ? snapshot.positions
+      : snapshot.positions.filter(p => pp.includes(p.ticker));
+    await pushPositionSensors(token, pushedPositions);
+  }
+
   if (snapshot.watchlistData?.length) await pushWatchlistSensors(token, snapshot.watchlistData);
 
   const baseCount = 15
@@ -357,7 +393,7 @@ async function pushAll(token, snapshot, options) {
     + (m.worstTicker ? 1 : 0);
   return baseCount
     + (options.targetValue > 0 ? 1 : 0)
-    + (options.pushPositions ? snapshot.positions.length : 0)
+    + pushedPositions.length
     + (snapshot.watchlistData?.length || 0);
 }
 

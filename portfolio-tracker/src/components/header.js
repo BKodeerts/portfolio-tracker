@@ -9,6 +9,7 @@ export function renderAppHeader() {
       <button class="nav-btn ${tab === 'analyse'       ? 'active' : ''}" onclick="globalThis._setTab('analyse')">Analyse</button>
       <button class="nav-btn ${tab === 'transacties'   ? 'active' : ''}" onclick="globalThis._setTab('transacties')">Transacties</button>
       <button class="nav-btn ${tab === 'import'        ? 'active' : ''}" onclick="globalThis._setTab('import')">Import</button>
+      <button class="nav-btn ${tab === 'instellingen'  ? 'active' : ''}" onclick="globalThis._setTab('instellingen')">Instellingen</button>
     </nav>
   </header>`;
   return '';

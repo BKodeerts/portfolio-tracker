@@ -44,6 +44,6 @@ export const state = {
   lastLatest: {},
 
   privacyMode: localStorage.getItem('privacy') === '1',
-  currentTheme: localStorage.getItem('theme') || 'default',
+  currentTheme: (() => { const t = localStorage.getItem('theme'); return (t === 'dark' || t === 'system') ? t : 'light'; })(),
   breakdownTab: 'allocatie',
 };

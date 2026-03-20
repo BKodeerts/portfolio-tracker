@@ -88,12 +88,17 @@ export function getMarketStatus() {
   const exchanges = new Map(); // label → open (bool)
   const coveredSfx = new Set();
 
+  const portfolioYahooSyms = new Set(
+    (state.CURRENT_TICKERS || []).map(t => state.TICKER_META?.[t]?.yahoo).filter(Boolean),
+  );
+
   if (state.intradayData) {
     for (const [sym, data] of Object.entries(state.intradayData)) {
       if (sym.endsWith('=X') || !data) continue;
+      // Only portfolio symbols determine market badges — not watchlist
+      if (!portfolioYahooSyms.has(sym)) continue;
       const sfx = yahooSuffix(sym);
       const def = EXCHANGE_DEFS[sfx];
-      // Only show badges for exchanges actually in the portfolio
       if (!def || !seen.has(sfx)) continue;
       // For US stocks use the actual exchange code (NASDAQ/NYSE), fall back to 'US'
       const label = !sfx ? (US_EXCHANGE_LABELS[data.exchange] ?? def.label) : def.label;
@@ -306,6 +311,7 @@ export function renderIntradaySection() {
   const watchlist = state.watchlistData || [];
   if (watchlist.length) {
     const divider = document.createElement('div');
+    divider.className = 'watchlist-section-start';
     divider.style.cssText = 'grid-column:1/-1;font-size:10px;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase;padding-top:4px';
     divider.textContent = 'Watchlist';
     gridEl.appendChild(divider);
