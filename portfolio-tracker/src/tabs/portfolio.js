@@ -36,18 +36,31 @@ function buildIntradayChartData(visibleTickers) {
       fxPtMap[p.ts] = p.close;
     });
 
-  // Collect today-only timestamps from equity tickers + FX (FX covers overnight)
+  // Collect today-only timestamps from equity tickers + FX
   const todayLocal = new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD local
   const isToday = (p) =>
     new Date(p.ts * 1000).toLocaleDateString("sv-SE") === todayLocal;
-  const tsSet = new Set();
+  const equityTsSet = new Set();
   visibleTickers.forEach((ticker) => {
     const data = state.intradayData[state.TICKER_META[ticker]?.yahoo];
     if (data?.points)
-      data.points.filter(isToday).forEach((p) => tsSet.add(p.ts));
+      data.points.filter(isToday).forEach((p) => equityTsSet.add(p.ts));
   });
-  if (fxData?.points)
-    fxData.points.filter(isToday).forEach((p) => tsSet.add(p.ts));
+  const tsSet = new Set(equityTsSet);
+  // Add FX timestamps only within ±1h of equity activity to avoid wasting chart space
+  // on pure currency movement before/after markets open
+  if (fxData?.points) {
+    if (equityTsSet.size > 0) {
+      const minEq = Math.min(...equityTsSet);
+      const maxEq = Math.max(...equityTsSet);
+      const BUFFER = 3600;
+      fxData.points
+        .filter((p) => isToday(p) && p.ts >= minEq - BUFFER && p.ts <= maxEq + BUFFER)
+        .forEach((p) => tsSet.add(p.ts));
+    } else {
+      fxData.points.filter(isToday).forEach((p) => tsSet.add(p.ts));
+    }
+  }
 
   const timestamps = [...tsSet].sort((a, b) => a - b);
   if (timestamps.length === 0) return null;
@@ -442,10 +455,6 @@ export function renderPortfolioChart(visibleTickers) {
         )
       : {};
 
-  const xDayStart = new Date();
-  xDayStart.setHours(0, 0, 0, 0);
-  const xDayEnd = new Date();
-  xDayEnd.setHours(23, 59, 59, 999);
 
   const hasEU = visibleTickers.some((t) =>
     EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ""),
@@ -498,6 +507,19 @@ export function renderPortfolioChart(visibleTickers) {
         ]
       : []),
   ];
+
+  // x-axis bounds: clip to data start, extend to last market close + 1h so the
+  // remaining session time is always visible even before markets close.
+  const xAxisBounds = (() => {
+    if (!useIntraday || !intra?.timestamps?.length) return {};
+    const closeTimes = sessionLines.filter((l) => l.label.includes("sluit")).map((l) => l.date.getTime());
+    const lastClose = closeTimes.length ? Math.max(...closeTimes) : 0;
+    const dataEnd = intra.timestamps.at(-1) * 1000;
+    return {
+      min: new Date(intra.timestamps[0] * 1000 - 10 * 60 * 1000),
+      max: new Date(Math.max(dataEnd, lastClose) + 60 * 60 * 1000),
+    };
+  })();
 
   const marketCloseLines = useIntraday
     ? {
@@ -644,7 +666,7 @@ export function renderPortfolioChart(visibleTickers) {
             unit: useIntraday ? "hour" : "month",
             tooltipFormat: useIntraday ? "HH:mm" : "dd MMM yyyy",
           },
-          ...(useIntraday ? { min: xDayStart, max: xDayEnd } : {}),
+          ...xAxisBounds,
           grid: { color: chartTheme().gridColor },
           ticks: { color: chartTheme().tickColor, font: { size: 10 } },
         },
