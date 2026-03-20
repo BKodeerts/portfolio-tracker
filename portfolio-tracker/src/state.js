@@ -14,12 +14,16 @@ export const state = {
   rollingReturns:      null,
   realizedPl:          0,
   realizedPlPerTicker: {},
+  totalDividends:      0,
+  dividendsPerTicker:  {},
+  annualPl:            [],
   usdExposurePct:      0,
   currencyExposure:    {},
   baseCurrency:        'EUR',
   bonusItems:          [],
   twrPct:              null,
   irrPct:              null,
+  watchlistData:       [],
 
   // Ticker metadata (sector, geo, manual price) — loaded from /api/ticker-meta
   tickerMeta: {},

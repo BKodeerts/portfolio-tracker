@@ -7,6 +7,7 @@ const fs   = require('node:fs');
 const path = require('node:path');
 const { fetchDailyQuote, fetchCandles, fetchIntraday, fetchQuoteSummary, sleep, FETCH_DELAY } = require('./yahoo.js');
 const { readCache, writeCache, QUOTES_CACHE_TTL, CACHE_TTL, INTRADAY_CACHE_TTL } = require('./cache.js');
+const { getOptions } = require('./ha-helper.js');
 
 const DATA_DIR          = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const TRANSACTIONS_FILE = path.join(DATA_DIR, 'transactions.json');
@@ -18,6 +19,7 @@ const FX_FALLBACK      = 1.09;        // backward compat
 const BENCHMARK_SYM    = 'VWCE.DE';
 const SP500_SYM        = '^GSPC';
 const SPLIT_CANDIDATES = [2, 3, 4, 5, 8, 10, 20, 25, 50, 100];
+const RISK_FREE_RATE   = Number(process.env.RISK_FREE_RATE ?? 0.03);
 
 // FX definitions: stock currency → { Yahoo FX symbol (EUR-base), fallback rate, optional /scale }
 const FX_DEFS = {
@@ -266,7 +268,7 @@ function computeNetShares(meta, transactions, adjSharesFn) {
   const netShares = {}, buyInvested = {};
   for (const ticker of Object.keys(meta)) {
     let net = 0, invested = 0;
-    for (const tx of transactions.filter(t => t.ticker === ticker)) {
+    for (const tx of transactions.filter(t => t.ticker === ticker && !isDividend(t))) {
       net += adjSharesFn(tx, ticker);
       if (tx.shares > 0) invested += tx.costEur;
     }
@@ -276,6 +278,27 @@ function computeNetShares(meta, transactions, adjSharesFn) {
   return { netShares, buyInvested };
 }
 
+// ── Dividend helpers ──────────────────────────────────────────────────────────
+
+/** True when a transaction represents a dividend (cash income, no shares). */
+function isDividend(tx) {
+  return tx.type === 'dividend';
+}
+
+/**
+ * Compute dividend income per ticker and total.
+ */
+function computeDividends(txsByTicker) {
+  const perTicker = {};
+  let total = 0;
+  for (const [ticker, txs] of Object.entries(txsByTicker)) {
+    const sum = txs.filter(isDividend).reduce((s, tx) => s + tx.costEur, 0);
+    if (sum > 0) perTicker[ticker] = Math.round(sum * 100) / 100;
+    total += sum;
+  }
+  return { perTicker, total: Math.round(total * 100) / 100 };
+}
+
 // ── FIFO cost basis & realized P&L ───────────────────────────────────────────
 
 /**
@@ -283,7 +306,7 @@ function computeNetShares(meta, transactions, adjSharesFn) {
  */
 function fifoCostBasis(txs, ticker, upToDate, adjSharesFn) {
   const lots = [];
-  for (const tx of txs.filter(t => t.date <= upToDate).sort((a, b) => a.date.localeCompare(b.date))) {
+  for (const tx of txs.filter(t => t.date <= upToDate && !isDividend(t)).sort((a, b) => a.date.localeCompare(b.date))) {
     const sh = adjSharesFn(tx, ticker);
     if (tx.shares > 0) {
       lots.push({ shares: sh, costPerShare: tx.costEur / sh });
@@ -308,7 +331,7 @@ function computeRealizedPl(txsByTicker, adjSharesFn) {
   const perTicker = {};
   let total = 0;
   for (const [ticker, txs] of Object.entries(txsByTicker)) {
-    const sorted = [...txs].sort((a, b) => a.date.localeCompare(b.date));
+    const sorted = [...txs].filter(tx => !isDividend(tx)).sort((a, b) => a.date.localeCompare(b.date));
     const lots = [];
     let realized = 0;
     for (const tx of sorted) {
@@ -352,7 +375,7 @@ function buildChartData(meta, transactions, priceMaps, fxMaps, sortedDates, adjS
       const m = meta[ticker];
       let sharesHeld = 0;
       for (const t of txs) {
-        if (t.date <= date) sharesHeld += adjSharesFn(t, ticker);
+        if (t.date <= date && !isDividend(t)) sharesHeld += adjSharesFn(t, ticker);
       }
       const price = priceMaps[m.yahoo]?.[date];
       if (sharesHeld > 0 && price != null) {
@@ -428,7 +451,7 @@ async function appendTodaySnapshot(chartData, meta, transactions, fxMaps, adjSha
     const m = meta[ticker];
     let sh = 0;
     for (const t of txs) {
-      if (t.date <= todayDate) sh += adjSharesFn(t, ticker);
+      if (t.date <= todayDate && !isDividend(t)) sh += adjSharesFn(t, ticker);
     }
     const price = prices[m.yahoo];
     if (sh > 0 && price) {
@@ -508,8 +531,8 @@ function computeRiskMetrics(chartData, benchmarkData) {
   const totalReturn  = chartData.at(-1).total / chartData[0].total;
   const annualReturn = Math.pow(totalReturn, 252 / n) - 1;
 
-  // Sharpe ratio (3% annual risk-free rate)
-  const sharpe = volatility > 0 ? (annualReturn - 0.03) / volatility : null;
+  // Sharpe ratio (configurable risk-free rate, default 3%)
+  const sharpe = volatility > 0 ? (annualReturn - RISK_FREE_RATE) / volatility : null;
 
   // Beta vs benchmark
   const aligned = portfolioReturns
@@ -524,16 +547,12 @@ function computeRiskMetrics(chartData, benchmarkData) {
     if (bVar > 0) beta = cov / bVar;
   }
 
-  // Max drawdown duration (consecutive days in drawdown)
-  let maxDDDays = 0, ddStart = null;
+  // Max drawdown: largest peak-to-trough % decline in portfolio value
+  let maxDDPct = 0, runningPeak = chartData[0].total;
   for (const row of chartData) {
-    if (row.profit < 0) {
-      if (ddStart === null) ddStart = row.date;
-      const days = Math.round((new Date(row.date) - new Date(ddStart)) / 86400000);
-      if (days > maxDDDays) maxDDDays = days;
-    } else {
-      ddStart = null;
-    }
+    if (row.total > runningPeak) runningPeak = row.total;
+    const dd = runningPeak > 0 ? (runningPeak - row.total) / runningPeak * 100 : 0;
+    if (dd > maxDDPct) maxDDPct = dd;
   }
 
   return {
@@ -541,7 +560,7 @@ function computeRiskMetrics(chartData, benchmarkData) {
     annualReturn:    Number.parseFloat((annualReturn * 100).toFixed(2)),
     sharpe:          sharpe != null ? Number.parseFloat(sharpe.toFixed(2)) : null,
     beta:            beta   != null ? Number.parseFloat(beta.toFixed(2))   : null,
-    maxDrawdownDays: maxDDDays,
+    maxDrawdownPct:  Number.parseFloat(maxDDPct.toFixed(2)),
   };
 }
 
@@ -599,12 +618,61 @@ function computeRollingReturns(chartData, benchmarkData, sp500Data, twrPct = nul
 }
 
 /**
+ * Realized P&L and dividend income grouped by calendar year.
+ * Returns array of { year, realizedPl, dividends, total } sorted newest first.
+ */
+function computeAnnualPl(txsByTicker, adjSharesFn) {
+  const realizedByYear = {};
+  const dividendsByYear = {};
+
+  for (const [ticker, txs] of Object.entries(txsByTicker)) {
+    // Dividends per year
+    for (const tx of txs) {
+      if (!isDividend(tx)) continue;
+      const y = tx.date.slice(0, 4);
+      dividendsByYear[y] = (dividendsByYear[y] || 0) + tx.costEur;
+    }
+    // Realized P&L per year via FIFO
+    const sorted = [...txs].filter(tx => !isDividend(tx)).sort((a, b) => a.date.localeCompare(b.date));
+    const lots = [];
+    for (const tx of sorted) {
+      const adjSh = adjSharesFn(tx, ticker);
+      if (tx.shares > 0) {
+        lots.push({ shares: adjSh, costPerShare: tx.costEur / adjSh });
+      } else {
+        const year = tx.date.slice(0, 4);
+        const salePPS = tx.costEur / Math.abs(adjSh);
+        let toSell = Math.abs(adjSh);
+        for (const lot of lots) {
+          const sold = Math.min(lot.shares, toSell);
+          realizedByYear[year] = (realizedByYear[year] || 0) + sold * (salePPS - lot.costPerShare);
+          lot.shares -= sold;
+          toSell -= sold;
+          if (toSell <= 0) break;
+        }
+      }
+    }
+  }
+
+  const allYears = new Set([...Object.keys(realizedByYear), ...Object.keys(dividendsByYear)]);
+  return [...allYears]
+    .sort((a, b) => b.localeCompare(a))
+    .map(year => ({
+      year,
+      realizedPl: Math.round((realizedByYear[year] || 0) * 100) / 100,
+      dividends:  Math.round((dividendsByYear[year] || 0) * 100) / 100,
+      total:      Math.round(((realizedByYear[year] || 0) + (dividendsByYear[year] || 0)) * 100) / 100,
+    }));
+}
+
+/**
  * XIRR (money-weighted return) using Newton-Raphson.
  * Cash flows: buys = -costEur, sells = +costEur, terminal = +currentValue at today.
  */
 function computeXIRR(transactions, currentValue) {
   const flows = transactions.map(tx => ({
-    amount: tx.shares > 0 ? -tx.costEur : tx.costEur,
+    // dividends are positive cash inflows; buys negative, sells positive
+    amount: isDividend(tx) ? tx.costEur : (tx.shares > 0 ? -tx.costEur : tx.costEur),
     t:      new Date(tx.date).getTime(),
   }));
   flows.push({ amount: currentValue, t: Date.now() });
@@ -756,6 +824,8 @@ async function computeFullPortfolio() {
     (txByTicker[tx.ticker] = txByTicker[tx.ticker] || []).push(tx);
   }
   const { perTicker: realizedPlPerTicker, total: realizedPl } = computeRealizedPl(txByTicker, adjSharesFn);
+  const { perTicker: dividendsPerTicker, total: totalDividends } = computeDividends(txByTicker);
+  const annualPl = computeAnnualPl(txByTicker, adjSharesFn);
 
   // Summary positions from the latest chartData row
   const latest = chartData.at(-1);
@@ -828,6 +898,10 @@ async function computeFullPortfolio() {
   // Backward compat
   const usdExposurePct = currencyExposure.USD ?? 0;
 
+  // Watchlist (symbols from HA options config)
+  const { watchlist: watchlistSymbols } = getOptions();
+  const watchlistData = watchlistSymbols?.length ? await fetchWatchlistPrices(watchlistSymbols) : [];
+
   // Analytics
   const riskMetrics    = computeRiskMetrics(chartData, benchmarkData);
   const twrPct         = computeServerTWR(chartData, transactions);
@@ -835,9 +909,10 @@ async function computeFullPortfolio() {
   const irrPct         = computeXIRR(transactions, totalValue);
 
   // Persist analytics + inception data for HA scheduler
+  // Net capital deployed = buys minus sale proceeds (excludes dividends)
   const totalInvested = transactions
-    .filter(tx => tx.shares > 0)
-    .reduce((s, tx) => s + tx.costEur, 0);
+    .filter(tx => tx.type !== 'dividend')
+    .reduce((s, tx) => s + (tx.shares > 0 ? tx.costEur : -tx.costEur), 0);
   writeAnalyticsState({
     twrPct, irrPct, riskMetrics,
     inceptionDate:  findEarliestDate(transactions),
@@ -847,6 +922,8 @@ async function computeFullPortfolio() {
   return {
     chartData, benchmarkData, sp500Data, meta, currentTickers, latestFxRate, positions,
     realizedPl, realizedPlPerTicker, usdExposurePct, currencyExposure,
+    totalDividends, dividendsPerTicker, annualPl,
+    watchlistData,
     riskMetrics, rollingReturns, twrPct, irrPct,
   };
 }

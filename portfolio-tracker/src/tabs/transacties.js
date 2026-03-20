@@ -12,13 +12,20 @@ function addTxForm() {
   return `
     <div id="addTxForm" class="tx-add-form" style="display:${addTxVisible ? 'block' : 'none'}">
       <div class="tx-add-form-fields">
+        <div class="tx-add-form-field"><label>Type *</label>
+          <select id="addType" style="width:100px" onchange="window._onAddTypeChange(this.value)">
+            <option value="buy">Koop</option>
+            <option value="sell">Verkoop</option>
+            <option value="dividend">Dividend</option>
+          </select>
+        </div>
         <div class="tx-add-form-field"><label>Datum *</label><input id="addDate" type="date" value="${today}" style="width:130px"></div>
         <div class="tx-add-form-field"><label>Ticker *</label><input id="addTicker" type="text" placeholder="GOOGL" style="width:72px;text-transform:uppercase"></div>
         <div class="tx-add-form-field"><label>Yahoo *</label><input id="addYahoo" type="text" placeholder="GOOGL" style="width:90px"></div>
         <div class="tx-add-form-field"><label>Naam</label><input id="addLabel" type="text" placeholder="Alphabet Inc." style="width:140px"></div>
         <div class="tx-add-form-field"><label>ISIN</label><input id="addIsin" type="text" placeholder="optioneel" style="width:110px"></div>
-        <div class="tx-add-form-field"><label>Aandelen *</label><input id="addShares" type="number" step="any" placeholder="10" style="width:80px"></div>
-        <div class="tx-add-form-field"><label>Kosten € *</label><input id="addCostEur" type="number" step="any" min="0" placeholder="1234.56" style="width:92px"></div>
+        <div class="tx-add-form-field" id="addSharesField"><label>Aandelen *</label><input id="addShares" type="number" step="any" placeholder="10" style="width:80px"></div>
+        <div class="tx-add-form-field"><label id="addCostLabel">Kosten € *</label><input id="addCostEur" type="number" step="any" min="0" placeholder="1234.56" style="width:92px"></div>
         <div class="tx-add-form-field"><label>Munt</label>
           <select id="addCurrency" style="width:64px">
             ${['EUR','USD','GBP','GBX','CLP','CHF','SEK','DKK','NOK','CAD','AUD','JPY','MXN','BRL'].map(c =>
@@ -34,6 +41,18 @@ function addTxForm() {
         </div>
       </div>
     </div>`;
+}
+
+export function onAddTypeChange(type) {
+  const sharesField = document.getElementById('addSharesField');
+  const costLabel   = document.getElementById('addCostLabel');
+  if (type === 'dividend') {
+    if (sharesField) sharesField.style.display = 'none';
+    if (costLabel) costLabel.textContent = 'Bedrag € *';
+  } else {
+    if (sharesField) sharesField.style.display = '';
+    if (costLabel) costLabel.textContent = 'Kosten € *';
+  }
 }
 
 export function renderTransacties() {
@@ -66,15 +85,22 @@ function buildTxTable() {
     .sort((a, b) => b.date.localeCompare(a.date))
     .map(t => {
       const match = !q || t.ticker.toLowerCase().includes(q) || t.date.includes(q) || (t.label || '').toLowerCase().includes(q);
-      const isSale = t.shares < 0;
+      const isDividendTx = t.type === 'dividend';
+      const isSale = !isDividendTx && t.shares < 0;
+      let sharesColor = '#16a34a';
+      if (isDividendTx) sharesColor = '#f59e0b';
+      else if (isSale)  sharesColor = '#ef4444';
+      const sharesDisplay = isDividendTx
+        ? '<span style="font-size:10px;background:#f59e0b22;color:#f59e0b;padding:1px 5px;border-radius:3px;font-weight:600">DIV</span>'
+        : `<span class="tx-cell" contenteditable="true" data-field="shares" inputmode="decimal">${t.shares}</span>`;
       return `<tr data-idx="${t._origIdx}"${match ? '' : ' style="display:none"'}>
         <td class="tx-col-date"><span class="tx-cell" contenteditable="true" data-field="date" inputmode="text">${t.date}</span></td>
         <td class="tx-col-name-group">
           <div class="tx-name-top"><span class="tx-dot" style="background:${getColor(t.ticker)}"></span><span class="tx-name-ticker">${t.ticker}</span></div>
           <div class="tx-name-sub">${t.label || ''}</div>
         </td>
-        <td class="tx-col-shares" style="color:${isSale ? '#ef4444' : '#16a34a'}">
-          <span class="tx-cell" contenteditable="true" data-field="shares" inputmode="decimal">${t.shares}</span>
+        <td class="tx-col-shares" style="color:${sharesColor}">
+          ${sharesDisplay}
         </td>
         <td class="tx-col-cost"><span class="tx-cell" contenteditable="true" data-field="costEur" inputmode="decimal">${Number.parseFloat(t.costEur).toFixed(2)}</span></td>
         <td class="tx-col-ccy">
@@ -123,21 +149,30 @@ export function toggleAddTx() {
 }
 
 export async function addManualTx() {
+  const type     = document.getElementById('addType')?.value || 'buy';
   const date     = (document.getElementById('addDate')?.value    || '').trim();
   const ticker   = (document.getElementById('addTicker')?.value  || '').trim().toUpperCase();
   const yahoo    = (document.getElementById('addYahoo')?.value   || '').trim();
   const label    = (document.getElementById('addLabel')?.value   || '').trim();
   const isin     = (document.getElementById('addIsin')?.value    || '').trim() || undefined;
-  const shares   = Number.parseFloat(document.getElementById('addShares')?.value);
   const costEur  = Number.parseFloat(document.getElementById('addCostEur')?.value);
   const currency = document.getElementById('addCurrency')?.value || 'EUR';
 
-  if (!date || !ticker || !yahoo || Number.isNaN(shares) || Number.isNaN(costEur) || costEur < 0) {
+  const isDividendTx = type === 'dividend';
+  const sharesRaw = isDividendTx ? 0 : Number.parseFloat(document.getElementById('addShares')?.value);
+  const shares    = type === 'sell' ? -Math.abs(sharesRaw) : sharesRaw;
+
+  if (!date || !ticker || !yahoo || (!isDividendTx && Number.isNaN(shares)) || Number.isNaN(costEur) || costEur < 0) {
     alert('Vul alle verplichte velden in (datum, ticker, yahoo, aandelen, kosten).');
     return;
   }
 
-  const tx = { date, ticker, yahoo, shares, costEur, currency, ...(label && { label }), ...(isin && { isin }) };
+  const tx = {
+    date, ticker, yahoo, shares, costEur, currency,
+    ...(isDividendTx && { type: 'dividend' }),
+    ...(label && { label }),
+    ...(isin  && { isin }),
+  };
   try {
     const json = await saveTransactions('replace', [...state.RAW_TRANSACTIONS, tx]);
     if (json.status !== 'ok') throw new Error(json.message);

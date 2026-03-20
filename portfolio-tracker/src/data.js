@@ -8,14 +8,26 @@ export async function loadData(onSuccess) {
     ${renderAppHeader()}
     <div class="loading">
       <div style="color:#94a3b8;font-size:13px;margin-bottom:12px">Portefeuille berekenen…</div>
-      <div class="progress-bar"><div class="progress-fill" style="width:15%"></div></div>
+      <div class="progress-bar"><div class="progress-fill" id="loadProgressFill" style="width:5%"></div></div>
     </div>`;
+
+  // Animate progress bar while waiting (5% → 85% over ~25s, then held)
+  let pct = 5;
+  const progressTimer = setInterval(() => {
+    pct = Math.min(85, pct + (85 - pct) * 0.07);
+    const el = document.getElementById('loadProgressFill');
+    if (el) el.style.width = `${pct.toFixed(1)}%`;
+  }, 600);
 
   try {
     const [portfolioRes, metaRes] = await Promise.all([
       fetch(`${SERVER_BASE}/api/portfolio`),
       fetch(`${SERVER_BASE}/api/ticker-meta`),
     ]);
+    clearInterval(progressTimer);
+    const fillEl = document.getElementById('loadProgressFill');
+    if (fillEl) fillEl.style.width = '100%';
+
     const json     = await portfolioRes.json();
     const metaJson = await metaRes.json();
 
@@ -33,6 +45,10 @@ export async function loadData(onSuccess) {
     state.rollingReturns      = d.rollingReturns      ?? null;
     state.realizedPl          = d.realizedPl          ?? 0;
     state.realizedPlPerTicker = d.realizedPlPerTicker ?? {};
+    state.totalDividends      = d.totalDividends      ?? 0;
+    state.dividendsPerTicker  = d.dividendsPerTicker  ?? {};
+    state.annualPl            = d.annualPl            ?? [];
+    state.watchlistData       = d.watchlistData       ?? [];
     state.usdExposurePct      = d.usdExposurePct      ?? 0;
     state.currencyExposure    = d.currencyExposure    ?? {};
     state.baseCurrency        = d.baseCurrency        ?? 'EUR';
@@ -55,6 +71,7 @@ export async function loadData(onSuccess) {
     Object.keys(state.TICKER_META).forEach(t => getColor(t));
     onSuccess();
   } catch (e) {
+    clearInterval(progressTimer);
     document.getElementById('root').innerHTML = `
       ${renderAppHeader()}
       <div class="error-box">

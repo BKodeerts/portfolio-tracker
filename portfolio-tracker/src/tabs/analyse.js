@@ -44,27 +44,37 @@ export function showPosModal(ticker) {
   const sign      = pl >= 0 ? '+' : '';
   const realSign  = realPl >= 0 ? '+' : '';
 
-  const high52 = meta.high52;
-  const low52  = meta.low52;
+  const high52  = meta.high52;
+  const low52   = meta.low52;
   const peRatio = meta.pe;
+  // 52W values come from Yahoo in native currency, not EUR
+  const nativeCcy  = meta.currency || 'EUR';
+  const ccySymbol  = nativeCcy === 'EUR' ? '€' : nativeCcy === 'USD' ? '$' : nativeCcy === 'GBP' ? '£' : nativeCcy;
 
   const txRows = txs.map(t => {
-    const isSale = t.shares < 0;
-    const price  = Math.abs(t.costEur / t.shares);
+    const isDividendTx = t.type === 'dividend';
+    const isSale = !isDividendTx && t.shares < 0;
+    const price  = isDividendTx ? null : Math.abs(t.costEur / t.shares);
     const note   = t.note ? `<div class="c-neutral" style="font-size:10px;margin-top:2px">${t.note}</div>` : '';
+    let typeLabel, typeColor;
+    if (isDividendTx)    { typeLabel = 'Dividend'; typeColor = '#f59e0b'; }
+    else if (isSale)     { typeLabel = 'Verkoop';  typeColor = '#ef4444'; }
+    else                 { typeLabel = 'Koop';     typeColor = '#16a34a'; }
     return `<tr>
       <td>${t.date}</td>
-      <td style="color:${isSale ? '#ef4444' : '#16a34a'}">${isSale ? 'Verkoop' : 'Koop'}</td>
-      <td>${Math.abs(t.shares).toLocaleString('nl-BE', { maximumFractionDigits: 4 })}</td>
+      <td style="color:${typeColor}">${typeLabel}</td>
+      <td>${isDividendTx ? '—' : Math.abs(t.shares).toLocaleString('nl-BE', { maximumFractionDigits: 4 })}</td>
       <td>${fmt(Math.abs(t.costEur))}</td>
-      <td>€${price.toFixed(2)}${note}</td>
+      <td>${price != null ? `€${price.toFixed(2)}` : '—'}${note}</td>
     </tr>`;
   }).join('');
 
+  const divIncome = state.dividendsPerTicker?.[ticker] || 0;
   const extraAttrs = [
-    high52  ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">52W Hoog</div><div class="pos-modal-stat-val">€${high52.toFixed(2)}</div></div>` : '',
-    low52   ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">52W Laag</div><div class="pos-modal-stat-val">€${low52.toFixed(2)}</div></div>` : '',
-    peRatio ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">P/E</div><div class="pos-modal-stat-val">${peRatio.toFixed(1)}</div></div>` : '',
+    high52     ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">52W Hoog</div><div class="pos-modal-stat-val">${ccySymbol}${high52.toFixed(2)}</div></div>` : '',
+    low52      ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">52W Laag</div><div class="pos-modal-stat-val">${ccySymbol}${low52.toFixed(2)}</div></div>` : '',
+    peRatio    ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">P/E</div><div class="pos-modal-stat-val">${peRatio.toFixed(1)}</div></div>` : '',
+    divIncome  ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">Dividenden</div><div class="pos-modal-stat-val c-pos privacy-val">+${fmt(divIncome)}</div></div>` : '',
   ].join('');
 
   const modal = document.getElementById('posModal');
@@ -94,7 +104,13 @@ export function showPosModal(ticker) {
 
   if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
 
-  const points = state.chartData.filter(row => row[ticker] != null).map(row => ({ x: row.date, y: row[ticker] }));
+  // Chart shows % return vs FIFO cost basis
+  const points = state.chartData
+    .filter(row => row[ticker] != null && (row[`${ticker}_cost`] || 0) > 0)
+    .map(row => {
+      const pct = ((row[ticker] - row[`${ticker}_cost`]) / row[`${ticker}_cost`] * 100);
+      return { x: row.date, y: Number.parseFloat(pct.toFixed(2)) };
+    });
   const ct = chartTheme();
   state.chartInstances.__posModal = new Chart(document.getElementById('posModalChart').getContext('2d'), {
     type: 'line',
@@ -110,13 +126,13 @@ export function showPosModal(ticker) {
           padding: 10, cornerRadius: 8,
           callbacks: {
             title: items => new Date(items[0].parsed.x).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }),
-            label: item => ` ${fmt(item.raw.y)}`,
+            label: item => ` ${item.raw.y >= 0 ? '+' : ''}${item.raw.y.toFixed(1)}%`,
           },
         },
       },
       scales: {
         x: { type: 'time', time: { unit: 'month' }, grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 } } },
-        y: { grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 }, callback: v => '€' + Math.round(v).toLocaleString('nl-BE') } },
+        y: { grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 }, callback: v => `${v >= 0 ? '+' : ''}${v.toFixed(0)}%` } },
       },
     },
   });
@@ -501,19 +517,20 @@ function renderRiskMetricsCard() {
       <div class="risk-stat-val">${value}</div>
     </div>`;
 
-  const pct  = v => v != null ? `${v >= 0 ? '' : ''}${v.toFixed(1)}%` : '—';
+  const pct  = v => v != null ? `${v.toFixed(1)}%` : '—';
   const num  = v => v != null ? v.toFixed(2) : '—';
-  const days = v => v != null ? `${v}d` : '—';
   const ret  = v => v != null ? `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : '—';
+  const dd   = v => v != null ? `-${v.toFixed(1)}%` : '—';
 
   el.innerHTML = [
     stat('Volatiliteit', state.privacyMode ? '●●' : pct(rm?.volatility), 'Geannualiseerde standaarddeviatie van dagrendement'),
-    stat('Sharpe Ratio', num(rm?.sharpe), 'Risicogecorrigeerd rendement (3% risicovrije rente)'),
+    stat('Sharpe Ratio', num(rm?.sharpe), 'Risicogecorrigeerd rendement (risicovrije rente via RISK_FREE_RATE, standaard 3%)'),
     stat('Beta', num(rm?.beta), 'Koersgevoeligheid t.o.v. VWCE'),
-    stat('Max DD Duur', days(rm?.maxDrawdownDays), 'Langste aaneengesloten periode met verlies'),
+    stat('Max Drawdown', dd(rm?.maxDrawdownPct), 'Grootste daling van piek tot dal'),
     stat('Jaarrendement', state.privacyMode ? '●●' : ret(rm?.annualReturn), 'Samengesteld jaarlijks rendement (CAGR)'),
     twr != null ? stat('TWR', state.privacyMode ? '●●' : ret(twr), 'Tijdgewogen rendement — effect van cashflows geëlimineerd') : '',
     irr != null ? stat('IRR', state.privacyMode ? '●●' : ret(irr), 'Geldgewogen rendement — interne rentevoet') : '',
+    state.totalDividends > 0 ? stat('Dividenden', state.privacyMode ? '●●' : `+${fmt(state.totalDividends)}`, 'Totaal ontvangen dividenden') : '',
   ].join('');
 }
 
@@ -737,6 +754,76 @@ export function setBreakdownTab(tab) {
   renderBreakdownContent(state.lastLatest);
 }
 
+// ── Annual P&L table ──────────────────────────────────────────────────────────
+
+function renderAnnualPlTable() {
+  const el = document.getElementById('annualPlTable');
+  if (!el) return;
+  const rows = state.annualPl;
+  if (!rows?.length) { el.style.display = 'none'; return; }
+
+  const fmtPl = v => {
+    if (v == null || v === 0) return '<span class="c-neutral">—</span>';
+    const cls = v >= 0 ? 'c-pos' : 'c-neg';
+    return `<span class="${cls}">${v >= 0 ? '+' : ''}${fmt(v)}</span>`;
+  };
+
+  el.innerHTML = `<table class="perf-table" style="width:auto;min-width:340px">
+    <thead><tr><th>Jaar</th><th>Gerealiseerd</th><th>Dividenden</th><th>Totaal</th></tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td style="font-weight:600">${r.year}</td>
+      <td>${state.privacyMode ? '●●' : fmtPl(r.realizedPl)}</td>
+      <td>${state.privacyMode ? '●●' : (r.dividends > 0 ? `<span class="c-pos">+${fmt(r.dividends)}</span>` : '<span class="c-neutral">—</span>')}</td>
+      <td>${state.privacyMode ? '●●' : fmtPl(r.total)}</td>
+    </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
+
+export function exportPositionsCsv() {
+  const latest = state.chartData.at(-1);
+  if (!latest) return;
+  const rows = [['Ticker', 'Naam', 'Aandelen', 'Gem. Kostprijs €', 'Geïnvesteerd €', 'Huidig €', 'P&L €', 'P&L %', 'Gerealiseerd €', 'Dividenden €']];
+  for (const ticker of state.CURRENT_TICKERS) {
+    const val   = latest[ticker] || 0;
+    const cost  = latest[`${ticker}_cost`] || 0;
+    const sh    = latest[`${ticker}_shares`] || 0;
+    const avg   = sh > 0 && cost > 0 ? (cost / sh).toFixed(2) : '';
+    const pl    = val - cost;
+    const plPct = cost > 0 ? (pl / cost * 100).toFixed(2) : '';
+    rows.push([
+      ticker, state.TICKER_META[ticker]?.label || '',
+      sh, avg, cost.toFixed(2), val.toFixed(2),
+      pl.toFixed(2), plPct,
+      (state.realizedPlPerTicker?.[ticker] || 0).toFixed(2),
+      (state.dividendsPerTicker?.[ticker] || 0).toFixed(2),
+    ]);
+  }
+  downloadCsv('posities.csv', rows);
+}
+
+export function exportTransactionsCsv() {
+  const rows = [['Datum', 'Ticker', 'Yahoo', 'Type', 'Aandelen', 'Kosten €', 'Munt', 'Notitie']];
+  for (const t of state.RAW_TRANSACTIONS) {
+    const type = t.type === 'dividend' ? 'Dividend' : (t.shares < 0 ? 'Verkoop' : 'Koop');
+    rows.push([t.date, t.ticker, t.yahoo || '', type, t.shares, t.costEur, t.currency || 'EUR', t.note || '']);
+  }
+  downloadCsv('transacties.csv', rows);
+}
+
+function downloadCsv(filename, rows) {
+  const csv  = rows.map(r => r.map(v => `"${String(v).replaceAll('"', '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM for Excel
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ── Orchestration ─────────────────────────────────────────────────────────────
 
 export function renderAnalyseCharts() {
@@ -751,6 +838,7 @@ export function renderAnalyseCharts() {
   renderBenchmarkChart();
   renderRollingReturnsTable();
   renderRiskMetricsCard();
+  renderAnnualPlTable();
   renderPositionsTable(latest);
   renderTickerMetaEditor();
 }
@@ -822,7 +910,19 @@ export function renderAnalyse() {
         <div id="riskMetricsGrid" class="risk-metrics-grid"></div>
       </div>
       <div class="chart-card analyse-full">
-        <div class="card-title">Posities detail</div>
+        <div class="chart-header" style="margin-bottom:12px">
+          <div class="card-title" style="margin-bottom:0">Jaarlijks resultaat</div>
+        </div>
+        <div id="annualPlTable"></div>
+      </div>
+      <div class="chart-card analyse-full">
+        <div class="chart-header" style="margin-bottom:12px">
+          <div class="card-title" style="margin-bottom:0">Posities detail</div>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn" onclick="window._exportPositionsCsv()" title="Exporteer posities als CSV">↓ Posities CSV</button>
+            <button class="btn" onclick="window._exportTransactionsCsv()" title="Exporteer transacties als CSV">↓ Transacties CSV</button>
+          </div>
+        </div>
         <div id="positionsTableWrap"></div>
       </div>
       <div class="chart-card analyse-full" id="tickerMetaEditor"></div>

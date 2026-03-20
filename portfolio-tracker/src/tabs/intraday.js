@@ -302,6 +302,30 @@ export function renderIntradaySection() {
 
   bonusCards.forEach(c => gridEl.appendChild(c));
 
+  // Watchlist cards (from HA config watchlist option)
+  const watchlist = state.watchlistData || [];
+  if (watchlist.length) {
+    const divider = document.createElement('div');
+    divider.style.cssText = 'grid-column:1/-1;font-size:10px;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase;padding-top:4px';
+    divider.textContent = 'Watchlist';
+    gridEl.appendChild(divider);
+
+    for (const item of watchlist) {
+      const pct = item.change1dPct ?? null;
+      const cls = pct == null ? 'c-neutral' : (pct >= 0 ? 'c-pos' : 'c-neg');
+      const card = document.createElement('div');
+      card.className = 'intraday-card';
+      card.style.opacity = '0.85';
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
+          <span class="pos-dot" style="background:#64748b"></span>${item.symbol}
+        </div>
+        <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct != null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%` : '—'}</div>
+        <div class="metric-sub">${item.price != null ? item.price.toFixed(2) : '—'}</div>`;
+      gridEl.appendChild(card);
+    }
+  }
+
   renderMarketStatus();
   renderTodayMetric();
 }

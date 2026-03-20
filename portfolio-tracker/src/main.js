@@ -10,9 +10,9 @@ import { getColor, destroyAllCharts } from './utils.js';
 import { fetchTransactions, clearCacheApi } from './api.js';
 import { loadData } from './data.js';
 import { renderApp, renderPortfolioChart } from './tabs/portfolio.js';
-import { renderAnalyse, renderAnalyseCharts, sortPos, showPosModal, closePosModal, saveTickerMetaUI, resetSectorsUI, setBreakdownTab, setBenchmark } from './tabs/analyse.js';
+import { renderAnalyse, renderAnalyseCharts, sortPos, showPosModal, closePosModal, saveTickerMetaUI, resetSectorsUI, setBreakdownTab, setBenchmark, exportPositionsCsv, exportTransactionsCsv } from './tabs/analyse.js';
 import { renderImport, handleCSVFile, updateYahooGuess, saveImport, saveTickerRenames } from './tabs/import.js';
-import { renderTransacties, filterTx, deleteTx, saveTxAll, toggleAddTx, addManualTx } from './tabs/transacties.js';
+import { renderTransacties, filterTx, deleteTx, saveTxAll, toggleAddTx, addManualTx, onAddTypeChange } from './tabs/transacties.js';
 import { loadIntradayData } from './tabs/intraday.js';
 import { renderAppHeader } from './components/header.js';
 
@@ -132,10 +132,13 @@ globalThis._saveTxAll           = saveTxAll;
 globalThis._toggleAddTx         = toggleAddTx;
 globalThis._addManualTx         = addManualTx;
 globalThis._saveTickerRenames   = saveTickerRenames;
+globalThis._onAddTypeChange     = onAddTypeChange;
 globalThis._saveTickerMetaUI    = saveTickerMetaUI;
 globalThis._resetSectorsUI      = resetSectorsUI;
 globalThis._setBreakdownTab     = setBreakdownTab;
-globalThis._setBenchmark        = setBenchmark;
+globalThis._setBenchmark            = setBenchmark;
+globalThis._exportPositionsCsv      = exportPositionsCsv;
+globalThis._exportTransactionsCsv   = exportTransactionsCsv;
 
 // Dismiss chart tooltips on mobile when finger lifts (works for all canvases).
 // rAF defers until after Chart.js finishes its own touch handling.
