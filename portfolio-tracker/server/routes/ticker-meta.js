@@ -1,6 +1,7 @@
 const express  = require('express');
 const fs       = require('node:fs');
 const path     = require('node:path');
+const { invalidatePortfolioCache } = require('./portfolio.js');
 
 const router   = express.Router();
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', '..', 'data');
@@ -33,6 +34,7 @@ router.post('/', (req, res) => {
       if (!Object.keys(clean[ticker]).length) delete clean[ticker];
     }
     fs.writeFileSync(FILE, JSON.stringify(clean, null, 2));
+    invalidatePortfolioCache();
     res.json({ status: 'ok', count: Object.keys(clean).length });
   } catch (e) {
     res.status(500).json({ status: 'error', message: e.message });

@@ -1,10 +1,12 @@
 const express = require('express');
 const router  = express.Router();
 const { CACHE_TTL, clearAll, status } = require('../cache.js');
+const { invalidatePortfolioCache } = require('./portfolio.js');
 
 router.post('/cache/clear', (req, res) => {
   try {
     const count = clearAll();
+    invalidatePortfolioCache();
     console.log(`[CACHE] Cleared ${count} files`);
     res.json({ status: 'ok', cleared: count });
   } catch (e) {
