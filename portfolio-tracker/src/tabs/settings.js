@@ -11,8 +11,9 @@ let _intradayDuringMarketHours = false;
 let _drawdownAlertPct          = 10;
 let _targetValue               = 0;
 let _pushInterval              = 15;
-let _pushPositions             = [];   // [] = none, ['*'] = all, ['AAPL',...] = specific
-let _loading                   = false;
+let _ppMode          = 'none';  // 'none' | 'all' | 'select' — explicit, not inferred
+let _selectedTickers = [];      // tickers checked when _ppMode === 'select'
+let _loading         = false;
 
 // ── Watchlist helpers ──────────────────────────────────────────────────────────
 function renderWatchlistItems() {
@@ -45,24 +46,17 @@ function removeWatchlistItem(i) {
 }
 
 // ── Push-positions helpers ─────────────────────────────────────────────────────
-function ppMode() {
-  if (_pushPositions.length === 0)         return 'none';
-  if (_pushPositions.includes('*'))        return 'all';
-  return 'select';
-}
-
 function renderPushPositions() {
   const container = document.getElementById('pushPositionsSection');
   if (!container) return;
 
   const tickers = state.CURRENT_TICKERS ?? [];
-  const mode    = ppMode();
 
-  const tickerRows = tickers.length > 0 && mode === 'select'
+  const tickerRows = _ppMode === 'select' && tickers.length > 0
     ? `<div style="margin-top:10px;display:flex;flex-direction:column;gap:4px">
         ${tickers.map(t => {
-          const label = state.TICKER_META?.[t]?.label || t;
-          const checked = _pushPositions.includes(t) ? 'checked' : '';
+          const label   = state.TICKER_META?.[t]?.label || t;
+          const checked = _selectedTickers.includes(t) ? 'checked' : '';
           return `<label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
             <input type="checkbox" value="${t}" ${checked}
               onchange="globalThis._togglePushTicker('${t}', this.checked)">
@@ -73,34 +67,40 @@ function renderPushPositions() {
       </div>`
     : '';
 
+  const labels = { none: 'Geen positie sensors', all: 'Alle posities', select: 'Handmatig kiezen' };
   container.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:6px">
       ${['none','all','select'].map(m => `
         <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
-          <input type="radio" name="ppMode" value="${m}" ${mode === m ? 'checked' : ''}
+          <input type="radio" name="ppMode" value="${m}" ${_ppMode === m ? 'checked' : ''}
             onchange="globalThis._setPpMode('${m}')">
-          ${{ none: 'Geen positie sensors', all: 'Alle posities', select: 'Handmatig kiezen' }[m]}
+          ${labels[m]}
         </label>`).join('')}
     </div>
     ${tickerRows}
-    ${mode === 'select' && tickers.length === 0
+    ${_ppMode === 'select' && tickers.length === 0
       ? '<p class="c-neutral" style="font-size:12px;margin-top:8px">Geen open posities gevonden.</p>'
       : ''}`;
 }
 
 function setPpMode(m) {
-  if (m === 'none')   _pushPositions = [];
-  else if (m === 'all')    _pushPositions = ['*'];
-  else if (m === 'select') _pushPositions = [];   // start empty, user ticks boxes
+  _ppMode = m;
+  if (m !== 'select') _selectedTickers = [];
   renderPushPositions();
 }
 
 function togglePushTicker(ticker, checked) {
   if (checked) {
-    if (!_pushPositions.includes(ticker)) _pushPositions.push(ticker);
+    if (!_selectedTickers.includes(ticker)) _selectedTickers.push(ticker);
   } else {
-    _pushPositions = _pushPositions.filter(t => t !== ticker);
+    _selectedTickers = _selectedTickers.filter(t => t !== ticker);
   }
+}
+
+function buildPushPositions() {
+  if (_ppMode === 'all')    return ['*'];
+  if (_ppMode === 'select') return _selectedTickers;
+  return [];
 }
 
 // ── Save ───────────────────────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ async function doSaveSettings() {
       drawdownAlertPct:          _drawdownAlertPct,
       targetValue:               _targetValue,
       pushInterval:              _pushInterval,
-      pushPositions:             _pushPositions,
+      pushPositions:             buildPushPositions(),
     });
     if (result.status !== 'ok') throw new Error(result.message ?? 'Onbekende fout');
     state.baseCurrency = _baseCurrency;
@@ -150,7 +150,10 @@ export async function renderSettings() {
     _drawdownAlertPct          = d.drawdownAlertPct          ?? 10;
     _targetValue               = d.targetValue               ?? 0;
     _pushInterval              = d.pushInterval              ?? 15;
-    _pushPositions             = Array.isArray(d.pushPositions) ? [...d.pushPositions] : [];
+    const pp = Array.isArray(d.pushPositions) ? d.pushPositions : [];
+    if (pp.includes('*'))   { _ppMode = 'all';    _selectedTickers = []; }
+    else if (pp.length > 0) { _ppMode = 'select'; _selectedTickers = [...pp]; }
+    else                    { _ppMode = 'none';   _selectedTickers = []; }
   } catch {
     _baseCurrency  = state.baseCurrency ?? 'EUR';
     _watchlist     = [...(state.watchlistData?.map(d => d.symbol) ?? [])];

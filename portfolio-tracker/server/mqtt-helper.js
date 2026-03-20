@@ -466,7 +466,11 @@ async function publishState(mqttClient, snapshot, options) {
 
   await mqttClient.publishAsync(STATE_TOPIC, JSON.stringify(payload), { retain: true });
 
-  if (options.pushPositions) await publishPositionStates(mqttClient, positions);
+  const pp = options.pushPositions; // string[] — [] = none, ['*'] = all, else specific tickers
+  if (pp.length > 0) {
+    const toPublish = pp.includes('*') ? positions : positions.filter(p => pp.includes(p.ticker));
+    await publishPositionStates(mqttClient, toPublish);
+  }
   if (snapshot.watchlistData?.length) await publishWatchStates(mqttClient, snapshot.watchlistData);
 }
 
