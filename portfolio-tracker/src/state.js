@@ -14,6 +14,7 @@ export const state = {
   rollingReturns:      null,
   realizedPl:          0,
   realizedPlPerTicker: {},
+  totalInvested:       0,
   totalDividends:      0,
   dividendsPerTicker:  {},
   annualPl:            [],

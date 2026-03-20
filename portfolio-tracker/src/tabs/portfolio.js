@@ -652,8 +652,9 @@ export function renderSummaryBar() {
   const profitSign = latest.profit >= 0 ? "+" : "";
   el.innerHTML = `<div class="metrics-grid summary-bar-grid">
     <div class="metric-card">
-      <div class="metric-label">Geïnvesteerd</div>
+      <div class="metric-label">Kostprijs</div>
       <div class="metric-value c-neutral privacy-val">${fmt(latest.totalCost)}</div>
+      ${state.totalInvested > 0 ? `<div class="metric-sub c-neutral">netto ${fmt(state.totalInvested)} ingelegd</div>` : ''}
     </div>
     <div class="metric-card">
       <div class="metric-label">Portefeuille</div>

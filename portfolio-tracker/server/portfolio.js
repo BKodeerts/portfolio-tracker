@@ -923,6 +923,7 @@ async function computeFullPortfolio() {
     chartData, benchmarkData, sp500Data, meta, currentTickers, latestFxRate, positions,
     realizedPl, realizedPlPerTicker, usdExposurePct, currencyExposure,
     totalDividends, dividendsPerTicker, annualPl,
+    totalInvested: Math.round(totalInvested * 100) / 100,
     watchlistData,
     riskMetrics, rollingReturns, twrPct, irrPct,
   };

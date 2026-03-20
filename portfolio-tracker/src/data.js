@@ -45,6 +45,7 @@ export async function loadData(onSuccess) {
     state.rollingReturns      = d.rollingReturns      ?? null;
     state.realizedPl          = d.realizedPl          ?? 0;
     state.realizedPlPerTicker = d.realizedPlPerTicker ?? {};
+    state.totalInvested       = d.totalInvested       ?? 0;
     state.totalDividends      = d.totalDividends      ?? 0;
     state.dividendsPerTicker  = d.dividendsPerTicker  ?? {};
     state.annualPl            = d.annualPl            ?? [];
