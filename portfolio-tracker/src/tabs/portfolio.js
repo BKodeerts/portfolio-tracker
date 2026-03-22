@@ -36,10 +36,17 @@ function buildIntradayChartData(visibleTickers) {
       fxPtMap[p.ts] = p.close;
     });
 
-  // Collect today-only timestamps from equity tickers + FX
-  const todayLocal = new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD local
+  // Use the most recent trading date across all tickers — EU stocks will have today's date
+  // before US markets open, while US stocks still show Friday's date. Taking the max avoids
+  // treating today's EU data as stale.
+  let tradingDate = "2000-01-01";
+  for (const ticker of visibleTickers) {
+    const d = state.intradayData[state.TICKER_META[ticker]?.yahoo];
+    if (d?.date && d.date > tradingDate) tradingDate = d.date;
+  }
+  if (tradingDate === "2000-01-01") tradingDate = new Date().toLocaleDateString("sv-SE");
   const isToday = (p) =>
-    new Date(p.ts * 1000).toLocaleDateString("sv-SE") === todayLocal;
+    new Date(p.ts * 1000).toLocaleDateString("sv-SE") === tradingDate;
   const equityTsSet = new Set();
   visibleTickers.forEach((ticker) => {
     const data = state.intradayData[state.TICKER_META[ticker]?.yahoo];
@@ -134,7 +141,8 @@ function buildIntradayChartData(visibleTickers) {
     tickerVals[ticker] = { prevValueEur, values };
   });
 
-  return { labels, timestamps, tickerVals };
+  const isLive = tradingDate === new Date().toLocaleDateString("sv-SE");
+  return { labels, timestamps, tickerVals, tradingDate, isLive };
 }
 
 const seg = (v) => (state.currentView === v ? "on" : "");
@@ -462,12 +470,10 @@ export function renderPortfolioChart(visibleTickers) {
   const hasUS = visibleTickers.some(
     (t) => !EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ""),
   );
-  // Convert exchange-local time (hour, min in tz) to a JS Date for today.
+  // Convert exchange-local time (hour, min in tz) to a JS Date for the given reference date.
   // Using Intl, this correctly handles DST transitions between US and EU.
-  function exchangeTimeToLocal(tz, hour, min) {
-    const tzDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(
-      new Date(),
-    );
+  function exchangeTimeToLocal(tz, hour, min, ref = new Date()) {
+    const tzDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(ref);
     const [yr, mo, dy] = tzDateStr.split("-").map(Number);
     const naiveUtc = Date.UTC(yr, mo - 1, dy, hour, min, 0);
     const parts = new Intl.DateTimeFormat("en-US", {
@@ -481,15 +487,17 @@ export function renderPortfolioChart(visibleTickers) {
     return new Date(naiveUtc + (hour * 60 + min - (tzH * 60 + tzM)) * 60000);
   }
 
+  // When showing a past trading day (weekend/holiday), compute session times for that day
+  const sessionRef = intra?.tradingDate ? new Date(intra.tradingDate + "T12:00:00") : new Date();
   const sessionLines = [
     ...(hasEU
       ? [
           {
-            date: exchangeTimeToLocal("Europe/Amsterdam", 9, 0),
+            date: exchangeTimeToLocal("Europe/Amsterdam", 9, 0, sessionRef),
             label: "EU opent",
           },
           {
-            date: exchangeTimeToLocal("Europe/Amsterdam", 17, 30),
+            date: exchangeTimeToLocal("Europe/Amsterdam", 17, 30, sessionRef),
             label: "EU sluit",
           },
         ]
@@ -497,11 +505,11 @@ export function renderPortfolioChart(visibleTickers) {
     ...(hasUS
       ? [
           {
-            date: exchangeTimeToLocal("America/New_York", 9, 30),
+            date: exchangeTimeToLocal("America/New_York", 9, 30, sessionRef),
             label: "US opent",
           },
           {
-            date: exchangeTimeToLocal("America/New_York", 16, 0),
+            date: exchangeTimeToLocal("America/New_York", 16, 0, sessionRef),
             label: "US sluit",
           },
         ]
@@ -512,12 +520,25 @@ export function renderPortfolioChart(visibleTickers) {
   // remaining session time is always visible even before markets close.
   const xAxisBounds = (() => {
     if (!useIntraday || !intra?.timestamps?.length) return {};
-    const closeTimes = sessionLines.filter((l) => l.label.includes("sluit")).map((l) => l.date.getTime());
-    const lastClose = closeTimes.length ? Math.max(...closeTimes) : 0;
     const dataEnd = intra.timestamps.at(-1) * 1000;
+    let maxTime = dataEnd + 10 * 60 * 1000;
+    if (intra.isLive) {
+      // Extend to last market close + 1h so remaining session time is visible
+      const closeTimes = sessionLines.filter((l) => l.label.includes("sluit")).map((l) => l.date.getTime());
+      const lastClose = closeTimes.length ? Math.max(...closeTimes) : 0;
+      maxTime = Math.max(dataEnd, lastClose) + 60 * 60 * 1000;
+    }
+    const openTimes = sessionLines.filter((l) => l.label.includes("opent")).map((l) => l.date.getTime());
+    const firstOpen = openTimes.length ? Math.min(...openTimes) : Infinity;
+    const dataStart = intra.timestamps[0] * 1000;
+    // On live days, use earliest session open as lower bound so EU session is always visible
+    // even if EU stock data arrives late. On historical days, just clip to data.
+    const minTime = intra.isLive
+      ? Math.min(firstOpen, dataStart) - 15 * 60 * 1000
+      : dataStart - 10 * 60 * 1000;
     return {
-      min: new Date(intra.timestamps[0] * 1000 - 10 * 60 * 1000),
-      max: new Date(Math.max(dataEnd, lastClose) + 60 * 60 * 1000),
+      min: new Date(minTime),
+      max: new Date(maxTime),
     };
   })();
 

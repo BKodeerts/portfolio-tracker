@@ -158,6 +158,12 @@ export function sparklineSVG(points, prevClose, tradingMins) {
 
 export function computeTodayPL() {
   const today = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
+  // If no ticker has data from today, markets haven't traded today (weekend/holiday)
+  const hasToday = state.CURRENT_TICKERS.some(t => {
+    const d = state.intradayData[state.TICKER_META[t]?.yahoo];
+    return d?.date === today && d?.points?.length > 0;
+  });
+  if (!hasToday) return null;
   let plEur = 0, baseEur = 0;
   const latest = state.chartData.at(-1);
   if (!latest) return null;
