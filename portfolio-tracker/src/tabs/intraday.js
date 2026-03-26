@@ -87,9 +87,10 @@ function exchangeState(def) {
 export function getMarketStatus() {
   // state: 'open' = regular hours, 'closed' = trades today but not now, 'dark' = no trading today
   const badge = (label, state) => {
-    const dot = state === 'open' ? '#4ade80' : '#334155';
-    const dim  = state === 'dark' ? 'opacity:0.45;' : '';
-    return `<span class="market-badge" style="${dim}"><span class="dot" style="background:${dot}"></span>${label}</span>`;
+    const dot   = state === 'open' ? '#4ade80' : '#334155';
+    const dim   = state === 'dark' ? 'opacity:0.45;' : '';
+    const title = state === 'open' ? '' : state === 'closed' ? 'opent later vandaag' : 'gesloten';
+    return `<span class="market-badge" style="${dim}" title="${title}"><span class="dot" style="background:${dot}"></span>${label}</span>`;
   };
 
   // Collect unique exchange suffixes from currently tracked tickers
