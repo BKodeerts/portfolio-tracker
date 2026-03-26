@@ -53,8 +53,8 @@ function clearByPrefix(prefix) {
 }
 
 const GROUPS = {
-  historical: f => f.startsWith('candles_') && !f.startsWith('candles_bonus_'),
-  quotes:     f => f.startsWith('quotes_'),
+  historical: f => !f.startsWith('quote') && !f.startsWith('intraday_') && !f.startsWith('eod_intraday_') && !f.startsWith('candles_bonus_') && !f.startsWith('lookup_'),
+  quotes:     f => f.startsWith('quote_') && !f.startsWith('quote_bonus_'),
   intraday:   f => f.startsWith('intraday_') || f.startsWith('eod_intraday_'),
   bonus:      f => f.startsWith('candles_bonus_') || f.startsWith('quote_bonus_'),
 };

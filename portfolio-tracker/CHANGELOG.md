@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.1] — 2026-04-03
+
+### Bug Fixes
+
+- Fixed cache group filters in the Settings page — "Historisch" and "Dagelijkse quotes" always showed 0 entries and clearing them had no effect. The prefix patterns did not match the actual cache filenames on disk.
+
 ## [0.6.0] — 2026-04-03
 
 ### New Features
