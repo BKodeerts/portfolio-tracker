@@ -46,5 +46,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 Portfolio Tracker running at http://0.0.0.0:${PORT}`);
   console.log(`   Cache dir: ${CACHE_DIR}`);
   console.log(`   Cache TTL: ${CACHE_TTL / 3600000}h\n`);
-  require('./scheduler').start();
+  const scheduler = require('./scheduler');
+  scheduler.start();
+  scheduler.startEodWriter();
 });

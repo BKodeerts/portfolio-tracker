@@ -3,6 +3,11 @@ const router  = express.Router();
 const { readCache, readStaleCache, writeCache } = require('../cache.js');
 const { fetchCandles, fetchDailyQuote, fetchIntraday, fetchYahoo, sleep, FETCH_DELAY } = require('../yahoo.js');
 const { QUOTES_CACHE_TTL, INTRADAY_CACHE_TTL } = require('../cache.js');
+const { isMarketOpen } = require('../ha-helper.js');
+
+function anyMarketOpen() {
+  return isMarketOpen('NYSE') || isMarketOpen('XETRA');
+}
 
 // Single symbol candles
 router.get('/candles/:symbol', async (req, res) => {
@@ -109,10 +114,21 @@ router.get('/intraday', async (req, res) => {
   const results = {};
   const toFetch = [];
 
+  const marketOpen = force ? true : anyMarketOpen();
+
   for (const symbol of symbols) {
     const cached = !force && readCache(`intraday_${symbol}`, INTRADAY_CACHE_TTL);
-    if (cached) { console.log(`[INTRADAY CACHE HIT] ${symbol}`); results[symbol] = cached; }
-    else toFetch.push(symbol);
+    if (cached) { console.log(`[INTRADAY CACHE HIT] ${symbol}`); results[symbol] = cached; continue; }
+    // When all markets are closed, prefer the EOD snapshot (written after market close,
+    // contains the full session from open to close) over stale or a fresh Yahoo fetch
+    // which would return an incomplete day with the first candle missing.
+    if (!marketOpen) {
+      const eod = readCache(`eod_intraday_${symbol}`, 24 * 60 * 60 * 1000);
+      if (eod) { console.log(`[INTRADAY EOD] ${symbol}`); results[symbol] = eod; continue; }
+      const stale = readStaleCache(`intraday_${symbol}`);
+      if (stale) { console.log(`[INTRADAY STALE] ${symbol} (market closed)`); results[symbol] = stale; continue; }
+    }
+    toFetch.push(symbol);
   }
 
   for (let i = 0; i < toFetch.length; i++) {
@@ -121,6 +137,7 @@ router.get('/intraday', async (req, res) => {
       console.log(`[INTRADAY FETCH] ${symbol}`);
       const data = await fetchIntraday(symbol);
       writeCache(`intraday_${symbol}`, data);
+      if (data?.marketState === 'CLOSED') writeCache(`eod_intraday_${symbol}`, data);
       results[symbol] = data;
     } catch (e) {
       console.error(`[INTRADAY ERROR] ${symbol}: ${e.message}`);

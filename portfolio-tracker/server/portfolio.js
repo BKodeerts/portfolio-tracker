@@ -141,6 +141,7 @@ async function getIntradayPrice(yahooSymbol) {
     if (!data?.points.length) return null;
     const close = data.points[data.points.length - 1].close;
     writeCache(cacheKey, close);
+    if (data.marketState === 'CLOSED') writeCache(`eod_intraday_${yahooSymbol}`, data);
     await sleep(FETCH_DELAY);
     return close;
   } catch {

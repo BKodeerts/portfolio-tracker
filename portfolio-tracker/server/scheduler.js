@@ -11,6 +11,43 @@
 
 const { computeCurrentSnapshot } = require('./portfolio.js');
 const { getOptions, pushAll, isMarketOpen } = require('./ha-helper.js');
+const { fetchIntraday, sleep, FETCH_DELAY } = require('./yahoo.js');
+const { readCache, writeCache } = require('./cache.js');
+const fs   = require('node:fs');
+const path = require('node:path');
+
+const TRANSACTIONS_FILE = path.join(process.env.DATA_DIR || path.join(__dirname, '..', 'data'), 'transactions.json');
+const TICKER_META_FILE  = path.join(process.env.DATA_DIR || path.join(__dirname, '..', 'data'), 'ticker_meta.json');
+
+async function writeEodCache() {
+  try {
+    if (!fs.existsSync(TRANSACTIONS_FILE)) return;
+    const transactions = JSON.parse(fs.readFileSync(TRANSACTIONS_FILE, 'utf8'));
+    const meta = fs.existsSync(TICKER_META_FILE)
+      ? JSON.parse(fs.readFileSync(TICKER_META_FILE, 'utf8'))
+      : {};
+    const yahooSymbols = [...new Set(transactions.map(t => meta[t.ticker]?.yahoo || t.yahoo || t.ticker).filter(Boolean))];
+    if (!yahooSymbols.length) return;
+    const today = new Date().toLocaleDateString('sv-SE');
+    for (let i = 0; i < yahooSymbols.length; i++) {
+      const sym = yahooSymbols[i];
+      const existing = readCache(`eod_intraday_${sym}`, 24 * 60 * 60 * 1000);
+      if (existing?.date === today) continue; // already written for today
+      try {
+        const data = await fetchIntraday(sym);
+        if (data?.marketState === 'CLOSED') {
+          writeCache(`eod_intraday_${sym}`, data);
+          console.log(`[EOD] Cached full session for ${sym}`);
+        }
+      } catch (e) {
+        console.warn(`[EOD] Failed for ${sym}:`, e.message);
+      }
+      if (i < yahooSymbols.length - 1) await sleep(FETCH_DELAY);
+    }
+  } catch (e) {
+    console.warn('[EOD] writeEodCache failed:', e.message);
+  }
+}
 
 async function runOnce() {
   const options = getOptions();
@@ -94,4 +131,17 @@ function start() {
   }
 }
 
-module.exports = { start };
+// Always-on EOD writer: fires once daily at 22:00 UTC (well after US close at 20:00-21:00 UTC).
+function startEodWriter() {
+  function scheduleNext() {
+    const now = new Date();
+    const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 22, 0, 0));
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    const msUntil = next - now;
+    setTimeout(() => { writeEodCache(); scheduleNext(); }, msUntil);
+    console.log(`[EOD] Next EOD cache write scheduled in ${Math.round(msUntil / 60000)} min`);
+  }
+  scheduleNext();
+}
+
+module.exports = { start, startEodWriter };
