@@ -224,29 +224,18 @@ function buildYBounds(datasets, floorMin, ceilMax) {
   };
 }
 
-function makeSegment(color, hasEU, hasUS) {
+function makeSegment(color, activeRanges) {
   return {
     borderColor: (ctx) => {
-      const mins =
-        new Date(ctx.p0.parsed.x).getHours() * 60 +
-        new Date(ctx.p0.parsed.x).getMinutes();
-      const active =
-        (hasEU && mins >= 540 && mins < 1050) ||
-        (hasUS && mins >= 930 && mins < 1320);
-      return active ? color : color + "35";
+      const ts = ctx.p0.parsed.x;
+      return activeRanges.some(([s, e]) => ts >= s && ts < e) ? color : color + "35";
     },
   };
 }
 
-function buildIntradayDatasets(visibleTickers, intra) {
+function buildIntradayDatasets(visibleTickers, intra, activeRanges) {
   const { tickerVals, timestamps } = intra;
   const view = state.currentView;
-  const hasEU = visibleTickers.some((t) =>
-    EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ""),
-  );
-  const hasUS = visibleTickers.some(
-    (t) => !EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ""),
-  );
   if (view === "total") {
     const totals = timestamps.map((_, i) =>
       visibleTickers.reduce(
@@ -273,7 +262,7 @@ function buildIntradayDatasets(visibleTickers, intra) {
         pointRadius: 0,
         tension: 0,
         cubicInterpolationMode: "monotone",
-        segment: makeSegment("#818cf8", hasEU, hasUS),
+        segment: makeSegment("#818cf8", activeRanges),
       },
       {
         label: "Vorige slotkoers",
@@ -303,7 +292,7 @@ function buildIntradayDatasets(visibleTickers, intra) {
       tension: 0,
       cubicInterpolationMode: "monotone",
       stack: "stack",
-      segment: makeSegment(getColor(t), hasEU, hasUS),
+      segment: makeSegment(getColor(t), activeRanges),
     }));
   }
   if (view === "pct") {
@@ -328,7 +317,7 @@ function buildIntradayDatasets(visibleTickers, intra) {
         pointRadius: 0,
         tension: 0,
         spanGaps: true,
-        segment: makeSegment(getColor(t), hasEU, hasUS),
+        segment: makeSegment(getColor(t), activeRanges),
       };
     });
   }
@@ -346,7 +335,7 @@ function buildIntradayDatasets(visibleTickers, intra) {
       cubicInterpolationMode: "monotone",
       stack: "stack",
       spanGaps: true,
-      segment: makeSegment(getColor(t), hasEU, hasUS),
+      segment: makeSegment(getColor(t), activeRanges),
     };
   });
 }
@@ -437,11 +426,45 @@ export function renderPortfolioChart(visibleTickers) {
   const intra = isIntraday ? buildIntradayChartData(visibleTickers) : null;
   const useIntraday = isIntraday && intra !== null;
 
+  const hasEU = visibleTickers.some((t) => EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ""));
+  const hasUS = visibleTickers.some((t) => !EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ""));
+
+  // Convert exchange-local time to a JS Date, DST-aware via Intl
+  function exchangeTimeToLocal(tz, hour, min, ref = new Date()) {
+    const tzDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(ref);
+    const [yr, mo, dy] = tzDateStr.split("-").map(Number);
+    const naiveUtc = Date.UTC(yr, mo - 1, dy, hour, min, 0);
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, hour: "numeric", minute: "numeric", hour12: false,
+    }).formatToParts(new Date(naiveUtc));
+    const tzH = Number(parts.find((p) => p.type === "hour").value) % 24;
+    const tzM = Number(parts.find((p) => p.type === "minute").value);
+    return new Date(naiveUtc + (hour * 60 + min - (tzH * 60 + tzM)) * 60000);
+  }
+
+  // When showing a past trading day (weekend/holiday), compute session times for that day
+  const sessionRef = intra?.tradingDate ? new Date(intra.tradingDate + "T12:00:00") : new Date();
+  const sessionLines = useIntraday ? [
+    ...(hasEU ? [
+      { date: exchangeTimeToLocal("Europe/Amsterdam", 9, 0, sessionRef),   label: "EU opent" },
+      { date: exchangeTimeToLocal("Europe/Amsterdam", 17, 30, sessionRef), label: "EU sluit" },
+    ] : []),
+    ...(hasUS ? [
+      { date: exchangeTimeToLocal("America/New_York", 9, 30, sessionRef), label: "US opent" },
+      { date: exchangeTimeToLocal("America/New_York", 16, 0, sessionRef), label: "US sluit" },
+    ] : []),
+  ] : [];
+
+  // Pre-compute active trading ranges as UTC [start, end] ms pairs for makeSegment
+  const activeRanges = [["EU opent", "EU sluit"], ["US opent", "US sluit"]]
+    .map(([o, c]) => [sessionLines.find(l => l.label === o)?.date.getTime(), sessionLines.find(l => l.label === c)?.date.getTime()])
+    .filter(([s, e]) => s != null && e != null);
+
   const labels = useIntraday
     ? intra.labels
     : getFilteredData().map((d) => d.date);
   let datasets = useIntraday
-    ? buildIntradayDatasets(visibleTickers, intra)
+    ? buildIntradayDatasets(visibleTickers, intra, activeRanges)
     : buildHistoricalDatasets(visibleTickers);
 
   // Tight y-axis bounds for intraday — only for non-stacked views, since stacking makes
@@ -463,82 +486,19 @@ export function renderPortfolioChart(visibleTickers) {
         )
       : {};
 
-
-  const hasEU = visibleTickers.some((t) =>
-    EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ""),
-  );
-  const hasUS = visibleTickers.some(
-    (t) => !EU_EXCHANGE_RE.test(state.TICKER_META[t]?.yahoo || ""),
-  );
-  // Convert exchange-local time (hour, min in tz) to a JS Date for the given reference date.
-  // Using Intl, this correctly handles DST transitions between US and EU.
-  function exchangeTimeToLocal(tz, hour, min, ref = new Date()) {
-    const tzDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(ref);
-    const [yr, mo, dy] = tzDateStr.split("-").map(Number);
-    const naiveUtc = Date.UTC(yr, mo - 1, dy, hour, min, 0);
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      hour: "numeric",
-      minute: "numeric",
-      hour12: false,
-    }).formatToParts(new Date(naiveUtc));
-    const tzH = Number(parts.find((p) => p.type === "hour").value) % 24;
-    const tzM = Number(parts.find((p) => p.type === "minute").value);
-    return new Date(naiveUtc + (hour * 60 + min - (tzH * 60 + tzM)) * 60000);
-  }
-
-  // When showing a past trading day (weekend/holiday), compute session times for that day
-  const sessionRef = intra?.tradingDate ? new Date(intra.tradingDate + "T12:00:00") : new Date();
-  const sessionLines = [
-    ...(hasEU
-      ? [
-          {
-            date: exchangeTimeToLocal("Europe/Amsterdam", 9, 0, sessionRef),
-            label: "EU opent",
-          },
-          {
-            date: exchangeTimeToLocal("Europe/Amsterdam", 17, 30, sessionRef),
-            label: "EU sluit",
-          },
-        ]
-      : []),
-    ...(hasUS
-      ? [
-          {
-            date: exchangeTimeToLocal("America/New_York", 9, 30, sessionRef),
-            label: "US opent",
-          },
-          {
-            date: exchangeTimeToLocal("America/New_York", 16, 0, sessionRef),
-            label: "US sluit",
-          },
-        ]
-      : []),
-  ];
-
-  // x-axis bounds: clip to data start, extend to last market close + 1h so the
-  // remaining session time is always visible even before markets close.
   const xAxisBounds = (() => {
     if (!useIntraday || !intra?.timestamps?.length) return {};
-    const dataEnd = intra.timestamps.at(-1) * 1000;
-    let maxTime = dataEnd + 10 * 60 * 1000;
-    if (intra.isLive) {
-      // Extend to last market close + 1h so remaining session time is visible
-      const closeTimes = sessionLines.filter((l) => l.label.includes("sluit")).map((l) => l.date.getTime());
-      const lastClose = closeTimes.length ? Math.max(...closeTimes) : 0;
-      maxTime = Math.max(dataEnd, lastClose) + 60 * 60 * 1000;
-    }
-    const openTimes = sessionLines.filter((l) => l.label.includes("opent")).map((l) => l.date.getTime());
-    const firstOpen = openTimes.length ? Math.min(...openTimes) : Infinity;
     const dataStart = intra.timestamps[0] * 1000;
-    // On live days, use earliest session open as lower bound so EU session is always visible
-    // even if EU stock data arrives late. On historical days, just clip to data.
-    const minTime = intra.isLive
-      ? Math.min(firstOpen, dataStart) - 15 * 60 * 1000
-      : dataStart - 10 * 60 * 1000;
+    const dataEnd   = intra.timestamps.at(-1) * 1000;
+    const opens  = sessionLines.filter(l => l.label.includes("opent")).map(l => l.date.getTime());
+    const closes = sessionLines.filter(l => l.label.includes("sluit")).map(l => l.date.getTime());
+    const firstOpen = opens.length  ? Math.min(...opens)  : dataStart;
+    const lastClose = closes.length ? Math.max(...closes) : dataEnd;
     return {
-      min: new Date(minTime),
-      max: new Date(maxTime),
+      min: new Date(Math.min(firstOpen, dataStart) - 15 * 60 * 1000),
+      max: new Date(intra.isLive
+        ? Math.max(dataEnd, lastClose) + 30 * 60 * 1000
+        : dataEnd + 10 * 60 * 1000),
     };
   })();
 
@@ -684,7 +644,9 @@ export function renderPortfolioChart(visibleTickers) {
         x: {
           type: "time",
           time: {
-            unit: useIntraday ? "hour" : "month",
+            unit: useIntraday ? "hour" : (
+              { '1m': 'week', '3m': 'week', '2y': 'quarter', '3y': 'quarter', 'total': 'year' }[state.currentPeriod] ?? 'month'
+            ),
             tooltipFormat: useIntraday ? "HH:mm" : "dd MMM yyyy",
           },
           ...xAxisBounds,

@@ -85,7 +85,7 @@ async function fetchIntraday(yahooSymbol) {
   let marketState = null;
   if (regular) marketState = (now >= regular.start && now < regular.end) ? 'REGULAR' : 'CLOSED';
   return {
-    date: new Date(points[0].ts * 1000).toISOString().slice(0, 10),
+    date: new Date(points[points.length - 1].ts * 1000).toISOString().slice(0, 10),
     previousClose: meta.chartPreviousClose ?? meta.regularMarketPreviousClose ?? null,
     currency: meta.currency || null,
     marketState,
