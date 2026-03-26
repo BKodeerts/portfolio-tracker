@@ -239,7 +239,8 @@ function makeSegment(color, activeRanges) {
 }
 
 function buildIntradayDatasets(visibleTickers, intra, activeRanges) {
-  const { tickerVals, timestamps } = intra;
+  const { tickerVals, timestamps, isLive } = intra;
+  const staleClr = "#64748b"; // slate — readable in both light and dark theme
   const view = state.currentView;
   if (view === "total") {
     const totals = timestamps.map((_, i) =>
@@ -256,18 +257,19 @@ function buildIntradayDatasets(visibleTickers, intra, activeRanges) {
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date();
     dayEnd.setHours(23, 59, 59, 999);
+    const lineClr = isLive ? "#818cf8" : staleClr;
     return [
       {
         label: "Portefeuille",
         data: totals,
-        borderColor: "#818cf8",
-        backgroundColor: "rgba(99,102,241,0.1)",
+        borderColor: lineClr,
+        backgroundColor: isLive ? "rgba(99,102,241,0.1)" : "rgba(100,116,139,0.1)",
         fill: true,
         borderWidth: 2,
         pointRadius: 0,
         tension: 0,
         cubicInterpolationMode: "monotone",
-        segment: makeSegment("#818cf8", activeRanges),
+        segment: makeSegment(lineClr, activeRanges),
       },
       {
         label: "Vorige slotkoers",
@@ -285,19 +287,20 @@ function buildIntradayDatasets(visibleTickers, intra, activeRanges) {
       },
     ];
   }
+  const clr = (t) => isLive ? getColor(t) : staleClr;
   if (view === "individual") {
     return [...visibleTickers].reverse().map((t) => ({
       label: t,
       data: tickerVals[t]?.values || [],
-      borderColor: getColor(t),
-      backgroundColor: getColor(t) + "28",
+      borderColor: clr(t),
+      backgroundColor: clr(t) + "28",
       fill: true,
       borderWidth: 1.5,
       pointRadius: 0,
       tension: 0,
       cubicInterpolationMode: "monotone",
       stack: "stack",
-      segment: makeSegment(getColor(t), activeRanges),
+      segment: makeSegment(clr(t), activeRanges),
     }));
   }
   if (view === "pct") {
@@ -309,20 +312,17 @@ function buildIntradayDatasets(visibleTickers, intra, activeRanges) {
           ? tv.values.map((v) =>
               tv.prevValueEur > 0
                 ? Number.parseFloat(
-                    (((v - tv.prevValueEur) / tv.prevValueEur) * 100).toFixed(
-                      2,
-                    ),
-                  )
+                    (((v - tv.prevValueEur) / tv.prevValueEur) * 100).toFixed(2))
                 : null,
             )
           : [],
-        borderColor: getColor(t),
+        borderColor: clr(t),
         fill: false,
         borderWidth: 2,
         pointRadius: 0,
         tension: 0,
         spanGaps: true,
-        segment: makeSegment(getColor(t), activeRanges),
+        segment: makeSegment(clr(t), activeRanges),
       };
     });
   }
@@ -331,8 +331,8 @@ function buildIntradayDatasets(visibleTickers, intra, activeRanges) {
     return {
       label: t,
       data: tv ? tv.values.map((v) => v - tv.prevValueEur) : [],
-      borderColor: getColor(t),
-      backgroundColor: getColor(t) + "28",
+      borderColor: clr(t),
+      backgroundColor: clr(t) + "28",
       fill: true,
       borderWidth: 1.5,
       pointRadius: 0,
@@ -340,7 +340,7 @@ function buildIntradayDatasets(visibleTickers, intra, activeRanges) {
       cubicInterpolationMode: "monotone",
       stack: "stack",
       spanGaps: true,
-      segment: makeSegment(getColor(t), activeRanges),
+      segment: makeSegment(clr(t), activeRanges),
     };
   });
 }
@@ -743,15 +743,15 @@ export function renderPortfolioChart(visibleTickers) {
   const wrap = document.getElementById("mainChart")?.parentElement;
   if (wrap) {
     wrap.querySelector(".chart-stale-label")?.remove();
+    wrap.style.opacity = "";
     if (useIntraday && !intra.isLive) {
-      wrap.style.cssText = (wrap.style.cssText || "") + ";position:relative;opacity:0.65";
+      wrap.style.position = "relative";
+      wrap.style.opacity = "0.75";
       const label = document.createElement("div");
       label.className = "chart-stale-label";
-      label.style.cssText = "position:absolute;bottom:8px;right:8px;font-size:10px;color:#f59e0b;font-family:'JetBrains Mono',monospace;pointer-events:none";
+      label.style.cssText = "position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:10px;color:#e2e8f0;font-family:'JetBrains Mono',monospace;pointer-events:none;background:rgba(15,23,42,0.55);padding:2px 8px;border-radius:4px;white-space:nowrap";
       label.textContent = new Date(intra.tradingDate + "T12:00:00").toLocaleDateString("nl-BE", { weekday: "long", day: "numeric", month: "short" });
       wrap.appendChild(label);
-    } else {
-      wrap.style.opacity = "";
     }
   }
 }
