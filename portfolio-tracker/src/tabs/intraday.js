@@ -22,23 +22,23 @@ const US_EXCHANGE_LABELS = {
 // Per-exchange config: yahoo suffix → { label, tz, open [h,m], close [h,m] }
 // Empty string = US stocks (no Yahoo suffix) — label used as fallback only
 const EXCHANGE_DEFS = {
-  '':    { label: 'US',    tz: 'America/New_York',   open: [9,30],  close: [16,0]  },
-  '.DE': { label: 'XETRA', tz: 'Europe/Berlin',      open: [9,0],   close: [17,30] },
-  '.AS': { label: 'AEX',   tz: 'Europe/Amsterdam',   open: [9,0],   close: [17,30] },
-  '.PA': { label: 'EPA',   tz: 'Europe/Paris',       open: [9,0],   close: [17,30] },
-  '.L':  { label: 'LSE',   tz: 'Europe/London',      open: [8,0],   close: [16,30] },
-  '.MI': { label: 'MIL',   tz: 'Europe/Rome',        open: [9,0],   close: [17,30] },
-  '.BR': { label: 'XBRU',  tz: 'Europe/Brussels',    open: [9,0],   close: [17,30] },
-  '.SW': { label: 'SWX',   tz: 'Europe/Zurich',      open: [9,0],   close: [17,30] },
-  '.ST': { label: 'SSEX',  tz: 'Europe/Stockholm',   open: [9,0],   close: [17,30] },
-  '.HE': { label: 'OMX',   tz: 'Europe/Helsinki',    open: [9,0],   close: [17,30] },
-  '.CO': { label: 'KFX',   tz: 'Europe/Copenhagen',  open: [9,0],   close: [17,30] },
-  '.OL': { label: 'OSE',   tz: 'Europe/Oslo',        open: [9,0],   close: [17,30] },
-  '.CL': { label: 'SCL',   tz: 'America/Santiago',   open: [9,30],  close: [17,0]  },
-  '.TO': { label: 'TSX',   tz: 'America/Toronto',    open: [9,30],  close: [16,0]  },
-  '.AX': { label: 'ASX',   tz: 'Australia/Sydney',   open: [10,0],  close: [16,0]  },
-  '.T':  { label: 'TSE',   tz: 'Asia/Tokyo',         open: [9,0],   close: [15,30] },
-  '.MX': { label: 'BMV',   tz: 'America/Mexico_City',open: [8,30],  close: [15,0]  },
+  '':    { label: 'US',    tz: 'America/New_York',    open: [9,30],  close: [16,0]  },
+  '.DE': { label: 'XETRA', tz: 'Europe/Berlin',       open: [9,0],   close: [17,30] },
+  '.AS': { label: 'AEX',   tz: 'Europe/Amsterdam',    open: [9,0],   close: [17,30] },
+  '.PA': { label: 'EPA',   tz: 'Europe/Paris',        open: [9,0],   close: [17,30] },
+  '.L':  { label: 'LSE',   tz: 'Europe/London',       open: [8,0],   close: [16,30] },
+  '.MI': { label: 'MIL',   tz: 'Europe/Rome',         open: [9,0],   close: [17,30] },
+  '.BR': { label: 'XBRU',  tz: 'Europe/Brussels',     open: [9,0],   close: [17,30] },
+  '.SW': { label: 'SWX',   tz: 'Europe/Zurich',       open: [9,0],   close: [17,30] },
+  '.ST': { label: 'SSEX',  tz: 'Europe/Stockholm',    open: [9,0],   close: [17,30] },
+  '.HE': { label: 'OMX',   tz: 'Europe/Helsinki',     open: [9,0],   close: [17,30] },
+  '.CO': { label: 'KFX',   tz: 'Europe/Copenhagen',   open: [9,0],   close: [17,30] },
+  '.OL': { label: 'OSE',   tz: 'Europe/Oslo',         open: [9,0],   close: [17,30] },
+  '.CL': { label: 'SCL',   tz: 'America/Santiago',    open: [9,30],  close: [17,0]  },
+  '.TO': { label: 'TSX',   tz: 'America/Toronto',     open: [9,30],  close: [16,0]  },
+  '.AX': { label: 'ASX',   tz: 'Australia/Sydney',    open: [10,0],  close: [16,0]  },
+  '.T':  { label: 'TSE',   tz: 'Asia/Tokyo',          open: [9,0],   close: [15,30] },
+  '.MX': { label: 'BMV',   tz: 'America/Mexico_City', open: [8,30],  close: [15,0]  },
 };
 
 function yahooSuffix(symbol) {
@@ -67,9 +67,30 @@ export function isExchangeOpen(yahooSymbol) {
   return isOpen(def.tz, ...def.open, ...def.close);
 }
 
+// Returns 'open' | 'closed' (trades today, not now) | 'dark' (no trading today)
+// Holiday detection is left to Yahoo — we only know weekends and trading hours here.
+function exchangeState(def) {
+  const now   = new Date();
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: def.tz, weekday: 'short', hour: 'numeric', minute: 'numeric', hour12: false,
+  }).formatToParts(now);
+  const get = t => parts.find(p => p.type === t)?.value;
+  if (['Sat', 'Sun'].includes(get('weekday'))) return 'dark';
+  const cur       = (Number.parseInt(get('hour')) % 24) * 60 + Number.parseInt(get('minute'));
+  const openMins  = def.open[0]  * 60 + def.open[1];
+  const closeMins = def.close[0] * 60 + def.close[1];
+  if (cur >= openMins && cur < closeMins) return 'open';
+  if (cur >= closeMins) return 'dark'; // past close, done for today
+  return 'closed'; // pre-market, will open later
+}
+
 export function getMarketStatus() {
-  const badge = (label, open) =>
-    `<span class="market-badge"><span class="dot" style="background:${open ? '#4ade80' : '#334155'}"></span>${label}</span>`;
+  // state: 'open' = regular hours, 'closed' = trades today but not now, 'dark' = no trading today
+  const badge = (label, state) => {
+    const dot = state === 'open' ? '#4ade80' : '#334155';
+    const dim  = state === 'dark' ? 'opacity:0.45;' : '';
+    return `<span class="market-badge" style="${dim}"><span class="dot" style="background:${dot}"></span>${label}</span>`;
+  };
 
   // Collect unique exchange suffixes from currently tracked tickers
   const seen = new Map();
@@ -103,23 +124,24 @@ export function getMarketStatus() {
       // For US stocks use the actual exchange code (NASDAQ/NYSE), fall back to 'US'
       const label = !sfx ? (US_EXCHANGE_LABELS[data.exchange] ?? def.label) : def.label;
       if (!exchanges.has(label)) {
-        const open = data.date === todayStr && data.marketState
-          ? data.marketState === 'REGULAR'
-          : isOpen(def.tz, ...def.open, ...def.close);
-        exchanges.set(label, open);
+        let state;
+        if (data.date !== todayStr)             state = 'dark';   // stale — no trading today
+        else if (data.marketState === 'REGULAR') state = 'open';
+        else                                     state = 'closed'; // PRE/POST/etc.
+        exchanges.set(label, state);
       }
       coveredSfx.add(sfx);
     }
   }
   // Fallback: portfolio suffixes not present in intradayData
   for (const [sfx, def] of seen.entries()) {
-    if (!coveredSfx.has(sfx)) exchanges.set(def.label, isOpen(def.tz, ...def.open, ...def.close));
+    if (!coveredSfx.has(sfx)) exchanges.set(def.label, exchangeState(def));
   }
   if (exchanges.size === 0) {
-    exchanges.set('US', isOpen('America/New_York', 9, 30, 16, 0));
-    exchanges.set('XETRA', isOpen('Europe/Berlin', 9, 0, 17, 30));
+    exchanges.set('US',    exchangeState(EXCHANGE_DEFS['']));
+    exchanges.set('XETRA', exchangeState(EXCHANGE_DEFS['.DE']));
   }
-  return [...exchanges.entries()].map(([label, open]) => badge(label, open)).join('');
+  return [...exchanges.entries()].map(([label, state]) => badge(label, state)).join('');
 }
 
 export function renderMarketStatus() {
