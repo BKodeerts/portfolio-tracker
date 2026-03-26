@@ -738,6 +738,22 @@ export function renderPortfolioChart(visibleTickers) {
     },
     plugins: marketCloseLines ? [marketCloseLines] : [],
   });
+
+  // Stale indicator on 1D when showing a previous trading day (weekend/holiday)
+  const wrap = document.getElementById("mainChart")?.parentElement;
+  if (wrap) {
+    wrap.querySelector(".chart-stale-label")?.remove();
+    if (useIntraday && !intra.isLive) {
+      wrap.style.cssText = (wrap.style.cssText || "") + ";position:relative;opacity:0.65";
+      const label = document.createElement("div");
+      label.className = "chart-stale-label";
+      label.style.cssText = "position:absolute;bottom:8px;right:8px;font-size:10px;color:#f59e0b;font-family:'JetBrains Mono',monospace;pointer-events:none";
+      label.textContent = new Date(intra.tradingDate + "T12:00:00").toLocaleDateString("nl-BE", { weekday: "long", day: "numeric", month: "short" });
+      wrap.appendChild(label);
+    } else {
+      wrap.style.opacity = "";
+    }
+  }
 }
 
 export function renderLegend(visibleTickers) {
