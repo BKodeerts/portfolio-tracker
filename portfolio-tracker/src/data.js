@@ -63,6 +63,7 @@ export async function loadData(onSuccess) {
           state.TICKER_META[pos.ticker].high52 = pos.high52;
           state.TICKER_META[pos.ticker].low52  = pos.low52;
           state.TICKER_META[pos.ticker].pe     = pos.pe;
+          state.TICKER_META[pos.ticker].fxPl   = pos.fxPl ?? null;
         }
       }
     }

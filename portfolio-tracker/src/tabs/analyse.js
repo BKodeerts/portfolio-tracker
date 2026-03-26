@@ -70,11 +70,18 @@ export function showPosModal(ticker) {
   }).join('');
 
   const divIncome = state.dividendsPerTicker?.[ticker] || 0;
+  const fxPl      = meta.fxPl ?? null;
   const extraAttrs = [
     high52     ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">52W Hoog</div><div class="pos-modal-stat-val">${ccySymbol}${high52.toFixed(2)}</div></div>` : '',
     low52      ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">52W Laag</div><div class="pos-modal-stat-val">${ccySymbol}${low52.toFixed(2)}</div></div>` : '',
     peRatio    ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">P/E</div><div class="pos-modal-stat-val">${peRatio.toFixed(1)}</div></div>` : '',
     divIncome  ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">Dividenden</div><div class="pos-modal-stat-val c-pos privacy-val">+${fmt(divIncome)}</div></div>` : '',
+    fxPl != null ? (() => {
+      const fxSign = fxPl >= 0 ? '+' : '';
+      const fxCls  = fxPl >= 0 ? 'c-pos' : 'c-neg';
+      const fxPct  = cost > 0 ? (fxPl / cost * 100).toFixed(1) : null;
+      return `<div class="pos-modal-stat"><div class="pos-modal-stat-label">Valuta effect</div><div class="pos-modal-stat-val ${fxCls} privacy-val">${fxSign}${fmt(fxPl)}</div>${fxPct != null ? `<div class="pos-modal-stat-sub ${fxCls}">${fxSign}${fxPct}%</div>` : ''}</div>`;
+    })() : '',
   ].join('');
 
   const modal = document.getElementById('posModal');

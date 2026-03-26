@@ -303,6 +303,35 @@ function computeDividends(txsByTicker) {
 // ── FIFO cost basis & realized P&L ───────────────────────────────────────────
 
 /**
+ * FIFO native-currency cost basis for open lots, converted to EUR at the latest FX rate.
+ * Returns the EUR value the open position would have if prices hadn't moved but FX did.
+ * Subtracting pos.cost from this gives the pure FX P&L.
+ */
+function fifoCostNativeEur(txs, ticker, adjSharesFn, fxMaps, ccy, latestDate) {
+  const def = FX_DEFS[ccy];
+  if (!def || !fxMaps[ccy]) return null;
+  const lots = [];
+  for (const tx of txs.filter(t => !isDividend(t)).sort((a, b) => a.date.localeCompare(b.date))) {
+    const sh = adjSharesFn(tx, ticker);
+    if (tx.shares > 0) {
+      const fxTx = fxMaps[ccy]?.[tx.date] || def.fallback;
+      lots.push({ shares: sh, costNativePerShare: (tx.costEur / sh) * fxTx });
+    } else {
+      let toSell = -sh;
+      for (const lot of lots) {
+        const sold = Math.min(lot.shares, toSell);
+        lot.shares -= sold;
+        toSell -= sold;
+        if (toSell <= 0) break;
+      }
+    }
+  }
+  const fxRate1 = fxMaps[ccy]?.[latestDate] || def.fallback;
+  const totalNative = lots.filter(l => l.shares > 0).reduce((s, l) => s + l.shares * l.costNativePerShare, 0);
+  return totalNative / fxRate1;
+}
+
+/**
  * FIFO cost basis for a ticker up to a specific date.
  */
 function fifoCostBasis(txs, ticker, upToDate, adjSharesFn) {
@@ -861,6 +890,14 @@ async function computeFullPortfolio() {
     pos.high52 = q?.fiftyTwoWeekHigh ?? null;
     pos.low52  = q?.fiftyTwoWeekLow  ?? null;
     pos.pe     = q?.trailingPE       ?? null;
+
+    const ccy = meta[pos.ticker].currency;
+    if (ccy && ccy !== 'EUR' && FX_DEFS[ccy] && fxMaps[ccy]) {
+      const nativeEur = fifoCostNativeEur(txByTicker[pos.ticker] || [], pos.ticker, adjSharesFn, fxMaps, ccy, sortedDates.at(-1));
+      pos.fxPl = nativeEur != null ? Math.round((nativeEur - pos.cost) * 100) / 100 : null;
+    } else {
+      pos.fxPl = null;
+    }
 
     const tm = tickerMetaLive[pos.ticker] || {};
 
