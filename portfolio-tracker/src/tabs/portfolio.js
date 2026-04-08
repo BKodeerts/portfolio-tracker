@@ -36,27 +36,23 @@ function buildIntradayChartData(visibleTickers) {
       fxPtMap[p.ts] = p.close;
     });
 
-  // Pick the trading date that has the most data across all tickers.
-  // When one region just opened (sparse data for today) while another still shows
-  // yesterday's full session, we want the date with the richest data — not just max(dates).
+  // Pick the trading date: prefer today if any ticker has data for today (even if sparse,
+  // e.g. EU just opened while US hasn't yet). Only fall back to the date with the most
+  // data points when today has zero points (weekend/holiday/after-hours).
+  const today = new Date().toLocaleDateString("sv-SE");
   const dateCounts = {};
   for (const ticker of visibleTickers) {
     const d = state.intradayData[state.TICKER_META[ticker]?.yahoo];
     if (!d?.points) continue;
-    const byDate = {};
     for (const p of d.points) {
       const pd = new Date(p.ts * 1000).toLocaleDateString("sv-SE");
-      byDate[pd] = (byDate[pd] || 0) + 1;
-    }
-    for (const [date, count] of Object.entries(byDate)) {
-      dateCounts[date] = (dateCounts[date] || 0) + count;
+      dateCounts[pd] = (dateCounts[pd] || 0) + 1;
     }
   }
-  let tradingDate = new Date().toLocaleDateString("sv-SE");
-  if (Object.keys(dateCounts).length > 0) {
-    // Among dates, prefer the one with the most total data points
-    tradingDate = Object.entries(dateCounts)
-      .sort((a, b) => b[1] - a[1])[0][0];
+  let tradingDate = today;
+  if (Object.keys(dateCounts).length > 0 && !dateCounts[today]) {
+    // Today has no data (weekend/holiday) — pick the most recent date with data
+    tradingDate = Object.keys(dateCounts).sort().at(-1);
   }
   const isToday = (p) =>
     new Date(p.ts * 1000).toLocaleDateString("sv-SE") === tradingDate;
