@@ -70,7 +70,9 @@ async function fetchDailyQuote(yahooSymbol) {
 
 async function fetchIntraday(yahooSymbol) {
   const isFx = yahooSymbol.endsWith('=X');
-  const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=5m&range=1d&includePrePost=${isFx}`;
+  // Use range=2d so we always have the previous session available when a market just
+  // opened and range=1d would only return the new (sparse) session.
+  const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=5m&range=2d&includePrePost=${isFx}`;
   const text = await fetchYahoo(url);
   const result = JSON.parse(text)?.chart?.result?.[0];
   if (!result) return null;

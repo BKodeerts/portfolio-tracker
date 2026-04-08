@@ -36,16 +36,28 @@ function buildIntradayChartData(visibleTickers) {
       fxPtMap[p.ts] = p.close;
     });
 
-  // Use the most recent trading date across all tickers — EU stocks will have today's date
-  // before US markets open, while US stocks still show Friday's date. Taking the max avoids
-  // treating today's EU data as stale.
-  let tradingDate = "2000-01-01";
+  // Pick the trading date that has the most data across all tickers.
+  // When one region just opened (sparse data for today) while another still shows
+  // yesterday's full session, we want the date with the richest data — not just max(dates).
+  const dateCounts = {};
   for (const ticker of visibleTickers) {
     const d = state.intradayData[state.TICKER_META[ticker]?.yahoo];
-    if (d?.date && d.date > tradingDate) tradingDate = d.date;
+    if (!d?.points) continue;
+    const byDate = {};
+    for (const p of d.points) {
+      const pd = new Date(p.ts * 1000).toLocaleDateString("sv-SE");
+      byDate[pd] = (byDate[pd] || 0) + 1;
+    }
+    for (const [date, count] of Object.entries(byDate)) {
+      dateCounts[date] = (dateCounts[date] || 0) + count;
+    }
   }
-  if (tradingDate === "2000-01-01")
-    tradingDate = new Date().toLocaleDateString("sv-SE");
+  let tradingDate = new Date().toLocaleDateString("sv-SE");
+  if (Object.keys(dateCounts).length > 0) {
+    // Among dates, prefer the one with the most total data points
+    tradingDate = Object.entries(dateCounts)
+      .sort((a, b) => b[1] - a[1])[0][0];
+  }
   const isToday = (p) =>
     new Date(p.ts * 1000).toLocaleDateString("sv-SE") === tradingDate;
   const equityTsSet = new Set();

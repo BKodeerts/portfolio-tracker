@@ -244,6 +244,15 @@ export function renderTodayMetric() {
   el.innerHTML = `<div class="metric-value ${cls} privacy-val" style="font-size:17px">${sign}${fmt(r.pl)}</div><div class="metric-sub ${cls}">${sign}${r.pct.toFixed(2)}%</div>`;
 }
 
+// Filter points to only include the most recent session (by data.date, UTC)
+function latestSessionPoints(data) {
+  if (!data?.points?.length) return [];
+  const sessionDate = data.date;
+  if (!sessionDate) return data.points;
+  return data.points.filter(p =>
+    new Date(p.ts * 1000).toISOString().slice(0, 10) === sessionDate);
+}
+
 export function renderIntradaySection() {
   const gridEl   = document.getElementById('intradayGrid');
   const statusEl = document.getElementById('intradayStatus');
@@ -273,11 +282,12 @@ export function renderIntradaySection() {
   const fxData = state.intradayData[FX_SYMBOL];
   const fxCard = fxData?.points?.length ? (() => {
     const prev      = fxData.previousClose;
-    const last      = fxData.points[fxData.points.length - 1];
+    const fxSessionPts = latestSessionPoints(fxData);
+    const last      = fxSessionPts.length ? fxSessionPts[fxSessionPts.length - 1] : fxData.points[fxData.points.length - 1];
     // Invert to USD/EUR so a stronger USD shows as a gain (matches portfolio impact)
     const prevInv   = prev ? 1 / prev : null;
     const lastInv   = 1 / last.close;
-    const invPoints = fxData.points.map(p => ({ ...p, close: 1 / p.close }));
+    const invPoints = fxSessionPts.map(p => ({ ...p, close: 1 / p.close }));
     const pct       = prevInv ? ((lastInv - prevInv) / prevInv * 100) : 0;
     const cls       = pct >= 0 ? 'c-pos' : 'c-neg';
     const todayStr  = new Date().toISOString().slice(0, 10);
@@ -309,7 +319,8 @@ export function renderIntradaySection() {
     }
     const meta    = state.TICKER_META[ticker];
     const prev    = data.previousClose;
-    const last    = data.points[data.points.length - 1];
+    const sessionPts = latestSessionPoints(data);
+    const last    = sessionPts.length ? sessionPts[sessionPts.length - 1] : data.points[data.points.length - 1];
     const pct     = prev ? ((last.close - prev) / prev * 100) : 0;
     const cls     = pct >= 0 ? 'c-pos' : 'c-neg';
     const todayStr  = new Date().toISOString().slice(0, 10);
@@ -329,7 +340,7 @@ export function renderIntradaySection() {
         ${statusLabel}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
-      ${sparklineSVG(data.points, prev, getTradingMins(yahoo))}
+      ${sparklineSVG(sessionPts, prev, getTradingMins(yahoo))}
       <div class="metric-sub">${nativeCcy} ${displayPrice.toFixed(2)}</div>
     </div>`;
   }).join('');
@@ -347,9 +358,10 @@ export function renderIntradaySection() {
 
     for (const item of watchlist) {
       const data      = state.intradayData?.[item.symbol];
-      const hasData   = data?.points?.length > 0;
+      const wlSession = latestSessionPoints(data);
+      const hasData   = wlSession.length > 0;
       const prev      = data?.previousClose;
-      const last      = hasData ? data.points[data.points.length - 1] : null;
+      const last      = hasData ? wlSession[wlSession.length - 1] : null;
       const pct       = hasData && prev ? ((last.close - prev) / prev * 100) : (item.change1dPct ?? null);
       let cls;
       if (pct == null)  cls = 'c-neutral';
@@ -373,7 +385,7 @@ export function renderIntradaySection() {
           ${isStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(data.date)}</span>` : ''}
         </div>
         <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pctStr}</div>
-        ${hasData ? sparklineSVG(data.points, prev, getTradingMins(item.symbol)) : ''}
+        ${hasData ? sparklineSVG(wlSession, prev, getTradingMins(item.symbol)) : ''}
         <div class="metric-sub">${priceStr}</div>`;
       gridEl.appendChild(card);
     }
