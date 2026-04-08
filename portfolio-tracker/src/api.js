@@ -69,6 +69,11 @@ export async function fetchBonus() {
   return res.json();
 }
 
+export async function fetchBonusHistory(id) {
+  const res = await fetch(`${SERVER_BASE}/api/bonus/${id}/history`);
+  return res.json();
+}
+
 export async function saveBonus(entry) {
   const res = await fetch(`${SERVER_BASE}/api/bonus`, {
     method: 'POST',

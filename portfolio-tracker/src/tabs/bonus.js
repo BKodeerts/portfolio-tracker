@@ -1,11 +1,33 @@
 import { state } from '../state.js';
-import { fetchBonus, saveBonus, deleteBonus, fetchBatch } from '../api.js';
+import { fetchBonus, saveBonus, deleteBonus, fetchBonusHistory } from '../api.js';
 import { sparklineSVG } from './intraday.js';
 import { fmt, chartTheme } from '../utils.js';
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 
 // ── Detail modal (reuses #posModal + pos-modal-inner styling) ─────────────────
+
+function buildTaxStats(item, netValueCls) {
+  return `
+      <div class="pos-modal-stat" style="grid-column:1/-1;border-top:1px solid #1e293b;margin-top:4px;padding-top:4px">
+        <div class="pos-modal-stat-label" style="color:#f59e0b;font-size:10px;letter-spacing:.08em">BELGISCHE FISCALITEIT (VAA / ATN)</div>
+      </div>
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Belastbare grondslag</div>
+        <div class="pos-modal-stat-val privacy-val">${fmt(item.vatGross)}</div>
+        <div class="pos-modal-stat-sub">${item.quantity} × €${item.grantPrice?.toFixed(2)} (optieprijs bij toekenning)</div>
+      </div>
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Bedrijfsvoorheffing (${item.taxRate ?? 53.5}%)</div>
+        <div class="pos-modal-stat-val c-neg privacy-val">−${fmt(item.vatTax)}</div>
+        <div class="pos-modal-stat-sub">belastbaar op ${item.taxableDate} (dag 60)</div>
+      </div>
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Netto optiewaarde na BV</div>
+        <div class="pos-modal-stat-val privacy-val ${netValueCls}">${fmt(item.netValue ?? 0)}</div>
+        <div class="pos-modal-stat-sub">optiewaarde − belasting</div>
+      </div>`;
+}
 
 async function showBonusDetail(item) {
   const isCall = item.type === 'call_option';
@@ -16,6 +38,22 @@ async function showBonusDetail(item) {
   const priceCls  = priceChange >= 0 ? 'c-pos' : 'c-neg';
   const priceSign = priceChange >= 0 ? '+' : '';
 
+  const intrinsic = isCall && item.currentIndexPrice && item.strikePrice
+    ? Math.max(0, item.currentIndexPrice - item.strikePrice) * (item.ratio || 1)
+    : 0;
+  const timeValue = isCall ? (item.currentWarrantPrice ?? 0) - intrinsic : 0;
+  const daysToExpiry = isCall && item.expiryDate
+    ? Math.max(0, Math.round((new Date(item.expiryDate) - Date.now()) / 86_400_000))
+    : null;
+
+  const sigmaNum   = item.sigmaUsed ?? item.volatility ?? null;
+  const sigmaVal   = sigmaNum == null ? '—' : `${sigmaNum}%`;
+  const sigmaLabel = item.sigmaUsed == null && !item.volatility
+    ? '—<span style="font-size:9px;color:#888"> (proportioneel)</span>'
+    : (item.volatility ? sigmaVal : `${sigmaVal}<span style="font-size:9px;color:#888"> (VSTOXX)</span>`);
+  const netValueCls = (item.netValue ?? 0) >= 0 ? 'c-pos' : 'c-neg';
+  const taxStats    = item.vatGross == null ? '' : buildTaxStats(item, netValueCls);
+
   const callExtraStats = isCall ? `
       <div class="pos-modal-stat">
         <div class="pos-modal-stat-label">Uitoefenprijs</div>
@@ -25,10 +63,31 @@ async function showBonusDetail(item) {
         <div class="pos-modal-stat-label">Status</div>
         <div class="pos-modal-stat-val ${item.isOutOfMoney ? 'c-neg' : 'c-pos'}">${item.isOutOfMoney ? 'Out of the money' : 'In the money ✓'}</div>
       </div>
+      ${intrinsic > 0 ? `<div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Intrinsieke waarde</div>
+        <div class="pos-modal-stat-val">€${intrinsic.toFixed(2)}</div>
+      </div>` : ''}
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Tijdswaarde</div>
+        <div class="pos-modal-stat-val">€${timeValue.toFixed(2)}</div>
+      </div>
       ${item.expiryDate ? `<div class="pos-modal-stat">
         <div class="pos-modal-stat-label">Vervaldatum</div>
-        <div class="pos-modal-stat-val">${item.expiryDate}</div>
-      </div>` : ''}` : '';
+        <div class="pos-modal-stat-val">${item.expiryDate}${daysToExpiry !== null ? `<span style="font-size:10px;color:#888"> (${daysToExpiry}d)</span>` : ''}</div>
+      </div>` : ''}
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Volatiliteit σ</div>
+        <div class="pos-modal-stat-val">${sigmaLabel}</div>
+      </div>
+      <div class="pos-modal-stat">
+        <div class="pos-modal-stat-label">Onderliggende</div>
+        <div class="pos-modal-stat-val">${item.currentIndexPrice?.toFixed(2) ?? '—'}</div>
+        <div class="pos-modal-stat-sub" style="color:#888">bij toekenning: ${item.grantIndexPrice?.toFixed(2) ?? '—'}</div>
+        ${item.navCorrectionFactor && item.navCorrectionFactor !== 1 && item.rawCurrentIndexPrice
+          ? `<div class="pos-modal-stat-sub" style="color:#888">Yahoo: ${item.rawCurrentIndexPrice.toFixed(2)} × ${item.navCorrectionFactor}</div>`
+          : ''}
+      </div>
+      ${taxStats}` : '';
 
   const modal = document.getElementById('posModal');
   modal.innerHTML = `<div class="pos-modal-inner">
@@ -60,14 +119,12 @@ async function showBonusDetail(item) {
         <div class="pos-modal-stat-sub ${cls}">${sign}${pct.toFixed(2)}%</div>
       </div>
       ${callExtraStats}
+      ${!isCall ? `
       <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">${isCall ? 'Onderliggende bij toekenning' : 'Index bij toekenning'}</div>
-        <div class="pos-modal-stat-val">${item.grantIndexPrice?.toFixed(2) ?? '—'}</div>
-      </div>
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">${isCall ? 'Onderliggende nu' : 'Index nu'}</div>
+        <div class="pos-modal-stat-label">Index</div>
         <div class="pos-modal-stat-val">${item.currentIndexPrice?.toFixed(2) ?? '—'}</div>
-      </div>
+        <div class="pos-modal-stat-sub" style="color:#888">bij toekenning: ${item.grantIndexPrice?.toFixed(2) ?? '—'}</div>
+      </div>` : ''}
     </div>
     <div class="pos-modal-chart-wrap"><canvas id="posModalChart"></canvas></div>
   </div>`;
@@ -76,55 +133,18 @@ async function showBonusDetail(item) {
 
   if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
 
-  // Draw historical warrant value chart with YoY comparison + forecast
+  // Draw historical option/warrant value chart
   try {
-    const yearAgoGrant = (() => { const d = new Date(item.grantDate); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10); })();
-    const yearAgoToday = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().slice(0, 10); })();
+    const json = await fetchBonusHistory(item.id);
+    if (json.status !== 'ok' || !json.data.points.length) return;
 
-    // Single fetch from 1y before grant covers current period, overlap AND forecast window
-    const json    = await fetchBatch([item.symbol], [yearAgoGrant]);
-    const candles = json.data?.[item.symbol] || [];
-    if (!candles.length || !item.grantIndexPrice) return;
-
+    const { points: raw, priorPoints: rawPrior } = json.data;
     const ct = chartTheme();
 
-    // How far to extend the forecast: enough that the prior-year line is always ≥60 days total
-    const daysSinceGrant  = Math.floor((Date.now() - new Date(item.grantDate)) / 86_400_000);
-    const forecastDays    = Math.max(14, 60 - daysSinceGrant);
-    const forecastEnd     = (() => { const d = new Date(yearAgoToday); d.setDate(d.getDate() + forecastDays); return d.toISOString().slice(0, 10); })();
-
-    const current      = candles.filter(c => c.date >= item.grantDate);
-    const priorOverlap = candles.filter(c => c.date >= yearAgoGrant && c.date <= yearAgoToday);
-    const priorFcast   = candles.filter(c => c.date > yearAgoToday && c.date <= forecastEnd);
-
-    const currentFirst = current[0];
-    const priorFirst   = priorOverlap[0];
-    if (!currentFirst) return; // need at least current data to draw anything
-
-    const valueOf = (close) => isCall
-      ? item.quantity * Math.max(0, close - item.strikePrice) * (item.ratio || 1)
-      : item.quantity * item.grantPrice * (close / item.grantIndexPrice);
-
-    const currentStartY = valueOf(currentFirst.close);
-
-    const toPoint = (c, shiftYears = 0) => {
-      const d = new Date(c.date);
-      if (shiftYears) d.setFullYear(d.getFullYear() + shiftYears);
-      return { x: d, y: valueOf(c.close) };
-    };
-    const toPriorPoint = c => {
-      const d = new Date(c.date);
-      d.setFullYear(d.getFullYear() + 1);
-      return { x: d, y: currentStartY * (c.close / priorFirst.close) };
-    };
-
-    const points        = current.map(c => toPoint(c));
-    const priorPoints = priorFirst ? priorOverlap.map(toPriorPoint) : [];
-    // Prepend last overlap point so forecast line connects seamlessly
-    const fcastPoints = priorFirst ? [
-      toPriorPoint(priorOverlap[priorOverlap.length - 1]),
-      ...priorFcast.map(toPriorPoint),
-    ] : [];
+    const toPoint = p => ({ x: new Date(p.date), y: p.value });
+    const points      = raw.map(toPoint);
+    const priorPoints = rawPrior.map(toPoint);
+    const fcastPoints = [];
 
     state.chartInstances.__posModal = new Chart(document.getElementById('posModalChart').getContext('2d'), {
       type: 'line',
@@ -135,6 +155,7 @@ async function showBonusDetail(item) {
       ]},
       options: {
         responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -145,16 +166,17 @@ async function showBonusDetail(item) {
             callbacks: {
               title: items => new Date(items[0].parsed.x).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }),
               label: i => {
-                if (i.datasetIndex === 1) return ` vorig jaar: ${fmt(i.parsed.y)}`;
-                if (i.datasetIndex === 2) return ` prognose (vorig jaar): ${fmt(i.parsed.y)}`;
-                return ` ${fmt(i.parsed.y)}`;
+                const fmtPrice = v => `€${Number(v).toLocaleString('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                if (i.datasetIndex === 1) return ` vorig jaar: ${fmtPrice(i.parsed.y)}`;
+                if (i.datasetIndex === 2) return ` prognose (vorig jaar): ${fmtPrice(i.parsed.y)}`;
+                return ` ${fmtPrice(i.parsed.y)}`;
               },
             },
           },
         },
         scales: {
           x: { type: 'time', time: { unit: 'month' }, grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 } } },
-          y: { grid: { color: ct.gridColor }, ticks: { display: !state.privacyMode, color: ct.tickColor, font: { size: 9 }, callback: v => '€' + Math.round(Number(v)).toLocaleString('nl-BE') } },
+          y: { grid: { color: ct.gridColor }, ticks: { display: !state.privacyMode, color: ct.tickColor, font: { size: 9 }, callback: v => '€' + Number(v).toLocaleString('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } },
         },
       },
     });
@@ -223,6 +245,12 @@ function openBonusEdit(existing = null) {
       <label style="${LBL}">Toekenningsdatum
         <input id="bDate" type="date" value="${grantDate}" style="${INP}">
       </label>
+      <label style="${LBL}">Koers onderliggende bij toekenning (override)
+        <input id="bGrantIdx" type="number" value="${existing?.grantIndexPriceOverride ?? ''}" placeholder="auto (Yahoo)" step="0.01" min="0" style="${INP}">
+      </label>
+      <label style="${LBL}" title="Correctiefactor voor ETFs die met premium boven NAV handelen (bijv. 0.991 voor SC0D.DE). Yahoo-koers × factor = geschatte NAV.">NAV-correctiefactor (optioneel)
+        <input id="bNavFactor" type="number" value="${existing?.navCorrectionFactor ?? ''}" placeholder="1 (geen correctie)" step="0.0001" min="0.9" max="1.1" style="${INP}">
+      </label>
       <div id="bCallFields" style="display:${isCall?'flex':'none'};flex-direction:column;gap:12px;padding-top:4px;border-top:1px solid #1e293b">
         <div style="display:flex;gap:10px">
           <label style="${LBL};flex:2">Uitoefenprijs (strike)
@@ -232,8 +260,19 @@ function openBonusEdit(existing = null) {
             <input id="bRatio" type="number" value="${ratio}" placeholder="1" step="0.01" min="0.01" style="${INP}">
           </label>
         </div>
-        <label style="${LBL}">Vervaldatum (optioneel)
+        <label style="${LBL}">Vervaldatum
           <input id="bExpiry" type="date" value="${expiryDate}" style="${INP}">
+        </label>
+        <div style="display:flex;gap:10px">
+          <label style="${LBL};flex:1">Volatiliteit σ (%)
+            <input id="bVol" type="number" value="${existing?.volatility ?? ''}" placeholder="20% (standaard)" step="0.1" min="0" max="200" style="${INP}">
+          </label>
+          <label style="${LBL};flex:1">Risicovrije rente r (%)
+            <input id="bRate" type="number" value="${existing?.riskFreeRate == null ? '' : existing.riskFreeRate * 100}" placeholder="2% (standaard)" step="0.1" min="0" max="20" style="${INP}">
+          </label>
+        </div>
+        <label style="${LBL}">Belastingtarief BV (%)
+          <input id="bTaxRate" type="number" value="${existing?.taxRate ?? 53.5}" step="0.1" min="0" max="100" style="${INP}">
         </label>
       </div>
     </div>
@@ -278,11 +317,16 @@ function openBonusEdit(existing = null) {
       quantity:   Number(document.getElementById('bQty').value),
       grantDate:  document.getElementById('bDate').value,
       grantPrice: Number(document.getElementById('bPrice').value),
+      grantIndexPriceOverride: Number(document.getElementById('bGrantIdx')?.value) || undefined,
+      navCorrectionFactor: Number(document.getElementById('bNavFactor')?.value) || undefined,
       ...(type === 'call_option' && {
         type,
         strikePrice: strike,
         ratio: Number(document.getElementById('bRatio').value) || 1,
         expiryDate: document.getElementById('bExpiry').value || undefined,
+        volatility: Number(document.getElementById('bVol')?.value) || undefined,
+        riskFreeRate: Number(document.getElementById('bRate')?.value) / 100 || undefined,
+        taxRate: Number(document.getElementById('bTaxRate')?.value) || 53.5,
       }),
     };
     if (!entry.symbol || !entry.quantity || !entry.grantDate) {
@@ -293,6 +337,12 @@ function openBonusEdit(existing = null) {
     await saveBonus(entry);
     dlg.close();
     await reloadBonusCards();
+    // If the detail modal is still open for this item, refresh it with updated data
+    const posModal = document.getElementById('posModal');
+    if (posModal?.open) {
+      const updated = state.bonusItems.find(b => b.id === entry.id);
+      if (updated) showBonusDetail(updated);
+    }
   };
 }
 
@@ -334,13 +384,18 @@ function bonusCard(item) {
     : '';
 
   const isCall = item.type === 'call_option';
+  const hasBs  = isCall && item.volatility && item.expiryDate;
   const tag    = isCall ? 'call optie' : 'bonus';
-  const valueHtml = isCall && item.isOutOfMoney && item.strikePrice
+  const otmTag = item.isOutOfMoney ? '<span style="font-size:9px;color:#f87171;font-family:\'JetBrains Mono\',monospace;font-weight:700;margin-left:4px">OTM</span>' : '';
+  const valueHtml = isCall && item.isOutOfMoney && !hasBs
     ? `<div style="display:flex;align-items:center;gap:6px;margin-top:5px">
         <span class="metric-value c-neg privacy-val" style="font-size:16px">${fmt(0)}</span>
-        <span style="font-size:9px;color:#f87171;font-family:'JetBrains Mono',monospace;font-weight:700">OTM</span>
+        ${otmTag}
       </div>`
-    : `<div class="metric-value ${cls} privacy-val" style="font-size:16px;margin-top:5px">${fmt(item.totalValue ?? 0)}</div>`;
+    : `<div style="display:flex;align-items:center;gap:2px;margin-top:5px">
+        <span class="metric-value ${cls} privacy-val" style="font-size:16px">${fmt(item.totalValue ?? 0)}</span>
+        ${isCall && item.isOutOfMoney ? otmTag : ''}
+      </div>`;
 
   return `<div class="intraday-card" style="cursor:pointer" onclick="globalThis._showBonusDetail('${item.id}')">
     <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
