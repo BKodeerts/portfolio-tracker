@@ -86,9 +86,23 @@ async function fetchIntraday(yahooSymbol) {
   const regular = meta.currentTradingPeriod?.regular;
   let marketState = null;
   if (regular) marketState = (now >= regular.start && now < regular.end) ? 'REGULAR' : 'CLOSED';
+  // With range=2d, chartPreviousClose is 2 sessions ago. Compute previousClose from
+  // the actual data: last point of the previous session (different date from the latest).
+  const lastDate = new Date(points[points.length - 1].ts * 1000).toISOString().slice(0, 10);
+  let previousClose = null;
+  for (let i = points.length - 2; i >= 0; i--) {
+    if (new Date(points[i].ts * 1000).toISOString().slice(0, 10) !== lastDate) {
+      previousClose = points[i].close;
+      break;
+    }
+  }
+  // Fallback to Yahoo meta when only one session in the data
+  if (previousClose == null) {
+    previousClose = meta.regularMarketPreviousClose ?? meta.chartPreviousClose ?? null;
+  }
   return {
-    date: new Date(points[points.length - 1].ts * 1000).toISOString().slice(0, 10),
-    previousClose: meta.chartPreviousClose ?? meta.regularMarketPreviousClose ?? null,
+    date: lastDate,
+    previousClose,
     currency: meta.currency || null,
     marketState,
     exchange: meta.exchangeName || null,

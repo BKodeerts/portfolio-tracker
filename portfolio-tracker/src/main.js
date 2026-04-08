@@ -14,7 +14,7 @@ import { renderAnalyse, renderAnalyseCharts, sortPos, showPosModal, closePosModa
 import { handleCSVFile, updateYahooGuess, saveImport, saveTickerRenames } from './tabs/import.js';
 import { renderTransacties, filterTx, deleteTx, saveTxAll, toggleAddTx, addManualTx, onAddTypeChange } from './tabs/transacties.js';
 import { renderSettings } from './tabs/settings.js';
-import { loadIntradayData } from './tabs/intraday.js';
+import { loadIntradayData, isExchangeOpen } from './tabs/intraday.js';
 import { renderAppHeader } from './components/header.js';
 
 const _systemMq = globalThis.matchMedia('(prefers-color-scheme: dark)');
@@ -123,6 +123,19 @@ function refreshIntraday() {
   });
 }
 
+// Auto-refresh intraday data every 5 minutes when any held stock's exchange is open
+let _autoRefreshTimer = null;
+function startAutoRefresh() {
+  if (_autoRefreshTimer) return;
+  _autoRefreshTimer = setInterval(() => {
+    const anyOpen = (state.CURRENT_TICKERS || []).some(t => {
+      const yahoo = state.TICKER_META?.[t]?.yahoo;
+      return yahoo && isExchangeOpen(yahoo);
+    });
+    if (anyOpen) refreshIntraday();
+  }, 5 * 60 * 1000);
+}
+
 // Expose all functions referenced by inline onclick= handlers
 globalThis._init             = init;
 globalThis._setTab           = setTab;
@@ -178,4 +191,4 @@ document.body.classList.toggle('privacy', state.privacyMode);
 document.querySelectorAll('.privacy-btn').forEach(b => b.classList.toggle('on', state.privacyMode));
 applyTheme();
 syncSystemListener();
-init();
+init().then(() => startAutoRefresh());
