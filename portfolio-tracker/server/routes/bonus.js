@@ -171,13 +171,18 @@ router.get('/bonus', async (_req, res) => {
   const result = [];
 
   for (const item of items) {
-    const grantIndexPrice  = item.grantIndexPriceOverride ?? await getPriceAtDate(item.symbol, item.grantDate);
-    const rawCurrentPrice  = await getCurrentPrice(item.symbol);
+    const rawGrantIndexPrice = item.grantIndexPriceOverride ?? await getPriceAtDate(item.symbol, item.grantDate);
+    const rawCurrentPrice    = await getCurrentPrice(item.symbol);
     // Apply NAV correction factor: Yahoo market price → estimated NAV
     // Needed for ETFs where Yahoo shows exchange price (with premium) but the option platform uses official NAV.
     // e.g. SC0D.DE trades ~0.9% above NAV; set navCorrectionFactor=0.991 to correct.
-    const navFactor         = item.navCorrectionFactor ?? 1;
-    const currentIndexPrice = rawCurrentPrice == null ? null : rawCurrentPrice * navFactor;
+    // Override comes from the offering letter (already NAV-correct) → never apply navFactor to it.
+    // Auto-fetched Yahoo price at grant has the same premium → apply navFactor for consistency.
+    const navFactor          = item.navCorrectionFactor ?? 1;
+    const grantIndexPrice = (item.grantIndexPriceOverride == null && rawGrantIndexPrice != null)
+      ? rawGrantIndexPrice * navFactor
+      : rawGrantIndexPrice;
+    const currentIndexPrice  = rawCurrentPrice == null ? null : rawCurrentPrice * navFactor;
     const pct = (grantIndexPrice && currentIndexPrice)
       ? (currentIndexPrice - grantIndexPrice) / grantIndexPrice * 100 : 0;
 
@@ -297,10 +302,16 @@ router.get("/bonus/:id/history", async (req, res) => {
   };
 
   const rawCandles = await fetchCached(item.symbol, yearAgoGrant);
-  const grantIndexPrice = item.grantIndexPriceOverride ?? await getPriceAtDate(item.symbol, item.grantDate);
-
-  // Apply NAV correction factor to every candle close (same correction as live price)
   const navFactor = item.navCorrectionFactor ?? 1;
+
+  // Apply NAV correction factor to every candle close (same correction as live price).
+  // Override comes from the offering letter (already NAV-correct) → use as-is.
+  // Auto-fetched Yahoo price at grant has the same premium as the candles → apply navFactor.
+  const rawGrantIndexPrice = item.grantIndexPriceOverride ?? await getPriceAtDate(item.symbol, item.grantDate);
+  const grantIndexPrice = (item.grantIndexPriceOverride == null && rawGrantIndexPrice != null)
+    ? rawGrantIndexPrice * navFactor
+    : rawGrantIndexPrice;
+
   const candles = navFactor === 1
     ? rawCandles
     : rawCandles.map((c) => ({ ...c, close: c.close * navFactor }));

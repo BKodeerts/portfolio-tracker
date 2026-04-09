@@ -650,6 +650,7 @@ export function renderPortfolioChart(visibleTickers) {
           bodyFont: { family: "'JetBrains Mono'", size: 11 },
           padding: 14,
           cornerRadius: 10,
+          itemSort: (a, b) => b.parsed.y - a.parsed.y,
           callbacks: {
             title: (items) =>
               useIntraday
@@ -803,7 +804,7 @@ export function renderSummaryBar() {
     </div>
     <div class="metric-card">
       <div class="metric-label">Portefeuille</div>
-      <div class="metric-value c-brand privacy-val">${fmt(latest.total)}</div>
+      <div id="metricPortfolio" class="metric-value c-brand privacy-val">${fmt(latest.total)}</div>
     </div>
     <div class="metric-card">
       <div class="metric-label">P&amp;L totaal</div>

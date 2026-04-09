@@ -68,11 +68,90 @@ async function fetchDailyQuote(yahooSymbol) {
   };
 }
 
+function deriveMarketState(periods) {
+  const now = Date.now() / 1000;
+  const { regular, pre, post } = periods || {};
+  if (regular && now >= regular.start && now < regular.end) return 'REGULAR';
+  if (pre     && now >= pre.start     && now < pre.end)     return 'PRE';
+  if (post    && now >= post.start    && now < post.end)    return 'POST';
+  return 'CLOSED';
+}
+
+function derivePreviousClose(points, periods, lastDate, meta) {
+  // Find the last close of the prior regular session.
+  // With includePrePost=true, we must skip today's extended-hours points by looking
+  // before today's pre-market start (if available), else before regular start.
+  const cutoff = periods?.pre?.start ?? periods?.regular?.start ?? null;
+  if (cutoff) {
+    for (let i = points.length - 1; i >= 0; i--) {
+      if (points[i].ts < cutoff) return points[i].close;
+    }
+  }
+  // Fallback: last point on a different calendar date
+  for (let i = points.length - 1; i >= 0; i--) {
+    if (new Date(points[i].ts * 1000).toISOString().slice(0, 10) !== lastDate) return points[i].close;
+  }
+  return meta.regularMarketPreviousClose ?? meta.chartPreviousClose ?? null;
+}
+
+// Returns { sessionPoints, previousClose } for the most relevant trading session.
+// When today's regular session has data, use it with the standard previousClose.
+// When it's pre-market (some today points exist but regular hasn't started), use
+// the fallback window with the standard previousClose (last close before today's pre/regular start).
+// When the market is fully closed with no today points at all (showing yesterday's stale
+// session), anchor previousClose to the last close BEFORE yesterday's session — otherwise
+// the baseline equals yesterday's close and every % reads 0.
+function deriveSession(points, periods, lastDate, meta) {
+  const regular = periods?.regular;
+  if (!regular) {
+    return { sessionPoints: points, previousClose: derivePreviousClose(points, periods, lastDate, meta) };
+  }
+
+  const todayPts = points.filter(p => p.ts >= regular.start && p.ts < regular.end);
+  if (todayPts.length > 0) {
+    return {
+      sessionPoints: todayPts,
+      previousClose: derivePreviousClose(points, periods, lastDate, meta),
+    };
+  }
+
+  // No regular-session data today — use the 24 h window before regular start
+  const stalePts  = points.filter(p => p.ts < regular.start && p.ts >= regular.start - 86400);
+  const preStart  = periods?.pre?.start;
+  const inPreToday = preStart && points.some(p => p.ts >= preStart);
+
+  if (inPreToday) {
+    // PRE state: standard previousClose (last close before today's pre/regular start)
+    return { sessionPoints: stalePts, previousClose: derivePreviousClose(points, periods, lastDate, meta) };
+  }
+
+  // Fully closed — find last close before the stale session began so % isn't always 0
+  const sessionStart = stalePts.length > 0 ? stalePts[0].ts : null;
+  if (sessionStart) {
+    let found = null;
+    for (let i = points.length - 1; i >= 0; i--) {
+      if (points[i].ts < sessionStart) { found = points[i].close; break; }
+    }
+    const previousClose = found ?? meta.regularMarketPreviousClose ?? meta.chartPreviousClose ?? null;
+    return { sessionPoints: stalePts, previousClose };
+  }
+
+  return { sessionPoints: stalePts, previousClose: derivePreviousClose(points, periods, lastDate, meta) };
+}
+
+function deriveExtendedPrices(points, pre, post) {
+  if (!pre || !post) return { preMarketPrice: null, postMarketPrice: null };
+  const last = (pts) => pts.length ? pts[pts.length - 1].close : null;
+  return {
+    preMarketPrice:  last(points.filter(p => p.ts >= pre.start  && p.ts < pre.end)),
+    postMarketPrice: last(points.filter(p => p.ts >= post.start && p.ts < post.end)),
+  };
+}
+
 async function fetchIntraday(yahooSymbol) {
-  const isFx = yahooSymbol.endsWith('=X');
   // Use range=2d so we always have the previous session available when a market just
   // opened and range=1d would only return the new (sparse) session.
-  const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=5m&range=2d&includePrePost=${isFx}`;
+  const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=5m&range=2d&includePrePost=true`;
   const text = await fetchYahoo(url);
   const result = JSON.parse(text)?.chart?.result?.[0];
   if (!result) return null;
@@ -81,32 +160,20 @@ async function fetchIntraday(yahooSymbol) {
   const meta       = result.meta || {};
   const points     = timestamps.map((ts, i) => ({ ts, close: closes[i] ?? null })).filter(d => d.close !== null);
   if (points.length === 0) return null;
-  // Derive marketState from currentTradingPeriod (accounts for holidays + DST)
-  const now = Date.now() / 1000;
-  const regular = meta.currentTradingPeriod?.regular;
-  let marketState = null;
-  if (regular) marketState = (now >= regular.start && now < regular.end) ? 'REGULAR' : 'CLOSED';
-  // With range=2d, chartPreviousClose is 2 sessions ago. Compute previousClose from
-  // the actual data: last point of the previous session (different date from the latest).
+
+  const periods  = meta.currentTradingPeriod;
   const lastDate = new Date(points[points.length - 1].ts * 1000).toISOString().slice(0, 10);
-  let previousClose = null;
-  for (let i = points.length - 2; i >= 0; i--) {
-    if (new Date(points[i].ts * 1000).toISOString().slice(0, 10) !== lastDate) {
-      previousClose = points[i].close;
-      break;
-    }
-  }
-  // Fallback to Yahoo meta when only one session in the data
-  if (previousClose == null) {
-    previousClose = meta.regularMarketPreviousClose ?? meta.chartPreviousClose ?? null;
-  }
+
+  const { sessionPoints, previousClose } = deriveSession(points, periods, lastDate, meta);
+
   return {
-    date: lastDate,
+    date:          lastDate,
     previousClose,
-    currency: meta.currency || null,
-    marketState,
-    exchange: meta.exchangeName || null,
-    points,
+    currency:      meta.currency || null,
+    marketState:   deriveMarketState(periods),
+    exchange:      meta.exchangeName || null,
+    ...deriveExtendedPrices(points, periods?.pre, periods?.post),
+    points: sessionPoints,
   };
 }
 

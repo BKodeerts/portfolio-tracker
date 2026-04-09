@@ -1,6 +1,6 @@
 import { state } from '../state.js';
 import { fetchBonus, saveBonus, deleteBonus, fetchBonusHistory } from '../api.js';
-import { sparklineSVG } from './intraday.js';
+import { sparklineSVG, latestSessionPoints } from './intraday.js';
 import { fmt, chartTheme } from '../utils.js';
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
@@ -8,24 +8,26 @@ import 'chartjs-adapter-date-fns';
 // ── Detail modal (reuses #posModal + pos-modal-inner styling) ─────────────────
 
 function buildTaxStats(item, netValueCls) {
+  const toggle = `const el=document.getElementById('bonusTaxBody');const open=el.style.display==='none';el.style.display=open?'':'none';this.querySelector('.tcv').style.transform=open?'rotate(180deg)':'rotate(0deg)'`;
+  const row = (label, val, valCls, sub) => `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.05)">
+      <span style="font-size:11px;color:#888">${label}</span>
+      <div style="display:flex;align-items:baseline;gap:12px">
+        ${sub ? `<span style="font-size:10px;color:#666">${sub}</span>` : ''}
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700" class="${valCls} privacy-val">${val}</span>
+      </div>
+    </div>`;
   return `
-      <div class="pos-modal-stat" style="grid-column:1/-1;border-top:1px solid #1e293b;margin-top:4px;padding-top:4px">
-        <div class="pos-modal-stat-label" style="color:#f59e0b;font-size:10px;letter-spacing:.08em">BELGISCHE FISCALITEIT (VAA / ATN)</div>
+      <div class="pos-modal-stat" style="grid-column:1/-1;border-top:1px solid #1e293b;margin-top:4px;padding-top:4px;cursor:pointer" onclick="${toggle}">
+        <div class="pos-modal-stat-label" style="color:#f59e0b;font-size:10px;letter-spacing:.08em;display:flex;align-items:center;gap:6px;user-select:none">
+          BELGISCHE FISCALITEIT (VAA / ATN)
+          <span class="tcv" style="font-size:10px;display:inline-block;transition:transform .2s">▾</span>
+        </div>
       </div>
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Belastbare grondslag</div>
-        <div class="pos-modal-stat-val privacy-val">${fmt(item.vatGross)}</div>
-        <div class="pos-modal-stat-sub">${item.quantity} × €${item.grantPrice?.toFixed(2)} (optieprijs bij toekenning)</div>
-      </div>
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Bedrijfsvoorheffing (${item.taxRate ?? 53.5}%)</div>
-        <div class="pos-modal-stat-val c-neg privacy-val">−${fmt(item.vatTax)}</div>
-        <div class="pos-modal-stat-sub">belastbaar op ${item.taxableDate} (dag 60)</div>
-      </div>
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Netto optiewaarde na BV</div>
-        <div class="pos-modal-stat-val privacy-val ${netValueCls}">${fmt(item.netValue ?? 0)}</div>
-        <div class="pos-modal-stat-sub">optiewaarde − belasting</div>
+      <div id="bonusTaxBody" style="grid-column:1/-1;display:none;padding:0 2px 4px">
+        ${row('Belastbare grondslag', fmt(item.vatGross), '', `${item.quantity} × €${item.grantPrice?.toFixed(2)}`)}
+        ${row(`Bedrijfsvoorheffing ${item.taxRate ?? 53.5}%`, '−' + fmt(item.vatTax), 'c-neg', `belastbaar op ${item.taxableDate}`)}
+        ${row('Netto optiewaarde na BV', fmt(item.netValue ?? 0), netValueCls, '')}
       </div>`;
 }
 
@@ -58,10 +60,7 @@ async function showBonusDetail(item) {
       <div class="pos-modal-stat">
         <div class="pos-modal-stat-label">Uitoefenprijs</div>
         <div class="pos-modal-stat-val">€${item.strikePrice?.toFixed(2) ?? '—'}${(item.ratio && item.ratio !== 1) ? `<span style="font-size:10px;color:#888"> ×${item.ratio}</span>` : ''}</div>
-      </div>
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Status</div>
-        <div class="pos-modal-stat-val ${item.isOutOfMoney ? 'c-neg' : 'c-pos'}">${item.isOutOfMoney ? 'Out of the money' : 'In the money ✓'}</div>
+        <div class="pos-modal-stat-sub ${item.isOutOfMoney ? 'c-neg' : 'c-pos'}">${item.isOutOfMoney ? 'out of the money' : 'in the money ✓'}</div>
       </div>
       ${intrinsic > 0 ? `<div class="pos-modal-stat">
         <div class="pos-modal-stat-label">Intrinsieke waarde</div>
@@ -78,14 +77,6 @@ async function showBonusDetail(item) {
       <div class="pos-modal-stat">
         <div class="pos-modal-stat-label">Volatiliteit σ</div>
         <div class="pos-modal-stat-val">${sigmaLabel}</div>
-      </div>
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Onderliggende</div>
-        <div class="pos-modal-stat-val">${item.currentIndexPrice?.toFixed(2) ?? '—'}</div>
-        <div class="pos-modal-stat-sub" style="color:#888">bij toekenning: ${item.grantIndexPrice?.toFixed(2) ?? '—'}</div>
-        ${item.navCorrectionFactor && item.navCorrectionFactor !== 1 && item.rawCurrentIndexPrice
-          ? `<div class="pos-modal-stat-sub" style="color:#888">Yahoo: ${item.rawCurrentIndexPrice.toFixed(2)} × ${item.navCorrectionFactor}</div>`
-          : ''}
       </div>
       ${taxStats}` : '';
 
@@ -105,12 +96,12 @@ async function showBonusDetail(item) {
       </div>
       <div class="pos-modal-stat">
         <div class="pos-modal-stat-label">Prijs bij toekenning</div>
-        <div class="pos-modal-stat-val">€${item.grantPrice.toFixed(2)}</div>
+        <div class="pos-modal-stat-val">€${item.grantPrice.toFixed(2)}${isCall && item.grantIndexPrice ? `<span style="font-size:11px;color:#888;font-weight:400"> (${item.grantIndexPrice.toFixed(2)})</span>` : ''}</div>
         <div class="pos-modal-stat-sub" style="color:#888">${item.grantDate}</div>
       </div>
       <div class="pos-modal-stat">
         <div class="pos-modal-stat-label">Prijs nu</div>
-        <div class="pos-modal-stat-val ${priceCls}">€${(item.currentWarrantPrice ?? item.grantPrice).toFixed(2)}</div>
+        <div class="pos-modal-stat-val ${priceCls}">€${(item.currentWarrantPrice ?? item.grantPrice).toFixed(2)}${isCall && item.currentIndexPrice ? `<span style="font-size:11px;color:#888;font-weight:400"> (${item.currentIndexPrice.toFixed(2)})</span>` : ''}</div>
         <div class="pos-modal-stat-sub ${priceCls}">${priceSign}€${Math.abs(priceChange).toFixed(2)}</div>
       </div>
       <div class="pos-modal-stat">
@@ -119,12 +110,6 @@ async function showBonusDetail(item) {
         <div class="pos-modal-stat-sub ${cls}">${sign}${pct.toFixed(2)}%</div>
       </div>
       ${callExtraStats}
-      ${!isCall ? `
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Index</div>
-        <div class="pos-modal-stat-val">${item.currentIndexPrice?.toFixed(2) ?? '—'}</div>
-        <div class="pos-modal-stat-sub" style="color:#888">bij toekenning: ${item.grantIndexPrice?.toFixed(2) ?? '—'}</div>
-      </div>` : ''}
     </div>
     <div class="pos-modal-chart-wrap"><canvas id="posModalChart"></canvas></div>
   </div>`;
@@ -379,8 +364,9 @@ function bonusCard(item) {
     todaySub = `<span style="color:${color}">${todaySign}${todayPct.toFixed(2)}% vandaag</span>`;
   }
 
-  const sparkline = data?.points?.length
-    ? sparklineSVG(data.points, data.previousClose, 510)
+  const sessionPts = latestSessionPoints(data);
+  const sparkline = sessionPts.length
+    ? sparklineSVG(sessionPts, data.previousClose, 510)
     : '';
 
   const isCall = item.type === 'call_option';
@@ -397,7 +383,7 @@ function bonusCard(item) {
         ${isCall && item.isOutOfMoney ? otmTag : ''}
       </div>`;
 
-  return `<div class="intraday-card" style="cursor:pointer" onclick="globalThis._showBonusDetail('${item.id}')">
+  return `<div class="intraday-card clickable" onclick="globalThis._showBonusDetail('${item.id}')">
     <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
       <span class="pos-dot" style="background:#a78bfa"></span>${item.label}
       <span style="font-size:9px;color:#a78bfa;font-family:'JetBrains Mono',monospace;margin-left:auto">${tag}</span>

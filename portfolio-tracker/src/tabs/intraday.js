@@ -242,15 +242,27 @@ export function renderTodayMetric() {
   const cls  = r.pl >= 0 ? 'c-pos' : 'c-neg';
   const sign = r.pl >= 0 ? '+' : '';
   el.innerHTML = `<div class="metric-value ${cls} privacy-val" style="font-size:17px">${sign}${fmt(r.pl)}</div><div class="metric-sub ${cls}">${sign}${r.pct.toFixed(2)}%</div>`;
+
+  const portfolioEl = document.getElementById('metricPortfolio');
+  if (portfolioEl) {
+    const latest = state.chartData.at(-1);
+    if (latest) portfolioEl.textContent = fmt(latest.total + r.pl);
+  }
 }
 
 // Filter points to only include the most recent session (by data.date, UTC)
-function latestSessionPoints(data) {
+export function latestSessionPoints(data) {
   if (!data?.points?.length) return [];
   const sessionDate = data.date;
   if (!sessionDate) return data.points;
   return data.points.filter(p =>
     new Date(p.ts * 1000).toISOString().slice(0, 10) === sessionDate);
+}
+
+const CCY_SYM = { USD: '$', EUR: '€', GBP: '£', GBX: 'p', CHF: 'Fr', JPY: '¥', AUD: 'A$', CAD: 'C$' };
+
+function sessionBadge(label, color = '#94a3b8') {
+  return `<span class="session-badge" style="color:${color};margin-left:auto">${label}</span>`;
 }
 
 export function renderIntradaySection() {
@@ -309,12 +321,13 @@ export function renderIntradaySection() {
   gridEl.innerHTML = fxCard + entries.map(({ ticker, yahoo, data }) => {
     const hasData = data?.points?.length > 0;
     if (!hasData) {
-      return `<div class="intraday-card" style="opacity:0.45;cursor:pointer" onclick="window._showPosModal('${ticker}')">
+      return `<div class="intraday-card clickable" style="opacity:0.45" onclick="window._showPosModal('${ticker}')">
         <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
           <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
         </div>
         <div class="metric-value c-neutral" style="font-size:16px;margin-top:5px">—</div>
-        <div class="metric-sub" style="margin-top:8px">geen data</div>
+        <div style="height:38px;margin-top:8px"></div>
+        <div class="metric-sub">geen data</div>
       </div>`;
     }
     const meta    = state.TICKER_META[ticker];
@@ -325,23 +338,34 @@ export function renderIntradaySection() {
     const cls     = pct >= 0 ? 'c-pos' : 'c-neg';
     const todayStr  = new Date().toISOString().slice(0, 10);
     const isStale   = data.date !== todayStr;
-    const isClosed  = !isStale && (data.marketState ? data.marketState !== 'REGULAR' : !isExchangeOpen(yahoo));
+    const marketState = data.marketState || (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED');
+    const isClosed  = !isStale && marketState !== 'REGULAR';
     let statusLabel = '';
-    if (isStale)       statusLabel = `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(data.date)}</span>`;
-    else if (isClosed) statusLabel = `<span style="font-size:9px;color:#64748b;font-family:'JetBrains Mono',monospace;margin-left:auto">gesloten</span>`;
+    if (isStale)                   statusLabel = sessionBadge(staleDayLabel(data.date), '#f59e0b');
+    else if (marketState === 'PRE')  statusLabel = sessionBadge('pre');
+    else if (marketState === 'POST') statusLabel = sessionBadge('post');
+    else if (isClosed)             statusLabel = sessionBadge('gesloten', '#64748b');
     // Show price in the stock's native currency (from TICKER_META), converting if Yahoo returns a different currency
     const nativeCcy    = meta?.currency || data.currency || '';
     const displayPrice = (nativeCcy === 'USD' && data.currency === 'EUR')
       ? last.close * (state.liveEurUsd || FX_FALLBACK)
       : last.close;
-    return `<div class="intraday-card" style="${isStale ? 'opacity:0.5;' : ''}cursor:pointer" onclick="window._showPosModal('${ticker}')">
+    // Extended-hours sub-indicator (only for POST — during PRE the main pct already reflects pre-market movement)
+    let extHoursHtml = '';
+    if (!isStale && prev && marketState === 'POST' && data.postMarketPrice) {
+      const extPct  = (data.postMarketPrice - last.close) / last.close * 100;
+      const extSign = extPct >= 0 ? '+' : '';
+      const extCls  = extPct >= 0 ? '#4ade80' : '#f87171';
+      extHoursHtml = ` <span style="color:#64748b">·</span> <span style="color:${extCls}">post ${extSign}${extPct.toFixed(2)}%</span>`;
+    }
+    return `<div class="intraday-card clickable" style="${isStale ? 'opacity:0.5' : ''}" onclick="window._showPosModal('${ticker}')">
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
         <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
         ${statusLabel}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
-      ${sparklineSVG(sessionPts, prev, getTradingMins(yahoo))}
-      <div class="metric-sub">${nativeCcy} ${displayPrice.toFixed(2)}</div>
+      ${sparklineSVG(sessionPts, prev, marketState === 'REGULAR' ? getTradingMins(yahoo) : null)}
+      <div class="metric-sub">${CCY_SYM[nativeCcy] || nativeCcy} ${displayPrice.toFixed(2)}${extHoursHtml}</div>
     </div>`;
   }).join('');
 
@@ -369,6 +393,12 @@ export function renderIntradaySection() {
       else               cls = 'c-neg';
       const todayStr  = new Date().toISOString().slice(0, 10);
       const isStale   = data && data.date !== todayStr;
+      const wlMarketState = data?.marketState || null;
+      let wlStatusLabel = '';
+      if (!isStale) {
+        if (wlMarketState === 'PRE')       wlStatusLabel = sessionBadge('pre');
+        else if (wlMarketState === 'POST') wlStatusLabel = sessionBadge('post');
+      }
       let priceStr;
       if (last)                priceStr = last.close.toFixed(2);
       else if (item.price != null) priceStr = item.price.toFixed(2);
@@ -382,10 +412,10 @@ export function renderIntradaySection() {
       card.innerHTML = `
         <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
           <span class="pos-dot" style="background:#64748b"></span>${item.symbol}
-          ${isStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(data.date)}</span>` : ''}
+          ${isStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(data.date)}</span>` : wlStatusLabel}
         </div>
         <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pctStr}</div>
-        ${hasData ? sparklineSVG(wlSession, prev, getTradingMins(item.symbol)) : ''}
+        ${hasData ? sparklineSVG(wlSession, prev, wlMarketState === 'REGULAR' ? getTradingMins(item.symbol) : null) : ''}
         <div class="metric-sub">${priceStr}</div>`;
       gridEl.appendChild(card);
     }

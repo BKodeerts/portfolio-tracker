@@ -6,7 +6,7 @@
 const fs   = require('node:fs');
 const path = require('node:path');
 const { fetchDailyQuote, fetchCandles, fetchIntraday, fetchQuoteSummary, sleep, FETCH_DELAY } = require('./yahoo.js');
-const { readCache, writeCache, QUOTES_CACHE_TTL, CACHE_TTL, INTRADAY_CACHE_TTL } = require('./cache.js');
+const { readCache, readStaleCache, writeCache, QUOTES_CACHE_TTL, CACHE_TTL, INTRADAY_CACHE_TTL } = require('./cache.js');
 const { getOptions } = require('./ha-helper.js');
 
 const DATA_DIR          = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -126,10 +126,16 @@ async function getQuote(yahooSymbol) {
   const cacheKey = `quote_${yahooSymbol}`;
   const cached = readCache(cacheKey, QUOTES_CACHE_TTL);
   if (cached) return cached;
-  const q = await fetchDailyQuote(yahooSymbol);
-  if (q) writeCache(cacheKey, q);
-  await sleep(FETCH_DELAY);
-  return q || null;
+  try {
+    const q = await fetchDailyQuote(yahooSymbol);
+    if (q) writeCache(cacheKey, q);
+    await sleep(FETCH_DELAY);
+    return q || null;
+  } catch (e) {
+    const stale = readStaleCache(cacheKey);
+    console.warn(`[QUOTE] ${yahooSymbol}: fetch failed (${e.code || e.message})${stale ? ', using stale cache' : ', no cache'}`);
+    return stale || null;
+  }
 }
 
 async function getIntradayPrice(yahooSymbol) {
@@ -165,10 +171,16 @@ async function getLivePrices(yahooSymbols, manualPrices = {}) {
 async function getRawCandles(yahooSymbol, fromDate) {
   const cached = readCache(yahooSymbol, CACHE_TTL);
   if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-  const candles = await fetchCandles(yahooSymbol, fromDate);
-  if (candles) writeCache(yahooSymbol, candles);
-  await sleep(FETCH_DELAY);
-  return candles || [];
+  try {
+    const candles = await fetchCandles(yahooSymbol, fromDate);
+    if (candles) writeCache(yahooSymbol, candles);
+    await sleep(FETCH_DELAY);
+    return candles || [];
+  } catch (e) {
+    const stale = readStaleCache(yahooSymbol);
+    console.warn(`[CANDLES] ${yahooSymbol}: fetch failed (${e.code || e.message})${stale ? ', using stale cache' : ', no cache'}`);
+    return stale || [];
+  }
 }
 
 // ── Price map construction ────────────────────────────────────────────────────
