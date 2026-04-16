@@ -5,18 +5,19 @@
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(0,0,0,0.07);
 }
-.top-bar-inner { max-width: 980px; margin: 0 auto; padding: 14px 20px 14px; }
-.summary-bar-grid { margin-top: 0; margin-bottom: 12px; }
+.top-bar-inner { max-width: 980px; margin: 0 auto; padding: 12px 20px; }
+.summary-bar-grid { margin-top: 0; margin-bottom: 10px; }
 .summary-bar-grid .metric-card { padding: 10px 14px; }
 .summary-bar-grid .metric-value { font-size: 16px !important; }
 
-/* ── Summary + display controls row ── */
-.summary-with-controls { display: flex; align-items: flex-start; gap: 8px; }
-#summary-bar { flex: 1; min-width: 0; }
-.display-controls { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; padding-top: 2px; }
+/* ── Nav + controls row ── */
+.nav-with-controls { display: flex; align-items: center; gap: 6px; }
+#app-header { flex: 1; min-width: 0; }
+#summary-bar { min-width: 0; }
+.display-controls { display: flex; flex-direction: row; gap: 2px; flex-shrink: 0; align-items: center; }
 
 /* ── App header ── */
-.app-header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.app-header { display: flex; align-items: center; }
 .app-nav { display: flex; gap: 2px; background: rgba(0,0,0,0.05); border-radius: 10px; padding: 3px; flex: 1; }
 .nav-btn {
   padding: 6px 16px; border-radius: 7px; border: none;
@@ -24,7 +25,7 @@
   cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap;
 }
 .nav-btn:hover { color: #444; }
-.nav-btn.active { background: rgba(0,0,0,0.08); color: #1c1c1c; }
+.nav-btn.active { background: rgba(255,255,255,0.88); color: #1c1c1c; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
 
 /* ── Metric cards ── */
 .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
@@ -327,14 +328,14 @@
 .intraday-card.clickable:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 .intraday-card.clickable:active { transform: none; box-shadow: none; }
 
-/* Display control icon toggles (theme + privacy) */
+/* Display control icon toggles (settings + privacy) */
 .icon-toggle {
-  background: none; border: none; padding: 4px; cursor: pointer;
-  font-size: 18px; line-height: 1; display: block;
-  opacity: 0.3; transition: opacity 0.2s; color: inherit;
+  background: none; border: none; padding: 5px; cursor: pointer;
+  line-height: 1; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; opacity: 0.38; transition: opacity 0.2s, background 0.15s; color: inherit;
 }
-.icon-toggle:hover { opacity: 0.7; }
-.icon-toggle.on    { opacity: 1; }
+.icon-toggle:hover { opacity: 0.72; background: rgba(0,0,0,0.05); }
+.icon-toggle.on    { opacity: 0.9; background: rgba(0,0,0,0.06); }
 
 /* Closed-eye slash drawn over the emoji when privacy is active */
 .eye-icon { position: relative; display: inline-block; }
