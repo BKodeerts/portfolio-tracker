@@ -117,11 +117,15 @@ export function renderStockDetail() {
       </div>
 
       <div class="stock-detail-header">
-        <span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span>
-        <span class="stock-detail-ticker">${ticker}</span>
-        <span class="stock-detail-name">${meta.label || ''}</span>
-        ${currentPrice != null ? `<span class="stock-detail-price privacy-val">${ccySym}${currentPrice.toFixed(2)}</span>` : ''}
-        ${dayChangePct != null ? `<span class="stock-detail-change ${dayChangeCls}">${dayChangeSign}${dayChangePct.toFixed(2)}%</span>` : ''}
+        <div class="sd-header-id">
+          <span class="sd-color-dot" style="background:${color}"></span>
+          <span class="stock-detail-ticker">${ticker}</span>
+        </div>
+        ${meta.label ? `<span class="stock-detail-name">${meta.label}</span>` : ''}
+        <div class="sd-header-price-row">
+          ${currentPrice != null ? `<span class="stock-detail-price privacy-val">${ccySym}${currentPrice.toFixed(2)}</span>` : ''}
+          ${dayChangePct != null ? `<span class="stock-detail-change ${dayChangeCls}">${dayChangeSign}${dayChangePct.toFixed(2)}%</span>` : ''}
+        </div>
         ${marketBadge}
       </div>
 
