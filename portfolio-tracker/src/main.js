@@ -78,8 +78,16 @@ async function init() {
   }
 }
 
-function setTab(t) {
+// ── Navigation history (browser-native back/forward) ──────────────────────
+// _applyTab renders the given tab without touching browser history.
+// setTab / navigateToStock push a history entry so the browser's own
+// back/forward gestures work.  The popstate handler calls _applyTab so
+// the in-app state stays in sync.  A guard at the bottom of popstate
+// prevents the user from accidentally leaving the app.
+
+function _applyTab(t, ticker) {
   state.currentTab = t;
+  if (ticker !== undefined) state.selectedTicker = ticker;
   if      (t === 'portefeuille') renderApp();
   else if (t === 'analyse')      renderAnalyse();
   else if (t === 'transacties')  renderTransacties();
@@ -88,13 +96,19 @@ function setTab(t) {
   else if (t === 'aandeel')      renderStockDetail();
 }
 
-function navigateToStock(ticker) {
-  state.prevTab = state.currentTab;
-  state.selectedTicker = ticker;
-  setTab('aandeel');
+function setTab(t) {
+  if (state.currentTab !== t) {
+    history.pushState({ _ptab: true, tab: t, ticker: null }, '');
+  }
+  _applyTab(t);
 }
 
-function stockDetailBack() { setTab(state.prevTab || 'portefeuille'); }
+function navigateToStock(ticker) {
+  history.pushState({ _ptab: true, tab: 'aandeel', ticker }, '');
+  _applyTab('aandeel', ticker);
+}
+
+function stockDetailBack() { history.back(); }
 
 function closePosModal() {
   const el = document.getElementById('posModal');
@@ -204,6 +218,21 @@ document.addEventListener('touchend', e => {
 const posModalEl = document.getElementById('posModal');
 posModalEl.addEventListener('click', e => { if (e.target === posModalEl) closePosModal(); });
 posModalEl.addEventListener('close', () => closePosModal());
+
+// Seed the history stack so the initial tab has a state entry.
+// This ensures popstate always receives our {_ptab} object.
+history.replaceState({ _ptab: true, tab: 'portefeuille', ticker: null }, '');
+
+// Browser back/forward — restore in-app tab without pushing a new entry.
+// If the user pops past the app's first entry (state is null / foreign),
+// push the current state back immediately so they stay in the app.
+window.addEventListener('popstate', e => {
+  if (e.state?._ptab) {
+    _applyTab(e.state.tab, e.state.ticker);
+  } else {
+    history.pushState({ _ptab: true, tab: state.currentTab, ticker: state.selectedTicker }, '');
+  }
+});
 
 // Boot
 document.body.classList.toggle('privacy', state.privacyMode);
