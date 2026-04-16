@@ -60,8 +60,6 @@ const distDir = path.join(__dirname, '..', 'dist');
 app.use(express.static(distDir));
 app.get('*', (req, res) => res.sendFile(path.join(distDir, 'index.html')));
 
-const fs = require('node:fs');
-
 // Copy Lovelace card to /config/www/ so it's accessible via /local/ (works with Nabu Casa)
 try {
   const wwwDir  = '/config/www/portfolio-tracker';
