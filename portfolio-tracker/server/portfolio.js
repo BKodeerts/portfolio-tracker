@@ -346,7 +346,8 @@ function computeDividends(txsByTicker) {
   const perTicker = {};
   let total = 0;
   for (const [ticker, txs] of Object.entries(txsByTicker)) {
-    const sum = txs.filter(isDividend).reduce((s, tx) => s + tx.costEur, 0);
+    // costEur must be positive for a dividend; guard against accidental negative entries
+    const sum = txs.filter(isDividend).reduce((s, tx) => s + Math.max(0, tx.costEur), 0);
     if (sum > 0) perTicker[ticker] = Math.round(sum * 100) / 100;
     total += sum;
   }

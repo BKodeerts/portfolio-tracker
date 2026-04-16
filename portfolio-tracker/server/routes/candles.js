@@ -4,9 +4,14 @@ const { readCache, readStaleCache, writeCache } = require('../cache.js');
 const { fetchCandles, fetchDailyQuote, fetchIntraday, fetchYahoo, sleep, FETCH_DELAY } = require('../yahoo.js');
 const { QUOTES_CACHE_TTL, INTRADAY_CACHE_TTL } = require('../cache.js');
 
+// Yahoo Finance symbols: letters, digits, dots, hyphens, carets (^GSPC), equals (EURUSD=X)
+const SYMBOL_RE = /^[A-Za-z0-9.\-^=]{1,30}$/;
+function validSymbol(s) { return typeof s === 'string' && SYMBOL_RE.test(s); }
+
 // Single symbol candles
 router.get('/candles/:symbol', async (req, res) => {
   const { symbol } = req.params;
+  if (!validSymbol(symbol)) return res.status(400).json({ status: 'error', message: 'Invalid symbol' });
   const from = req.query.from || '2021-01-01';
   const cached = readCache(symbol);
   if (cached) {
@@ -36,6 +41,8 @@ router.get('/batch', async (req, res) => {
   const symbols = (req.query.symbols || '').split(',').filter(Boolean);
   const froms   = (req.query.froms   || '').split(',');
   if (symbols.length === 0) return res.status(400).json({ status: 'error', message: 'No symbols provided' });
+  const invalid = symbols.find(s => !validSymbol(s));
+  if (invalid) return res.status(400).json({ status: 'error', message: `Invalid symbol: ${invalid}` });
 
   const results = {};
   const toFetch = [];
@@ -72,6 +79,8 @@ router.get('/batch', async (req, res) => {
 router.get('/quotes', async (req, res) => {
   const symbols = (req.query.symbols || '').split(',').filter(Boolean);
   if (symbols.length === 0) return res.status(400).json({ status: 'error', message: 'No symbols provided' });
+  const invalid = symbols.find(s => !validSymbol(s));
+  if (invalid) return res.status(400).json({ status: 'error', message: `Invalid symbol: ${invalid}` });
 
   const results = {};
   const toFetch = [];
@@ -105,6 +114,8 @@ router.get('/intraday', async (req, res) => {
   const symbols = (req.query.symbols || '').split(',').filter(Boolean);
   const force   = req.query.force === '1';
   if (symbols.length === 0) return res.status(400).json({ status: 'error', message: 'No symbols provided' });
+  const invalid = symbols.find(s => !validSymbol(s));
+  if (invalid) return res.status(400).json({ status: 'error', message: `Invalid symbol: ${invalid}` });
 
   const results = {};
   const toFetch = [];
@@ -139,9 +150,13 @@ const LOOKUP_SUFFIXES = {
   XLON:'.L', LSE:'.L', XMIL:'.MI', MIL:'.MI', XBRU:'.BR', BRU:'.BR', XSWX:'.SW', SWX:'.SW',
   NSQ:'', NYSE:'', XNAS:'', XNYS:'',
 };
+const ISIN_RE     = /^[A-Z]{2}[A-Z0-9]{10}$/;
+const EXCHANGE_RE = /^[A-Za-z]{1,10}$/;
 router.get('/lookup', async (req, res) => {
   const { isin, exchange } = req.query;
   if (!isin) return res.status(400).json({ status: 'error', message: 'isin required' });
+  if (!ISIN_RE.test(isin)) return res.status(400).json({ status: 'error', message: 'Invalid ISIN format' });
+  if (exchange && !EXCHANGE_RE.test(exchange)) return res.status(400).json({ status: 'error', message: 'Invalid exchange' });
   const cacheKey = `lookup_${isin.replaceAll(/[^a-zA-Z0-9]/g, '_')}`;
   const cached = readCache(cacheKey, 30 * 24 * 60 * 60 * 1000);
   if (cached) return res.json({ status: 'ok', symbol: cached.symbol });
