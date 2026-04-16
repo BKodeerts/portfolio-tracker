@@ -103,18 +103,11 @@ export function renderStockDetail() {
     </tr>`;
   }).join('');
 
-  // Back button label
-  const backLabels = { portefeuille: 'Overzicht', analyse: 'Analyse', transacties: 'Transacties', instellingen: 'Instellingen' };
-  const backLabel  = backLabels[state.prevTab] || 'Terug';
-
   const pill = p => _period === p ? 'on' : '';
 
   document.getElementById('root').innerHTML = `
     ${renderAppHeader()}
     <div class="stock-detail-page">
-      <div class="stock-detail-back">
-        <button onclick="globalThis._stockDetailBack()">← ${backLabel}</button>
-      </div>
 
       <div class="stock-detail-header">
         <div class="sd-header-id">
@@ -164,10 +157,12 @@ export function renderStockDetail() {
       ${txRows ? `
       <div class="chart-card">
         <div class="card-title">Transacties</div>
-        <table class="pos-modal-tx-table">
-          <thead><tr><th>Datum</th><th>Type</th><th>Aandelen</th><th>Kosten €</th><th>Prijs/stuk</th></tr></thead>
-          <tbody>${txRows}</tbody>
-        </table>
+        <div class="pos-modal-tx-table-wrap">
+          <table class="pos-modal-tx-table">
+            <thead><tr><th>Datum</th><th>Type</th><th>Aandelen</th><th>Kosten €</th><th>Prijs/stuk</th></tr></thead>
+            <tbody>${txRows}</tbody>
+          </table>
+        </div>
       </div>` : ''}
     </div>`;
 

@@ -100,6 +100,10 @@
   .sd-header-price-row                { grid-area: price; }
   .stock-detail-header .market-badge  { grid-area: badge; justify-self: end; }
 
+  /* Remove double horizontal padding — #root already provides 12px on mobile */
+  .stock-detail-page  { padding-left: 0; padding-right: 0; }
+  .bonus-detail-page  { padding-left: 0; padding-right: 0; }
+
   /* Period pills: scrollable single row */
   .stock-detail-controls { overflow: hidden; }
   .stock-detail-controls .period-pills {
