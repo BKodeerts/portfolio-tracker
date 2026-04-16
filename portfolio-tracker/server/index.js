@@ -30,10 +30,8 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 
 // ── Startup environment validation ────────────────────────────────────────────
-const DATA_DIR  = process.env.DATA_DIR;
-const CACHE_DIR = process.env.CACHE_DIR;
-if (!DATA_DIR)  console.warn('[Startup] DATA_DIR not set — using default ./data (OK for local dev)');
-if (!CACHE_DIR) console.warn('[Startup] CACHE_DIR not set — using default ./cache (OK for local dev)');
+if (!process.env.DATA_DIR)  console.warn('[Startup] DATA_DIR not set — using default ./data (OK for local dev)');
+if (!process.env.CACHE_DIR) console.warn('[Startup] CACHE_DIR not set — using default ./cache (OK for local dev)');
 
 const PORT = process.env.PORT || 3069;
 
