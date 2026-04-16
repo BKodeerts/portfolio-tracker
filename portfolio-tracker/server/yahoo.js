@@ -3,7 +3,16 @@ const https = require('node:https');
 const FETCH_DELAY = 100;
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
 
-function fetchYahoo(url) {
+// Custom error class that carries the HTTP status code so callers can
+// distinguish rate-limit (429) responses from genuine failures.
+class YahooHttpError extends Error {
+  constructor(statusCode, body) {
+    super(`HTTP ${statusCode}: ${body.slice(0, 200)}`);
+    this.statusCode = statusCode;
+  }
+}
+
+function fetchYahooRaw(url) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
       headers: { 'User-Agent': UA },
@@ -13,12 +22,39 @@ function fetchYahoo(url) {
       res.on('data', chunk => (body += chunk));
       res.on('end', () => {
         if (res.statusCode === 200) resolve(body);
-        else reject(new Error(`HTTP ${res.statusCode}: ${body.slice(0, 200)}`));
+        else reject(new YahooHttpError(res.statusCode, body));
       });
     });
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
   });
+}
+
+/**
+ * Fetch a Yahoo Finance URL with automatic exponential backoff on HTTP 429.
+ * Retries up to 3 times with 2s / 4s / 8s delays before giving up.
+ */
+async function fetchYahoo(url) {
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fetchYahooRaw(url);
+    } catch (err) {
+      if (err instanceof YahooHttpError && err.statusCode === 429) {
+        if (attempt < MAX_RETRIES) {
+          const wait = Math.pow(2, attempt + 1) * 1000; // 2s, 4s, 8s
+          console.warn(`[Yahoo] Rate limited (429), retrying in ${wait / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          await new Promise(r => setTimeout(r, wait));
+          continue;
+        }
+        console.warn('[Yahoo] Rate limited (429) — max retries reached');
+      } else if (err instanceof YahooHttpError && err.statusCode === 404) {
+        // Symbol not found — don't retry
+        console.warn(`[Yahoo] Symbol not found (404): ${url.split('?')[0].split('/').at(-1)}`);
+      }
+      throw err;
+    }
+  }
 }
 
 async function fetchCandles(yahooSymbol, fromDate) {

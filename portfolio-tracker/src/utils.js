@@ -24,8 +24,7 @@ export function getFilteredData(period = state.currentPeriod) {
   else if (period === '1y')  { const d = new Date(now); d.setFullYear(d.getFullYear()-1); cutoff = d.toISOString().slice(0,10); }
   else if (period === '2y')  { const d = new Date(now); d.setFullYear(d.getFullYear()-2); cutoff = d.toISOString().slice(0,10); }
   else if (period === '3y')  { const d = new Date(now); d.setFullYear(d.getFullYear()-3); cutoff = d.toISOString().slice(0,10); }
-  const result = state.chartData.filter(d => d.date >= cutoff);
-  return result.length ? result : state.chartData.slice(-1);
+  return state.chartData.filter(d => d.date >= cutoff);
 }
 
 export function destroyAllCharts() {
