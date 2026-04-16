@@ -398,10 +398,9 @@ body.privacy .pos-modal-tx-table td:nth-child(4) {
 .bd-back-btn:hover { color: var(--text-primary, #1c1c1c); }
 
 .bd-header { margin-bottom: 20px; }
-.bd-header-id {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;
-}
-.bd-label { font-size: 22px; font-weight: 700; }
+.bd-header-id { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.bd-label { font-size: 20px; font-weight: 700; }
+.bd-badges { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
 .bd-type-tag {
   font-size: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 700;
   color: #a78bfa; background: rgba(167,139,250,0.12);
@@ -412,19 +411,18 @@ body.privacy .pos-modal-tx-table td:nth-child(4) {
   color: #f87171; background: rgba(248,113,113,0.12);
   border-radius: 4px; padding: 2px 8px; letter-spacing: 0.04em;
 }
-
-.bd-value-row {
-  display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; flex-wrap: wrap;
-}
 .bd-total-value {
-  font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 700;
+  font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700;
+  margin-bottom: 4px;
 }
-.bd-grant-change { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; }
+.bd-meta-row {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px;
+}
+.bd-grant-change { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; }
 .bd-grant-label  { font-size: 12px; color: #888; }
-
-.bd-underlying-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
-.bd-underlying-symbol { font-size: 12px; color: #888; font-family: 'JetBrains Mono', monospace; }
-.bd-underlying-price  { font-size: 13px; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+.bd-meta-sep     { color: #ccc; font-size: 12px; }
+.bd-underlying-symbol { font-size: 11px; color: #999; font-family: 'JetBrains Mono', monospace; }
+.bd-underlying-price  { font-size: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
 
 .bd-chart-card { margin-bottom: 12px; }
 .bd-chart-header {
