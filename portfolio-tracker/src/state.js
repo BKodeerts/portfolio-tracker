@@ -34,6 +34,9 @@ export const state = {
   liveEurUsd: null,
   parsedCSVRows: [],
 
+  selectedTicker: null,
+  prevTab: 'portefeuille',
+
   currentTab: 'portefeuille',
   currentView: 'total',
   currentPeriod: '1d',

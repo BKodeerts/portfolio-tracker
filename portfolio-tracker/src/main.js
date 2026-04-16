@@ -10,7 +10,8 @@ import { getColor, destroyAllCharts } from './utils.js';
 import { fetchTransactions, clearCacheApi } from './api.js';
 import { loadData } from './data.js';
 import { renderApp, renderPortfolioChart } from './tabs/portfolio.js';
-import { renderAnalyse, renderAnalyseCharts, sortPos, showPosModal, closePosModal, saveTickerMetaUI, resetSectorsUI, setBreakdownTab, setBenchmark, exportPositionsCsv, exportTransactionsCsv } from './tabs/analyse.js';
+import { renderAnalyse, renderAnalyseCharts, sortPos, saveTickerMetaUI, resetSectorsUI, setBreakdownTab, setBenchmark, exportPositionsCsv, exportTransactionsCsv } from './tabs/analyse.js';
+import { renderStockDetail, setStockDetailPeriod } from './tabs/stock-detail.js';
 import { handleCSVFile, updateYahooGuess, saveImport, saveTickerRenames } from './tabs/import.js';
 import { renderTransacties, filterTx, deleteTx, saveTxAll, toggleAddTx, addManualTx, onAddTypeChange } from './tabs/transacties.js';
 import { renderSettings } from './tabs/settings.js';
@@ -84,6 +85,21 @@ function setTab(t) {
   else if (t === 'transacties')  renderTransacties();
   else if (t === 'import')       renderTransacties();
   else if (t === 'instellingen') renderSettings();
+  else if (t === 'aandeel')      renderStockDetail();
+}
+
+function navigateToStock(ticker) {
+  state.prevTab = state.currentTab;
+  state.selectedTicker = ticker;
+  setTab('aandeel');
+}
+
+function stockDetailBack() { setTab(state.prevTab || 'portefeuille'); }
+
+function closePosModal() {
+  const el = document.getElementById('posModal');
+  if (el?.open) el.close();
+  if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
 }
 
 function renderAppKeepScroll() { const y = globalThis.scrollY; renderApp(); globalThis.scrollTo(0, y); }
@@ -152,8 +168,10 @@ globalThis._updateYahooGuess = updateYahooGuess;
 globalThis._saveImport       = saveImport;
 globalThis._getColor         = getColor;
 globalThis._sortPos          = sortPos;
-globalThis._showPosModal     = showPosModal;
-globalThis._closePosModal    = closePosModal;
+globalThis._closePosModal            = closePosModal;
+globalThis._navigateToStock          = navigateToStock;
+globalThis._stockDetailBack          = stockDetailBack;
+globalThis._setStockDetailPeriod     = setStockDetailPeriod;
 globalThis._filterTx         = filterTx;
 globalThis._deleteTx         = deleteTx;
 globalThis._saveTxAll           = saveTxAll;
@@ -181,7 +199,8 @@ document.addEventListener('touchend', e => {
   });
 }, { passive: true });
 
-// Modal: close on backdrop click or native Escape (dialog close event)
+
+// Modal: close on backdrop click or native Escape (bonus detail modal)
 const posModalEl = document.getElementById('posModal');
 posModalEl.addEventListener('click', e => { if (e.target === posModalEl) closePosModal(); });
 posModalEl.addEventListener('close', () => closePosModal());

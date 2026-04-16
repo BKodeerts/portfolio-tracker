@@ -101,6 +101,11 @@ export async function saveSettings(settings) {
   return res.json();
 }
 
+export async function fetchCandles(symbol, from) {
+  const res = await fetch(`${SERVER_BASE}/api/candles/${encodeURIComponent(symbol)}?from=${from}`);
+  return res.json();
+}
+
 export async function saveTickerMeta(meta) {
   const res = await fetch(`${SERVER_BASE}/api/ticker-meta`, {
     method: 'POST',
