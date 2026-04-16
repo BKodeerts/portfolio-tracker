@@ -108,33 +108,34 @@ export async function renderBonusDetail() {
 
       <div class="bd-header">
         <div class="bd-header-id">
-          <span class="pos-dot" style="background:#a78bfa;width:12px;height:12px;flex-shrink:0"></span>
+          <span class="pos-dot" style="background:#a78bfa;width:11px;height:11px;flex-shrink:0"></span>
           <span class="bd-label">${item.label}</span>
+        </div>
+        <div class="bd-badges">
           <span class="bd-type-tag">${isCall ? 'call optie' : 'warrant'}</span>
           ${isCall && item.isOutOfMoney ? '<span class="bd-otm-tag">OTM</span>' : ''}
         </div>
-        <div class="bd-value-row">
-          <span class="bd-total-value privacy-val">${fmt(item.totalValue ?? 0)}</span>
+        <div class="bd-total-value privacy-val">${fmt(item.totalValue ?? 0)}</div>
+        <div class="bd-meta-row">
           <span class="bd-grant-change ${pctCls}">${sign}${pct.toFixed(2)}%</span>
           <span class="bd-grant-label">v.a. toekenning</span>
-        </div>
-        <div class="bd-underlying-row">
-          <span class="bd-underlying-symbol">${item.symbol}</span>
-          ${item.currentIndexPrice
-            ? `<span class="bd-underlying-price">€${item.currentIndexPrice.toFixed(2)}</span>`
-            : ''}
+          ${item.currentIndexPrice ? `
+            <span class="bd-meta-sep">·</span>
+            <span class="bd-underlying-symbol">${item.symbol}</span>
+            <span class="bd-underlying-price">€${item.currentIndexPrice.toFixed(2)}</span>
+          ` : `<span class="bd-meta-sep">·</span><span class="bd-underlying-symbol">${item.symbol}</span>`}
         </div>
       </div>
 
       <div class="chart-card bd-chart-card">
         <div class="bd-chart-header">
           <span class="bd-chart-title">Historische waarde</span>
-          <label class="bd-prior-toggle">
+          <label class="bd-prior-toggle" id="bdPriorToggle" style="display:none">
             <input type="checkbox" checked onchange="globalThis._setBonusDetailPrior(this.checked)">
             Vorig jaar
           </label>
         </div>
-        <div id="bonusDetailChartWrap" style="height:300px;position:relative">
+        <div id="bonusDetailChartWrap" style="height:280px;position:relative">
           <div class="sd-chart-msg">Laden…</div>
         </div>
       </div>
@@ -155,6 +156,10 @@ export async function renderBonusDetail() {
     const json = await fetchBonusHistory(item.id);
     if (json.status === 'ok' && json.data.points.length) {
       _histData = json.data;
+      // Show prior-year toggle only when that data exists
+      const hasPrior = _histData.priorPoints?.length > 0;
+      const toggle = document.getElementById('bdPriorToggle');
+      if (toggle && hasPrior) toggle.style.display = '';
       _redrawChart();
     } else {
       _showChartMsg('Geen historische data beschikbaar');
