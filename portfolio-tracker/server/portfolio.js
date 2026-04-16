@@ -75,12 +75,41 @@ function fxSymbolsFor(currencies) {
 
 function loadTransactions() {
   if (!fs.existsSync(TRANSACTIONS_FILE)) return [];
-  return JSON.parse(fs.readFileSync(TRANSACTIONS_FILE, 'utf8'));
+  let raw;
+  try {
+    raw = JSON.parse(fs.readFileSync(TRANSACTIONS_FILE, 'utf8'));
+  } catch (e) {
+    console.error('[Portfolio] transactions.json is corrupt — cannot parse JSON:', e.message);
+    return [];
+  }
+  if (!Array.isArray(raw)) {
+    console.error('[Portfolio] transactions.json must be an array, got:', typeof raw);
+    return [];
+  }
+  // Validate each entry has required fields; skip malformed rows with a warning
+  const valid = [];
+  for (const tx of raw) {
+    if (!tx || typeof tx !== 'object') { console.warn('[Portfolio] Skipping non-object transaction:', tx); continue; }
+    if (!tx.date || !tx.ticker || tx.shares === undefined || tx.costEur === undefined) {
+      console.warn('[Portfolio] Skipping transaction with missing required fields:', JSON.stringify(tx));
+      continue;
+    }
+    valid.push(tx);
+  }
+  if (valid.length !== raw.length) {
+    console.warn(`[Portfolio] ${raw.length - valid.length} transaction(s) skipped due to missing required fields`);
+  }
+  return valid;
 }
 
 function loadTickerMeta() {
   try {
-    return JSON.parse(fs.readFileSync(TICKER_META_FILE, 'utf8'));
+    const raw = JSON.parse(fs.readFileSync(TICKER_META_FILE, 'utf8'));
+    if (typeof raw !== 'object' || Array.isArray(raw) || raw === null) {
+      console.warn('[Portfolio] ticker_meta.json has unexpected format — using empty metadata');
+      return {};
+    }
+    return raw;
   } catch {
     return {};
   }
@@ -216,11 +245,23 @@ function buildPriceMaps(rawCandles, sortedDates, manualPrices = {}) {
  */
 function buildFxRateMaps(rawCandles, sortedDates, currencies) {
   const maps = {};
+  const today = new Date().toISOString().slice(0, 10);
   for (const ccy of currencies) {
     const def = FX_DEFS[ccy];
     if (!def) continue;
     const raw = {};
-    for (const c of (rawCandles[def.symbol] || [])) raw[c.date] = c.close;
+    let latestFxDate = null;
+    for (const c of (rawCandles[def.symbol] || [])) {
+      raw[c.date] = c.close;
+      if (!latestFxDate || c.date > latestFxDate) latestFxDate = c.date;
+    }
+    // Warn if FX data is more than 2 trading days stale (accounts for weekends)
+    if (latestFxDate) {
+      const ageDays = (new Date(today) - new Date(latestFxDate)) / 86400000;
+      if (ageDays > 4) {
+        console.warn(`[FX] ${ccy} (${def.symbol}) rate is ${Math.round(ageDays)} days stale — valuations may be inaccurate`);
+      }
+    }
     const map = {};
     let last = def.fallback;
     for (const d of sortedDates) {
@@ -447,6 +488,15 @@ function buildChartData(meta, transactions, priceMaps, fxMaps, sortedDates, adjS
 async function appendTodaySnapshot(chartData, meta, transactions, fxMaps, adjSharesFn) {
   const yahooSymbols = [...new Set(Object.values(meta).map(m => m.yahoo))];
 
+  // Fetch all quotes in parallel
+  const currencies = nonEurCurrencies(meta);
+  const uniqueFxSymbols = [...new Set(currencies.map(c => FX_DEFS[c]?.symbol).filter(Boolean))];
+  const allQuoteSymbols = [...new Set([...yahooSymbols, ...uniqueFxSymbols])];
+
+  const quoteResults = Object.fromEntries(
+    await Promise.all(allQuoteSymbols.map(async sym => [sym, await getQuote(sym)])),
+  );
+
   const prices = {};
   let todayDate = null;
   for (const sym of yahooSymbols) {
@@ -455,7 +505,7 @@ async function appendTodaySnapshot(chartData, meta, transactions, fxMaps, adjSha
       prices[sym] = m.manualPriceEur;
       if (!todayDate) todayDate = new Date().toISOString().slice(0, 10);
     } else {
-      const q = await getQuote(sym);
+      const q = quoteResults[sym];
       if (q) {
         prices[sym] = q.close;
         if (!todayDate) todayDate = q.date;
@@ -463,20 +513,14 @@ async function appendTodaySnapshot(chartData, meta, transactions, fxMaps, adjSha
     }
   }
 
-  // Fetch live FX rates for all non-EUR currencies
-  const currencies = nonEurCurrencies(meta);
+  // Build live FX rates from already-fetched quotes
   const liveRates = {};
-  const seenFxSymbols = new Set();
   for (const ccy of currencies) {
     const def = FX_DEFS[ccy];
-    if (!def || seenFxSymbols.has(def.symbol)) { continue; }
-    seenFxSymbols.add(def.symbol);
+    if (!def) continue;
     const lastHistorical = Object.values(fxMaps[ccy] || {}).at(-1) || def.fallback;
-    const fxQ = await getQuote(def.symbol);
-    const rate = fxQ?.close || lastHistorical;
-    for (const c of currencies) {
-      if (FX_DEFS[c]?.symbol === def.symbol) liveRates[c] = rate;
-    }
+    const rate = quoteResults[def.symbol]?.close || lastHistorical;
+    liveRates[ccy] = rate;
   }
 
   if (!todayDate || todayDate <= (chartData.at(-1)?.date || '')) return chartData;
@@ -735,15 +779,23 @@ function computeXIRR(transactions, currentValue) {
   const dnpv = r => cfs.reduce((s, cf) => s - cf.years * cf.amount / Math.pow(1 + r, cf.years + 1), 0);
 
   let r = 0.1;
+  let converged = false;
   for (let i = 0; i < 100; i++) {
     const f  = npv(r);
     const df = dnpv(r);
-    if (Math.abs(df) < 1e-10) break;
+    if (Math.abs(df) < 1e-10) {
+      console.warn('[XIRR] Derivative near zero — cannot converge (flat/degenerate cash flows)');
+      break;
+    }
     const rNew = r - f / df;
-    if (Math.abs(rNew - r) < 1e-7) { r = rNew; break; }
+    if (Math.abs(rNew - r) < 1e-7) { r = rNew; converged = true; break; }
     r = rNew;
-    if (r < -0.999 || r > 100) return null;
+    if (r < -0.999 || r > 100) {
+      console.warn(`[XIRR] Rate out of bounds (${r.toFixed(4)}) — diverged after ${i + 1} iterations`);
+      return null;
+    }
   }
+  if (!converged) console.warn('[XIRR] Did not converge in 100 iterations — result may be inaccurate');
 
   if (!Number.isFinite(r) || r <= -1) return null;
   return Number.parseFloat((r * 100).toFixed(2));
@@ -835,10 +887,10 @@ async function computeFullPortfolio() {
   const neededFxSyms = fxSymbolsFor(currencies);
   const allSymbols   = [...new Set([...fetchSymbols, FX_SYMBOL, ...neededFxSyms, BENCHMARK_SYM, SP500_SYM])];
 
-  const rawCandles = {};
-  for (const sym of allSymbols) {
-    rawCandles[sym] = await getRawCandles(sym, earliestDate);
-  }
+  // Fetch all candles in parallel (each symbol is independently cached)
+  const rawCandles = Object.fromEntries(
+    await Promise.all(allSymbols.map(async sym => [sym, await getRawCandles(sym, earliestDate)])),
+  );
   for (const sym of yahooSymbols) {
     if (!rawCandles[sym]) rawCandles[sym] = [];
   }
@@ -892,11 +944,11 @@ async function computeFullPortfolio() {
       }))
     : [];
 
-  // Enrich positions with 52w data + auto-populate quoteType/sector in ticker_meta
+  // Enrich positions with 52w data + auto-populate quoteType/sector in ticker_meta (parallel)
   const tickerMetaLive = loadTickerMeta();
   let tickerMetaChanged = false;
 
-  for (const pos of positions) {
+  await Promise.all(positions.map(async pos => {
     const yahooSym = meta[pos.ticker].yahoo;
     const q = await getQuote(yahooSym);
     pos.high52 = q?.fiftyTwoWeekHigh ?? null;
@@ -921,7 +973,6 @@ async function computeFullPortfolio() {
         try {
           summary = await fetchQuoteSummary(yahooSym);
           if (summary) writeCache(summaryKey, summary);
-          await sleep(FETCH_DELAY);
         } catch (e) {
           console.warn(`[SUMMARY] ${yahooSym}: ${e.message}`);
         }
@@ -935,7 +986,7 @@ async function computeFullPortfolio() {
         tickerMetaChanged = true;
       }
     }
-  }
+  }));
 
   if (tickerMetaChanged) {
     fs.writeFileSync(TICKER_META_FILE, JSON.stringify(tickerMetaLive, null, 2));
@@ -1062,10 +1113,10 @@ async function computeCurrentSnapshot(options = {}) {
       if (FX_DEFS[c]?.symbol === def.symbol) liveRates[c] = rate;
     }
   }
-  const rawCandles = {};
-  for (const sym of [...fetchSymbols, ...neededFxSyms]) {
-    if (!rawCandles[sym]) rawCandles[sym] = await getRawCandles(sym, earliestDate);
-  }
+  const uniqueSnapshotSyms = [...new Set([...fetchSymbols, ...neededFxSyms])];
+  const rawCandles = Object.fromEntries(
+    await Promise.all(uniqueSnapshotSyms.map(async sym => [sym, await getRawCandles(sym, earliestDate)])),
+  );
 
   const allDates    = new Set();
   for (const candles of Object.values(rawCandles)) for (const c of candles) allDates.add(c.date);

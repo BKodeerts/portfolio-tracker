@@ -9,8 +9,15 @@ const INTRADAY_CACHE_TTL =  5 * 60 * 1000;        // 5min
 if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
 
 function getCacheFile(symbol) {
-  const safe = symbol.replace(/[^a-zA-Z0-9.-]/g, '_');
-  return path.join(CACHE_DIR, `${safe}.json`);
+  // Replace any character that isn't alphanumeric, hyphen or dot with underscore,
+  // then strip any remaining dots at the start to prevent directory traversal.
+  const safe = symbol.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/^\.+/, '_');
+  // Ensure the resolved path stays inside CACHE_DIR
+  const resolved = path.resolve(CACHE_DIR, `${safe}.json`);
+  if (!resolved.startsWith(path.resolve(CACHE_DIR) + path.sep)) {
+    throw new Error(`Invalid cache symbol: ${symbol}`);
+  }
+  return resolved;
 }
 
 function readCache(symbol, ttl) {
