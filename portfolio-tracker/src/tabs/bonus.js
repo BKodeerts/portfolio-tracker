@@ -1,182 +1,11 @@
 import { state } from '../state.js';
-import { fetchBonus, saveBonus, deleteBonus, fetchBonusHistory } from '../api.js';
+import { fetchBonus, saveBonus, deleteBonus } from '../api.js';
 import { sparklineSVG, latestSessionPoints } from './intraday.js';
-import { fmt, chartTheme } from '../utils.js';
-import Chart from 'chart.js/auto';
-import 'chartjs-adapter-date-fns';
+import { fmt } from '../utils.js';
 
-// ── Detail modal (reuses #posModal + pos-modal-inner styling) ─────────────────
-
-function buildTaxStats(item, netValueCls) {
-  const toggle = `const el=document.getElementById('bonusTaxBody');const open=el.style.display==='none';el.style.display=open?'':'none';this.querySelector('.tcv').style.transform=open?'rotate(180deg)':'rotate(0deg)'`;
-  const row = (label, val, valCls, sub) => `
-    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.05)">
-      <span style="font-size:11px;color:#888">${label}</span>
-      <div style="display:flex;align-items:baseline;gap:12px">
-        ${sub ? `<span style="font-size:10px;color:#666">${sub}</span>` : ''}
-        <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700" class="${valCls} privacy-val">${val}</span>
-      </div>
-    </div>`;
-  return `
-      <div class="pos-modal-stat" style="grid-column:1/-1;border-top:1px solid #1e293b;margin-top:4px;padding-top:4px;cursor:pointer" onclick="${toggle}">
-        <div class="pos-modal-stat-label" style="color:#f59e0b;font-size:10px;letter-spacing:.08em;display:flex;align-items:center;gap:6px;user-select:none">
-          BELGISCHE FISCALITEIT (VAA / ATN)
-          <span class="tcv" style="font-size:10px;display:inline-block;transition:transform .2s">▾</span>
-        </div>
-      </div>
-      <div id="bonusTaxBody" style="grid-column:1/-1;display:none;padding:0 2px 4px">
-        ${row('Belastbare grondslag', fmt(item.vatGross), '', `${item.quantity} × €${item.grantPrice?.toFixed(2)}`)}
-        ${row(`Bedrijfsvoorheffing ${item.taxRate ?? 53.5}%`, '−' + fmt(item.vatTax), 'c-neg', `belastbaar op ${item.taxableDate}`)}
-        ${row('Netto optiewaarde na BV', fmt(item.netValue ?? 0), netValueCls, '')}
-      </div>`;
-}
-
-async function showBonusDetail(item) {
-  const isCall = item.type === 'call_option';
-  const pct    = item.changeSinceGrantPct ?? 0;
-  const cls    = pct >= 0 ? 'c-pos' : 'c-neg';
-  const sign   = pct >= 0 ? '+' : '';
-  const priceChange = (item.currentWarrantPrice ?? item.grantPrice) - item.grantPrice;
-  const priceCls  = priceChange >= 0 ? 'c-pos' : 'c-neg';
-  const priceSign = priceChange >= 0 ? '+' : '';
-
-  const intrinsic = isCall && item.currentIndexPrice && item.strikePrice
-    ? Math.max(0, item.currentIndexPrice - item.strikePrice) * (item.ratio || 1)
-    : 0;
-  const timeValue = isCall ? (item.currentWarrantPrice ?? 0) - intrinsic : 0;
-  const daysToExpiry = isCall && item.expiryDate
-    ? Math.max(0, Math.round((new Date(item.expiryDate) - Date.now()) / 86_400_000))
-    : null;
-
-  const sigmaNum   = item.sigmaUsed ?? item.volatility ?? null;
-  const sigmaVal   = sigmaNum == null ? '—' : `${sigmaNum}%`;
-  const sigmaLabel = item.sigmaUsed == null && !item.volatility
-    ? '—<span style="font-size:9px;color:#888"> (proportioneel)</span>'
-    : (item.volatility ? sigmaVal : `${sigmaVal}<span style="font-size:9px;color:#888"> (VSTOXX)</span>`);
-  const netValueCls = (item.netValue ?? 0) >= 0 ? 'c-pos' : 'c-neg';
-  const taxStats    = item.vatGross == null ? '' : buildTaxStats(item, netValueCls);
-
-  const callExtraStats = isCall ? `
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Uitoefenprijs</div>
-        <div class="pos-modal-stat-val">€${item.strikePrice?.toFixed(2) ?? '—'}${(item.ratio && item.ratio !== 1) ? `<span style="font-size:10px;color:#888"> ×${item.ratio}</span>` : ''}</div>
-        <div class="pos-modal-stat-sub ${item.isOutOfMoney ? 'c-neg' : 'c-pos'}">${item.isOutOfMoney ? 'out of the money' : 'in the money ✓'}</div>
-      </div>
-      ${intrinsic > 0 ? `<div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Intrinsieke waarde</div>
-        <div class="pos-modal-stat-val">€${intrinsic.toFixed(2)}</div>
-      </div>` : ''}
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Tijdswaarde</div>
-        <div class="pos-modal-stat-val">€${timeValue.toFixed(2)}</div>
-      </div>
-      ${item.expiryDate ? `<div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Vervaldatum</div>
-        <div class="pos-modal-stat-val">${item.expiryDate}${daysToExpiry !== null ? `<span style="font-size:10px;color:#888"> (${daysToExpiry}d)</span>` : ''}</div>
-      </div>` : ''}
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Volatiliteit σ</div>
-        <div class="pos-modal-stat-val">${sigmaLabel}</div>
-      </div>
-      ${taxStats}` : '';
-
-  const modal = document.getElementById('posModal');
-  modal.innerHTML = `<div class="pos-modal-inner">
-    <div class="pos-modal-header">
-      <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#a78bfa;flex-shrink:0"></span>
-      <span style="font-size:16px;font-weight:700;flex-shrink:0">${item.label}</span>
-      <span class="pos-modal-header-label" style="font-size:13px;color:#888">${item.symbol}</span>
-      <button class="btn" style="margin-left:auto;font-size:11px;padding:4px 10px" onclick="globalThis._openBonusEdit('${item.id}')">Bewerken</button>
-      <button class="pos-modal-close" onclick="globalThis._closePosModal()">✕</button>
-    </div>
-    <div class="pos-modal-stats">
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">${isCall ? 'Aantal opties' : 'Aantal warrants'}</div>
-        <div class="pos-modal-stat-val privacy-val">${item.quantity}</div>
-      </div>
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Prijs bij toekenning</div>
-        <div class="pos-modal-stat-val">€${item.grantPrice.toFixed(2)}${isCall && item.grantIndexPrice ? `<span style="font-size:11px;color:#888;font-weight:400"> (${item.grantIndexPrice.toFixed(2)})</span>` : ''}</div>
-        <div class="pos-modal-stat-sub" style="color:#888">${item.grantDate}</div>
-      </div>
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Prijs nu</div>
-        <div class="pos-modal-stat-val ${priceCls}">€${(item.currentWarrantPrice ?? item.grantPrice).toFixed(2)}${isCall && item.currentIndexPrice ? `<span style="font-size:11px;color:#888;font-weight:400"> (${item.currentIndexPrice.toFixed(2)})</span>` : ''}</div>
-        <div class="pos-modal-stat-sub ${priceCls}">${priceSign}€${Math.abs(priceChange).toFixed(2)}</div>
-      </div>
-      <div class="pos-modal-stat">
-        <div class="pos-modal-stat-label">Totale waarde</div>
-        <div class="pos-modal-stat-val privacy-val">${fmt(item.totalValue ?? 0)}</div>
-        <div class="pos-modal-stat-sub ${cls}">${sign}${pct.toFixed(2)}%</div>
-      </div>
-      ${callExtraStats}
-    </div>
-    <div class="pos-modal-chart-wrap"><canvas id="posModalChart"></canvas></div>
-  </div>`;
-
-  modal.showModal();
-
-  if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
-
-  // Draw historical option/warrant value chart
-  try {
-    const json = await fetchBonusHistory(item.id);
-    if (json.status !== 'ok' || !json.data.points.length) return;
-
-    const { points: raw, priorPoints: rawPrior } = json.data;
-    const ct = chartTheme();
-
-    const toPoint = p => ({ x: new Date(p.date), y: p.value });
-    const points      = raw.map(toPoint);
-    const priorPoints = rawPrior.map(toPoint);
-    const fcastPoints = [];
-
-    state.chartInstances.__posModal = new Chart(document.getElementById('posModalChart').getContext('2d'), {
-      type: 'line',
-      data: { datasets: [
-        { data: points,       borderColor: '#a78bfa',   borderWidth: 2,   fill: true,  backgroundColor: '#a78bfa22', tension: 0.3, pointRadius: 0 },
-        { data: priorPoints,  borderColor: '#a78bfa55', borderWidth: 1.5, fill: false, tension: 0.3, pointRadius: 0, borderDash: [4, 3] },
-        { data: fcastPoints,  borderColor: '#a78bfa88', borderWidth: 1.5, fill: true,  backgroundColor: '#a78bfa11', tension: 0.3, pointRadius: 0, borderDash: [3, 4] },
-      ]},
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
-            titleColor: ct.titleColor, bodyColor: ct.bodyColor,
-            titleFont: { family: "'DM Sans'", size: 11, weight: 700 }, bodyFont: { family: "'JetBrains Mono'", size: 11 },
-            padding: 10, cornerRadius: 8,
-            callbacks: {
-              title: items => new Date(items[0].parsed.x).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }),
-              label: i => {
-                const fmtPrice = v => `€${Number(v).toLocaleString('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                if (i.datasetIndex === 1) return ` vorig jaar: ${fmtPrice(i.parsed.y)}`;
-                if (i.datasetIndex === 2) return ` prognose (vorig jaar): ${fmtPrice(i.parsed.y)}`;
-                return ` ${fmtPrice(i.parsed.y)}`;
-              },
-            },
-          },
-        },
-        scales: {
-          x: { type: 'time', time: { unit: 'month' }, grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 } } },
-          y: { grid: { color: ct.gridColor }, ticks: { display: !state.privacyMode, color: ct.tickColor, font: { size: 9 }, callback: v => '€' + Number(v).toLocaleString('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } },
-        },
-      },
-    });
-  } catch (e) {
-    console.warn('Bonus chart load failed:', e.message);
-  }
-}
-
-// ── Edit / add form (small dialog) ────────────────────────────────────────────
+// ── Edit / add form (dialog) ──────────────────────────────────────────────────
 
 function openBonusEdit(existing = null) {
-  // Close detail modal if open
-  const posModal = document.getElementById('posModal');
-  if (posModal?.open) posModal.close();
-
   const id          = existing?.id          || '';
   const label       = existing?.label       || '';
   const symbol      = existing?.symbol      || '^STOXX50E';
@@ -289,13 +118,14 @@ function openBonusEdit(existing = null) {
       await deleteBonus(existing.id);
       dlg.close();
       await reloadBonusCards();
+      if (state.currentTab === 'bonus') history.back();
     };
   }
 
   document.getElementById('bSave').onclick = async () => {
-    const type = dlg._bonusType;
+    const type   = dlg._bonusType;
     const strike = Number(document.getElementById('bStrike')?.value) || undefined;
-    const entry = {
+    const entry  = {
       ...(id ? { id } : {}),
       label:      document.getElementById('bLabel').value.trim() || document.getElementById('bSymbol').value.trim(),
       symbol:     document.getElementById('bSymbol').value.trim(),
@@ -322,11 +152,9 @@ function openBonusEdit(existing = null) {
     await saveBonus(entry);
     dlg.close();
     await reloadBonusCards();
-    // If the detail modal is still open for this item, refresh it with updated data
-    const posModal = document.getElementById('posModal');
-    if (posModal?.open) {
-      const updated = state.bonusItems.find(b => b.id === entry.id);
-      if (updated) showBonusDetail(updated);
+    if (state.currentTab === 'bonus' && state.selectedBonusId === entry.id) {
+      const { renderBonusDetail } = await import('./bonus-detail.js');
+      await renderBonusDetail();
     }
   };
 }
@@ -340,18 +168,17 @@ function bonusCard(item) {
   const cls      = pct >= 0 ? 'c-pos' : 'c-neg';
   const sign     = pct >= 0 ? '+' : '';
 
-  const hasToday  = data?.points?.length > 0 && data.previousClose && data.date === todayStr;
-  const last      = hasToday ? data.points[data.points.length - 1].close : null;
+  const hasToday = data?.points?.length > 0 && data.previousClose && data.date === todayStr;
+  const last     = hasToday ? data.points[data.points.length - 1].close : null;
   let todayPct;
   if (!hasToday) {
     todayPct = null;
   } else if (item.type === 'call_option') {
-    // Show change in intrinsic value, not underlying % move
     const prevIntrinsic = Math.max(0, data.previousClose - item.strikePrice) * (item.ratio || 1);
     const currIntrinsic = Math.max(0, last - item.strikePrice) * (item.ratio || 1);
     todayPct = prevIntrinsic > 0
       ? (currIntrinsic - prevIntrinsic) / prevIntrinsic * 100
-      : null; // was OTM at open — can't express as %
+      : null;
   } else {
     todayPct = (last - data.previousClose) / data.previousClose * 100;
   }
@@ -359,20 +186,20 @@ function bonusCard(item) {
   if (todayPct === null) {
     todaySub = `<span>${sign}${pct.toFixed(2)}% v.a. toekenning</span>`;
   } else {
-    const color = todayPct >= 0 ? '#4ade80' : '#f87171';
+    const color     = todayPct >= 0 ? '#4ade80' : '#f87171';
     const todaySign = todayPct >= 0 ? '+' : '';
     todaySub = `<span style="color:${color}">${todaySign}${todayPct.toFixed(2)}% vandaag</span>`;
   }
 
   const sessionPts = latestSessionPoints(data);
-  const sparkline = sessionPts.length
-    ? sparklineSVG(sessionPts, data.previousClose, 510)
-    : '';
+  const sparkline  = sessionPts.length ? sparklineSVG(sessionPts, data.previousClose, 510) : '';
 
   const isCall = item.type === 'call_option';
   const hasBs  = isCall && item.volatility && item.expiryDate;
   const tag    = isCall ? 'call optie' : 'bonus';
-  const otmTag = item.isOutOfMoney ? '<span style="font-size:9px;color:#f87171;font-family:\'JetBrains Mono\',monospace;font-weight:700;margin-left:4px">OTM</span>' : '';
+  const otmTag = item.isOutOfMoney
+    ? '<span style="font-size:9px;color:#f87171;font-family:\'JetBrains Mono\',monospace;font-weight:700;margin-left:4px">OTM</span>'
+    : '';
   const valueHtml = isCall && item.isOutOfMoney && !hasBs
     ? `<div style="display:flex;align-items:center;gap:6px;margin-top:5px">
         <span class="metric-value c-neg privacy-val" style="font-size:16px">${fmt(0)}</span>
@@ -383,7 +210,7 @@ function bonusCard(item) {
         ${isCall && item.isOutOfMoney ? otmTag : ''}
       </div>`;
 
-  return `<div class="intraday-card clickable" onclick="globalThis._showBonusDetail('${item.id}')">
+  return `<div class="intraday-card clickable" onclick="globalThis._navigateToBonusDetail('${item.id}')">
     <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
       <span class="pos-dot" style="background:#a78bfa"></span>${item.label}
       <span style="font-size:9px;color:#a78bfa;font-family:'JetBrains Mono',monospace;margin-left:auto">${tag}</span>
@@ -414,10 +241,8 @@ export function renderBonusCards() {
   const grid = document.getElementById('intradayGrid');
   if (!grid) return;
 
-  // Remove any previously injected bonus cards from the grid
   grid.querySelectorAll('.bonus-card').forEach(el => el.remove());
 
-  // Append bonus cards directly into the intraday grid so they share the same row
   const fragment = document.createDocumentFragment();
   for (const item of state.bonusItems) {
     const div = document.createElement('div');
@@ -435,10 +260,6 @@ export function renderBonusCards() {
 }
 
 export function initBonus() {
-  globalThis._showBonusDetail = (id) => {
-    const item = state.bonusItems.find(b => b.id === id);
-    if (item) showBonusDetail(item);
-  };
   globalThis._openBonusEdit = (id) => {
     const item = id ? state.bonusItems.find(b => b.id === id) : null;
     openBonusEdit(item ?? null);
