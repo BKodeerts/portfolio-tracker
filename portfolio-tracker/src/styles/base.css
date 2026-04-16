@@ -19,5 +19,5 @@ body {
 .c-brand   { color: #555; }
 .c-pos     { color: #16a34a; }
 .c-neg     { color: #dc2626; }
-.c-pos-muted { color: #7aaa86; }
-.c-neg-muted { color: #b07878; }
+.c-pos-muted { color: rgba(22, 163, 74, 0.45); }
+.c-neg-muted { color: rgba(220, 38, 38, 0.45); }
