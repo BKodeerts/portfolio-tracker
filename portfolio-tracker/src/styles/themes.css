@@ -21,7 +21,9 @@ body.theme-dark .progress-bar                          { background: rgba(255,25
 body.theme-dark .app-nav                               { background: rgba(255,255,255,0.07); }
 body.theme-dark .nav-btn                               { color: #808080; }
 body.theme-dark .nav-btn:hover                         { color: #b0b0b0; }
-body.theme-dark .nav-btn.active                        { background: rgba(255,255,255,0.13); color: #e2e2e2; }
+body.theme-dark .nav-btn.active                        { background: rgba(255,255,255,0.14); color: #e2e2e2; box-shadow: 0 1px 3px rgba(0,0,0,0.45); }
+body.theme-dark .icon-toggle:hover                     { background: rgba(255,255,255,0.07); }
+body.theme-dark .icon-toggle.on                        { background: rgba(255,255,255,0.09); }
 body.theme-dark .metric-card,
 body.theme-dark .intraday-card                         { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.12); }
 body.theme-dark .metric-label                          { color: #909090; }
