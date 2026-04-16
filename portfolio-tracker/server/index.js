@@ -7,10 +7,15 @@ const app = express();
 // The frontend is served by this same Express process in production, so browsers
 // will never send a cross-origin header for normal usage.  We only need to allow
 // the Vite dev proxy (localhost:5173) and any HA ingress proxy.
+// Set CORS_ORIGIN env var (comma-separated) to allow additional origins (e.g. Nabu Casa URL).
+const _extraOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()).filter(Boolean)
+  : [];
 const ALLOWED_ORIGINS = new Set([
   'http://localhost:3069',
   'http://localhost:5173',
   'http://127.0.0.1:3069',
+  ..._extraOrigins,
 ]);
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -18,12 +23,12 @@ app.use((req, res, next) => {
     // Same-origin or non-browser request — always allow
     return next();
   }
-  if (ALLOWED_ORIGINS.has(origin) || origin.startsWith('http://homeassistant') || origin.startsWith('https://')) {
+  if (ALLOWED_ORIGINS.has(origin) || origin.startsWith('http://homeassistant')) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Token');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
@@ -34,6 +39,20 @@ if (!process.env.DATA_DIR)  console.warn('[Startup] DATA_DIR not set — using d
 if (!process.env.CACHE_DIR) console.warn('[Startup] CACHE_DIR not set — using default ./cache (OK for local dev)');
 
 const PORT = process.env.PORT || 3069;
+
+// ── Optional API token auth ───────────────────────────────────────────────────
+// Set API_TOKEN env var to require a token on all state-mutating endpoints.
+// The frontend sends it via the X-API-Token header; it is never exposed to other origins.
+const API_TOKEN = process.env.API_TOKEN || null;
+if (API_TOKEN) {
+  console.log('[Auth] API_TOKEN is set — mutating endpoints require X-API-Token header');
+  app.use('/api', (req, res, next) => {
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+    const provided = req.headers['x-api-token'] || (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '');
+    if (provided !== API_TOKEN) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+    next();
+  });
+}
 
 app.use('/api', require('./routes/bonus.js'));
 app.use('/api', require('./routes/candles.js'));

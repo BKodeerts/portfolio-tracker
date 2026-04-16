@@ -15,6 +15,9 @@ const DEFAULTS = {
   pushPositions:             false,
 };
 
+// Must match the currencies supported in server/portfolio.js FX_DEFS plus EUR
+const VALID_CURRENCIES = new Set(['EUR', 'USD', 'GBP', 'GBX', 'CLP', 'CHF']);
+
 function readSettings() {
   try {
     return { ...DEFAULTS, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) };
@@ -38,8 +41,12 @@ router.post('/settings', (req, res) => {
             pushInterval, pushPositions } = req.body;
     const current = readSettings();
 
-    if (typeof baseCurrency === 'string')
-      current.baseCurrency = baseCurrency.toUpperCase();
+    if (typeof baseCurrency === 'string') {
+      const upper = baseCurrency.toUpperCase();
+      if (!VALID_CURRENCIES.has(upper))
+        return res.status(400).json({ status: 'error', message: `Unsupported baseCurrency: ${upper}` });
+      current.baseCurrency = upper;
+    }
     if (Array.isArray(watchlist))
       current.watchlist = watchlist.map(s => String(s).trim().toUpperCase()).filter(Boolean);
     if (typeof intradayDuringMarketHours === 'boolean')
