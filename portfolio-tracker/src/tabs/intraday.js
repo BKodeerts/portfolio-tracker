@@ -150,7 +150,7 @@ export function renderMarketStatus() {
   if (el) el.innerHTML = getMarketStatus();
 }
 
-export function sparklineSVG(points, prevClose, tradingMins) {
+export function sparklineSVG(points, prevClose, tradingMins, muted = false) {
   if (!points || points.length < 2 || !prevClose) return '';
   const pcts = points.map(p => (p.close - prevClose) / prevClose * 100);
   const min = Math.min(0, ...pcts);
@@ -166,7 +166,9 @@ export function sparklineSVG(points, prevClose, tradingMins) {
     xs.slice(1).map((x, i) => `L${x.toFixed(1)},${ys[i + 1].toFixed(1)}`).join(' ') +
     ` L${xs[xs.length - 1].toFixed(1)},${H} L${xs[0].toFixed(1)},${H} Z`;
   const zeroY = ((H - 3) - ((-min) / range) * (H - 6)).toFixed(1);
-  const clr = pcts[pcts.length - 1] >= 0 ? '#4ade80' : '#f87171';
+  const clr = pcts[pcts.length - 1] >= 0
+    ? (muted ? '#7abe90' : '#4ade80')
+    : (muted ? '#c49090' : '#f87171');
   const uid = `sp${Math.random().toString(36).slice(2, 7)}`;
   return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;margin-top:8px">
     <defs><linearGradient id="${uid}" x1="0" x2="0" y1="0" y2="1">
@@ -335,10 +337,11 @@ export function renderIntradaySection() {
     const sessionPts = latestSessionPoints(data);
     const last    = sessionPts.length ? sessionPts[sessionPts.length - 1] : data.points[data.points.length - 1];
     const pct     = prev ? ((last.close - prev) / prev * 100) : 0;
-    const cls     = pct >= 0 ? 'c-pos' : 'c-neg';
     const todayStr  = new Date().toISOString().slice(0, 10);
     const isStale   = data.date !== todayStr;
     const marketState = data.marketState || (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED');
+    const isMuted   = !isStale && marketState === 'PRE';
+    const cls       = pct >= 0 ? (isMuted ? 'c-pos-muted' : 'c-pos') : (isMuted ? 'c-neg-muted' : 'c-neg');
     const isClosed  = !isStale && marketState !== 'REGULAR';
     let statusLabel = '';
     if (isStale)                   statusLabel = sessionBadge(staleDayLabel(data.date), '#f59e0b');
@@ -364,7 +367,7 @@ export function renderIntradaySection() {
         ${statusLabel}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
-      ${sparklineSVG(sessionPts, prev, marketState === 'REGULAR' ? getTradingMins(yahoo) : null)}
+      ${sparklineSVG(sessionPts, prev, marketState === 'REGULAR' ? getTradingMins(yahoo) : null, isMuted)}
       <div class="metric-sub">${CCY_SYM[nativeCcy] || nativeCcy} ${displayPrice.toFixed(2)}${extHoursHtml}</div>
     </div>`;
   }).join('');
@@ -387,13 +390,14 @@ export function renderIntradaySection() {
       const prev      = data?.previousClose;
       const last      = hasData ? wlSession[wlSession.length - 1] : null;
       const pct       = hasData && prev ? ((last.close - prev) / prev * 100) : (item.change1dPct ?? null);
-      let cls;
-      if (pct == null)  cls = 'c-neutral';
-      else if (pct >= 0) cls = 'c-pos';
-      else               cls = 'c-neg';
       const todayStr  = new Date().toISOString().slice(0, 10);
       const isStale   = data && data.date !== todayStr;
       const wlMarketState = data?.marketState || null;
+      const wlMuted   = !isStale && wlMarketState === 'PRE';
+      let cls;
+      if (pct == null)  cls = 'c-neutral';
+      else if (pct >= 0) cls = wlMuted ? 'c-pos-muted' : 'c-pos';
+      else               cls = wlMuted ? 'c-neg-muted' : 'c-neg';
       let wlStatusLabel = '';
       if (!isStale) {
         if (wlMarketState === 'PRE')       wlStatusLabel = sessionBadge('pre');
@@ -415,7 +419,7 @@ export function renderIntradaySection() {
           ${isStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(data.date)}</span>` : wlStatusLabel}
         </div>
         <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pctStr}</div>
-        ${hasData ? sparklineSVG(wlSession, prev, wlMarketState === 'REGULAR' ? getTradingMins(item.symbol) : null) : ''}
+        ${hasData ? sparklineSVG(wlSession, prev, wlMarketState === 'REGULAR' ? getTradingMins(item.symbol) : null, wlMuted) : ''}
         <div class="metric-sub">${priceStr}</div>`;
       gridEl.appendChild(card);
     }
