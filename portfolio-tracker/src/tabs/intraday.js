@@ -50,6 +50,13 @@ export function getTradingMins(yahooSymbol) {
   return EU_EXCHANGE_RE.test(yahooSymbol || '') ? 510 : 390;
 }
 
+// EU exchanges have no real post-market session — Yahoo sometimes returns POST
+// after close, which is misleading. Treat it as CLOSED for EU symbols.
+export function normalizeMarketState(yahooSymbol, rawState) {
+  if (rawState === 'POST' && EU_EXCHANGE_RE.test(yahooSymbol || '')) return 'CLOSED';
+  return rawState;
+}
+
 function isOpen(tz, openH, openM, closeH, closeM) {
   const now   = new Date();
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -337,7 +344,7 @@ export function renderIntradaySection() {
     const pct     = prev ? ((last.close - prev) / prev * 100) : 0;
     const todayStr  = new Date().toISOString().slice(0, 10);
     const isStale   = data.date !== todayStr;
-    const marketState = data.marketState || (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED');
+    const marketState = normalizeMarketState(yahoo, data.marketState || (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
     const isMuted   = !isStale && marketState === 'PRE';
     const cls       = pct >= 0 ? (isMuted ? 'c-pos-muted' : 'c-pos') : (isMuted ? 'c-neg-muted' : 'c-neg');
     const isClosed  = !isStale && marketState !== 'REGULAR';
@@ -390,7 +397,7 @@ export function renderIntradaySection() {
       const pct       = hasData && prev ? ((last.close - prev) / prev * 100) : (item.change1dPct ?? null);
       const todayStr  = new Date().toISOString().slice(0, 10);
       const isStale   = data && data.date !== todayStr;
-      const wlMarketState = data?.marketState || null;
+      const wlMarketState = normalizeMarketState(item.symbol, data?.marketState || null);
       const wlMuted   = !isStale && wlMarketState === 'PRE';
       let cls;
       if (pct == null)  cls = 'c-neutral';
