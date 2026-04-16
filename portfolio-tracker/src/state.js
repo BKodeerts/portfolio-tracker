@@ -35,6 +35,7 @@ export const state = {
   parsedCSVRows: [],
 
   selectedTicker: null,
+  selectedBonusId: null,
   prevTab: 'portefeuille',
 
   currentTab: 'portefeuille',
