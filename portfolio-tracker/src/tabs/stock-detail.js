@@ -4,7 +4,7 @@ import { state } from '../state.js';
 import { fmt, getColor, chartTheme } from '../utils.js';
 import { renderAppHeader } from '../components/header.js';
 import { fetchCandles } from '../api.js';
-import { latestSessionPoints } from './intraday.js';
+import { latestSessionPoints, EU_EXCHANGE_RE, normalizeMarketState } from './intraday.js';
 
 // Module-level state — reset on each fresh navigation
 let _period        = '1d';
@@ -46,7 +46,7 @@ export function renderStockDetail() {
   const dayChangeSign = dayChangePct != null && dayChangePct >= 0 ? '+' : '';
 
   // Market state badge
-  const marketBadge = buildSingleMarketBadge(iData);
+  const marketBadge = buildSingleMarketBadge(iData, yahoo);
 
   // Position stats
   const latest  = (ticker in (state.lastLatest || {})) ? state.lastLatest : (state.chartData?.at(-1) ?? {});
@@ -176,9 +176,9 @@ export function renderStockDetail() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function buildSingleMarketBadge(iData) {
+function buildSingleMarketBadge(iData, yahoo) {
   if (!iData?.marketState) return '';
-  const ms    = iData.marketState;
+  const ms    = normalizeMarketState(yahoo || '', iData.marketState);
   const dot   = ms === 'REGULAR' ? '#4ade80' : '#334155';
   const label = ms === 'REGULAR' ? 'Open' : ms === 'PRE' ? 'Pre-market' : ms === 'POST' ? 'Post-market' : 'Gesloten';
   return `<span class="market-badge"><span class="dot" style="background:${dot}"></span>${label}</span>`;
