@@ -54,33 +54,45 @@ async function runOnce() {
 
   if (!options.enableHaSensors) return;
 
+  let snapshot;
   try {
-    const snapshot = await computeCurrentSnapshot({ watchlist: options.watchlist });
-    if (!snapshot) return;
-
-    if (options.useMqttDiscovery) {
-      await require('./mqtt-helper.js').publish(snapshot, options);
-    } else {
-      const token = process.env.SUPERVISOR_TOKEN;
-      if (!token) {
-        console.warn('[Scheduler] States API mode requires SUPERVISOR_TOKEN');
-        return;
-      }
-      await pushAll(token, snapshot, options);
-    }
-
-    const { totalValue, totalCost, dailyPl } = snapshot;
-    const pl    = totalValue - totalCost;
-    const plPct = totalCost > 0 ? (pl / totalCost * 100) : 0;
-    const mode  = options.useMqttDiscovery ? 'MQTT' : 'states API';
-    console.log(
-      `[Scheduler] HA push OK (${mode}) — ` +
-      `€${totalValue.toFixed(0)}, P&L €${pl.toFixed(0)} (${plPct.toFixed(1)}%), ` +
-      `vandaag €${(dailyPl || 0).toFixed(0)}`,
-    );
+    snapshot = await computeCurrentSnapshot({ watchlist: options.watchlist });
   } catch (e) {
-    console.warn('[Scheduler] run failed:', e.message);
+    console.warn('[Scheduler] Portfolio snapshot failed:', e.message);
+    return;
   }
+  if (!snapshot) return;
+
+  if (options.useMqttDiscovery) {
+    try {
+      await require('./mqtt-helper.js').publish(snapshot, options);
+    } catch (e) {
+      console.warn('[Scheduler] MQTT publish failed:', e.message);
+      return;
+    }
+  } else {
+    const token = process.env.SUPERVISOR_TOKEN;
+    if (!token) {
+      console.warn('[Scheduler] States API mode requires SUPERVISOR_TOKEN');
+      return;
+    }
+    try {
+      await pushAll(token, snapshot, options);
+    } catch (e) {
+      console.warn('[Scheduler] States API push failed:', e.message);
+      return;
+    }
+  }
+
+  const { totalValue, totalCost, dailyPl } = snapshot;
+  const pl    = totalValue - totalCost;
+  const plPct = totalCost > 0 ? (pl / totalCost * 100) : 0;
+  const mode  = options.useMqttDiscovery ? 'MQTT' : 'states API';
+  console.log(
+    `[Scheduler] HA push OK (${mode}) — ` +
+    `€${totalValue.toFixed(0)}, P&L €${pl.toFixed(0)} (${plPct.toFixed(1)}%), ` +
+    `vandaag €${(dailyPl || 0).toFixed(0)}`,
+  );
 }
 
 function start() {

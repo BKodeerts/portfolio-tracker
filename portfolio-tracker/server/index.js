@@ -2,14 +2,38 @@ const express = require('express');
 const path    = require('node:path');
 
 const app = express();
+
+// CORS: allow same-origin requests and explicit localhost/LAN origins for dev.
+// The frontend is served by this same Express process in production, so browsers
+// will never send a cross-origin header for normal usage.  We only need to allow
+// the Vite dev proxy (localhost:5173) and any HA ingress proxy.
+const ALLOWED_ORIGINS = new Set([
+  'http://localhost:3069',
+  'http://localhost:5173',
+  'http://127.0.0.1:3069',
+]);
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (!origin) {
+    // Same-origin or non-browser request — always allow
+    return next();
+  }
+  if (ALLOWED_ORIGINS.has(origin) || origin.startsWith('http://homeassistant') || origin.startsWith('https://')) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
 app.use(express.json({ limit: '10mb' }));
+
+// ── Startup environment validation ────────────────────────────────────────────
+const DATA_DIR  = process.env.DATA_DIR;
+const CACHE_DIR = process.env.CACHE_DIR;
+if (!DATA_DIR)  console.warn('[Startup] DATA_DIR not set — using default ./data (OK for local dev)');
+if (!CACHE_DIR) console.warn('[Startup] CACHE_DIR not set — using default ./cache (OK for local dev)');
 
 const PORT = process.env.PORT || 3069;
 
@@ -21,6 +45,15 @@ app.use('/api', require('./routes/ha.js'));
 app.use('/api', require('./routes/portfolio.js'));
 app.use('/api', require('./routes/settings.js'));
 app.use('/api/ticker-meta', require('./routes/ticker-meta.js'));
+
+// ── Health check ──────────────────────────────────────────────────────────────
+const fs = require('node:fs');
+app.get('/health', (req, res) => {
+  const { CACHE_DIR: cDir } = require('./cache.js');
+  const cacheWritable = (() => { try { fs.accessSync(cDir, fs.constants.W_OK); return true; } catch { return false; } })();
+  const status = cacheWritable ? 'ok' : 'degraded';
+  res.status(cacheWritable ? 200 : 503).json({ status, cache_dir: cDir, cache_writable: cacheWritable });
+});
 
 // Serve built frontend
 const distDir = path.join(__dirname, '..', 'dist');

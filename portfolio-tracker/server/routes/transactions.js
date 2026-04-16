@@ -10,6 +10,17 @@ const MAX_BACKUPS       = 5;
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
+const TX_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function validateTransaction(t) {
+  if (!t || typeof t !== 'object') return 'must be an object';
+  if (!t.date || !TX_DATE_RE.test(t.date)) return `invalid date: ${t.date}`;
+  if (!t.ticker || typeof t.ticker !== 'string' || !t.ticker.trim()) return 'missing ticker';
+  if (typeof t.shares !== 'number' || !Number.isFinite(t.shares) || t.shares === 0) return `invalid shares: ${t.shares}`;
+  if (typeof t.costEur !== 'number' || !Number.isFinite(t.costEur) || t.costEur < 0) return `invalid costEur: ${t.costEur}`;
+  return null;
+}
+
 function txKey(t) {
   return `${t.date}|${t.ticker}|${t.shares}|${t.costEur}`;
 }
@@ -47,6 +58,14 @@ router.post('/transactions', (req, res) => {
     const { mode, transactions } = req.body;
     if (!Array.isArray(transactions)) {
       return res.status(400).json({ status: 'error', message: 'transactions must be an array' });
+    }
+
+    // Validate each transaction and reject the batch on any error
+    for (let i = 0; i < transactions.length; i++) {
+      const err = validateTransaction(transactions[i]);
+      if (err) {
+        return res.status(400).json({ status: 'error', message: `Transaction at index ${i}: ${err}` });
+      }
     }
 
     let final;
