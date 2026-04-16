@@ -248,7 +248,7 @@ router.post("/bonus", (req, res) => {
   } = req.body;
   if (!symbol || !quantity || !grantDate || !grantPrice) {
     return res.status(400).json({
-      error: "symbol, quantity, grantDate en grantPrice zijn verplicht",
+      status: 'error', message: 'symbol, quantity, grantDate en grantPrice zijn verplicht',
     });
   }
   const entry = {
@@ -281,7 +281,7 @@ router.post("/bonus", (req, res) => {
 // GET /api/bonus/:id/history — historical option values for charting
 router.get("/bonus/:id/history", async (req, res) => {
   const item = loadBonus().find((i) => i.id === req.params.id);
-  if (!item) return res.status(404).json({ error: "not found" });
+  if (!item) return res.status(404).json({ status: 'error', message: 'not found' });
 
   const yearAgoGrant = (() => {
     const d = new Date(item.grantDate);
