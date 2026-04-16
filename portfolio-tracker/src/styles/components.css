@@ -313,7 +313,7 @@
   font-size: 10px; font-family: 'JetBrains Mono', monospace;
   background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.07);
   border-radius: 6px; padding: 3px 7px; white-space: nowrap; color: #888;
-  margin-right: 5px; cursor: default; user-select: none;
+  cursor: default; user-select: none;
 }
 .market-badge .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
 .session-badge {
@@ -363,15 +363,17 @@ body.privacy .pos-modal-tx-table td:nth-child(4) {
   cursor: pointer; padding: 4px 0; font-family: inherit;
 }
 .stock-detail-back button:hover { color: var(--text-primary, #1c1c1c); }
-.stock-detail-header {
-  display: flex; align-items: center; gap: 10px;
-  margin-bottom: 18px; flex-wrap: wrap;
-}
+
+/* Desktop: single flex row — identity · name (fills) · price+change · badge */
+.stock-detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.sd-header-id    { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.sd-color-dot    { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .stock-detail-ticker { font-size: 22px; font-weight: 700; }
 .stock-detail-name   { font-size: 13px; color: #888; flex: 1; min-width: 0; }
+.sd-header-price-row { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .stock-detail-price  { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; }
 .stock-detail-change { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; }
-.stock-detail-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.stock-detail-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .stock-detail-prepost {
   display: flex; align-items: center; gap: 6px;
   font-size: 11px; color: #888; cursor: pointer;

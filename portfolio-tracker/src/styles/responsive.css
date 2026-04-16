@@ -85,4 +85,29 @@
   }
   .pos-modal-stats        { grid-template-columns: repeat(2, 1fr); }
   .pos-modal-header-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+
+  /* Stock detail header: grid layout so badge anchors top-right without duplication */
+  .stock-detail-header {
+    display: grid;
+    grid-template-areas:
+      "id    badge"
+      "name  name"
+      "price price";
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 4px 8px;
+    margin-bottom: 16px;
+  }
+  .sd-header-id        { grid-area: id; }
+  .stock-detail-name   { grid-area: name; flex: none; }
+  .sd-header-price-row                { grid-area: price; }
+  .stock-detail-header .market-badge  { grid-area: badge; justify-self: end; }
+
+  /* Period pills: scrollable single row */
+  .stock-detail-controls { overflow: hidden; }
+  .stock-detail-controls .period-pills {
+    overflow-x: auto; flex-wrap: nowrap; margin-left: 0;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .stock-detail-controls .period-pills::-webkit-scrollbar { display: none; }
 }
