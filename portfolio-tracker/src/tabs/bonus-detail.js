@@ -102,7 +102,6 @@ export async function renderBonusDetail() {
     <div class="bonus-detail-page">
 
       <div class="bonus-detail-topbar">
-        <button class="bd-back-btn" onclick="globalThis._bonusDetailBack()">← Terug</button>
         <button class="btn" style="font-size:11px;padding:5px 12px" onclick="globalThis._openBonusEdit('${item.id}')">Bewerken</button>
       </div>
 
