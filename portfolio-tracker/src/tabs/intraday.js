@@ -243,12 +243,12 @@ export function renderTodayMetric() {
   if (!el) return;
   const r = computeTodayPL();
   if (!r) {
-    el.innerHTML = `<div class="metric-value c-neutral" style="font-size:17px">—</div><div class="metric-sub">geen data</div>`;
+    el.innerHTML = `<div class="summary-today-value c-neutral">—</div><div class="summary-today-pct c-neutral">geen data</div>`;
     return;
   }
   const cls  = r.pl >= 0 ? 'c-pos' : 'c-neg';
   const sign = r.pl >= 0 ? '+' : '';
-  el.innerHTML = `<div class="metric-value ${cls} privacy-val" style="font-size:17px">${sign}${fmt(r.pl)}</div><div class="metric-sub ${cls}">${sign}${r.pct.toFixed(2)}%</div>`;
+  el.innerHTML = `<div class="summary-today-value ${cls} privacy-val">${sign}${fmt(r.pl)}</div><div class="summary-today-pct ${cls}">${sign}${r.pct.toFixed(2)}%</div>`;
 
   const portfolioEl = document.getElementById('metricPortfolio');
   if (portfolioEl) {
@@ -278,7 +278,16 @@ export function renderIntradaySection() {
   if (!gridEl) return;
 
   const entries = state.CURRENT_TICKERS
-    .map(t => ({ ticker: t, yahoo: state.TICKER_META[t]?.yahoo, data: state.intradayData[state.TICKER_META[t]?.yahoo] }));
+    .map(t => ({ ticker: t, yahoo: state.TICKER_META[t]?.yahoo, data: state.intradayData[state.TICKER_META[t]?.yahoo] }))
+    .sort((a, b) => {
+      const pctOf = e => {
+        if (!e.data?.points?.length || !e.data.previousClose) return -Infinity;
+        const pts = latestSessionPoints(e.data);
+        const last = pts.length ? pts[pts.length - 1] : e.data.points[e.data.points.length - 1];
+        return Math.abs((last.close - e.data.previousClose) / e.data.previousClose);
+      };
+      return pctOf(b) - pctOf(a);
+    });
 
   const withData = entries.filter(e => e.data?.points?.length > 0);
 
@@ -311,9 +320,10 @@ export function renderIntradaySection() {
     const cls       = pct >= 0 ? 'c-pos' : 'c-neg';
     const todayStr  = new Date().toISOString().slice(0, 10);
     const fxIsStale = fxData.date !== todayStr;
-    return `<div class="intraday-card" style="${fxIsStale ? 'opacity:0.5' : ''}">
-      <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
-        <span class="pos-dot" style="background:#94a3b8"></span>USD/EUR
+    const fxAccent = pct >= 0 ? '#4ade80' : '#f87171';
+    return `<div class="intraday-card" style="border-left-color:${fxAccent};${fxIsStale ? 'opacity:0.5' : ''}">
+      <div style="display:flex;align-items:center;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
+        <span>USD/EUR</span>
         ${fxIsStale ? `<span style="font-size:9px;color:#f59e0b;font-family:'JetBrains Mono',monospace;margin-left:auto">${staleDayLabel(fxData.date)}</span>` : ''}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
@@ -328,10 +338,8 @@ export function renderIntradaySection() {
   gridEl.innerHTML = fxCard + entries.map(({ ticker, yahoo, data }) => {
     const hasData = data?.points?.length > 0;
     if (!hasData) {
-      return `<div class="intraday-card clickable" style="opacity:0.45" onclick="window._navigateToStock('${ticker}')">
-        <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
-          <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
-        </div>
+      return `<div class="intraday-card clickable" style="opacity:0.45;border-left-color:rgba(148,163,184,0.4)" onclick="window._navigateToStock('${ticker}')">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">${ticker}</div>
         <div class="metric-value c-neutral" style="font-size:16px;margin-top:5px">—</div>
         <div style="height:38px;margin-top:8px"></div>
         <div class="metric-sub">geen data</div>
@@ -352,7 +360,7 @@ export function renderIntradaySection() {
     if (isStale)                   statusLabel = sessionBadge(staleDayLabel(data.date), '#f59e0b');
     else if (marketState === 'PRE')  statusLabel = sessionBadge('pre');
     else if (marketState === 'POST') statusLabel = sessionBadge('post');
-    else if (isClosed)             statusLabel = sessionBadge('gesloten', '#64748b');
+    else if (isClosed)             statusLabel = `<span class="session-badge session-badge-closed" style="color:#94a3b8;margin-left:auto">gesloten</span>`;
     // Show price in the stock's native currency (from TICKER_META), converting if Yahoo returns a different currency
     const nativeCcy    = meta?.currency || data.currency || '';
     const displayPrice = (nativeCcy === 'USD' && data.currency === 'EUR')
@@ -366,9 +374,10 @@ export function renderIntradaySection() {
       const extCls  = extPct >= 0 ? '#4ade80' : '#f87171';
       extHoursHtml = ` <span style="color:#64748b">·</span> <span style="color:${extCls}">post ${extSign}${extPct.toFixed(2)}%</span>`;
     }
-    return `<div class="intraday-card clickable" style="${isStale ? 'opacity:0.5' : ''}" onclick="window._navigateToStock('${ticker}')">
-      <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
-        <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
+    const accentColor = pct >= 0 ? '#4ade80' : '#f87171';
+    return `<div class="intraday-card clickable" style="border-left-color:${accentColor};${isStale ? 'opacity:0.5' : ''}" onclick="window._navigateToStock('${ticker}')">
+      <div style="display:flex;align-items:center;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
+        <span>${ticker}</span>
         ${statusLabel}
       </div>
       <div class="metric-value ${cls}" style="font-size:16px;margin-top:5px">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
