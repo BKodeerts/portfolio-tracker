@@ -416,7 +416,8 @@ export function renderIntradaySection() {
       if (pct == null)  pctStr = '—';
       else              pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
       const card = document.createElement('div');
-      card.className = 'intraday-card';
+      card.className = 'intraday-card clickable';
+      card.onclick = () => globalThis._navigateToStock(item.symbol);
       if (isStale) card.style.opacity = '0.5';
       card.innerHTML = `
         <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">

@@ -142,6 +142,7 @@ export function renderStockDetail() {
         </div>
       </div>
 
+      ${sh !== 0 || cost !== 0 ? `
       <div class="chart-card" style="margin-bottom:12px">
         <div class="card-title">Positie</div>
         <div class="pos-modal-stats">
@@ -152,7 +153,7 @@ export function renderStockDetail() {
           <div class="pos-modal-stat"><div class="pos-modal-stat-label">Gerealiseerd</div><div class="pos-modal-stat-val ${realCls} privacy-val">${realSign}${fmt(realPl)}</div></div>
           ${extraStats}
         </div>
-      </div>
+      </div>` : ''}
 
       ${txRows ? `
       <div class="chart-card">
