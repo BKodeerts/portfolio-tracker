@@ -1,0 +1,10 @@
+{
+  "baseCurrency": "EUR",
+  "watchlist": [
+    "SC0D.DE",
+    "ASTS"
+  ],
+  "intradayDuringMarketHours": false,
+  "pushInterval": 15,
+  "pushPositions": []
+}

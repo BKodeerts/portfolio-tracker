@@ -166,6 +166,13 @@ async function fetchIntraday(yahooSymbol) {
 
   const { sessionPoints, previousClose } = deriveSession(points, periods, lastDate, meta);
 
+  // All points spanning today's full extended session (pre + regular + post)
+  const dayStart = periods?.pre?.start ?? periods?.regular?.start;
+  const dayEnd   = periods?.post?.end  ?? periods?.regular?.end;
+  const allPoints = (dayStart && dayEnd)
+    ? points.filter(p => p.ts >= dayStart && p.ts < dayEnd)
+    : points.filter(p => new Date(p.ts * 1000).toISOString().slice(0, 10) === lastDate);
+
   return {
     date:          lastDate,
     previousClose,
@@ -173,7 +180,9 @@ async function fetchIntraday(yahooSymbol) {
     marketState:   deriveMarketState(periods),
     exchange:      meta.exchangeName || null,
     ...deriveExtendedPrices(points, periods?.pre, periods?.post),
-    points: sessionPoints,
+    points:        sessionPoints,
+    allPoints,
+    tradingPeriods: periods || null,
   };
 }
 

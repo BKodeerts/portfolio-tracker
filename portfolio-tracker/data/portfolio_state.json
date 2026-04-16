@@ -1,0 +1,13 @@
+{
+  "twrPct": 311.62,
+  "irrPct": 57.95,
+  "riskMetrics": {
+    "volatility": 111.95,
+    "annualReturn": 177.55,
+    "sharpe": 1.56,
+    "beta": 0.81,
+    "maxDrawdownPct": 89.11
+  },
+  "inceptionDate": "2021-05-06",
+  "totalInvested": 38888.81
+}

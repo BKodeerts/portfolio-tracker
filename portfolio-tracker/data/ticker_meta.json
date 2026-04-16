@@ -1,0 +1,28 @@
+{
+  "ASTS": {
+    "quoteType": "EQUITY",
+    "sector": "Technology",
+    "industry": "Communication Equipment"
+  },
+  "LUNR": {
+    "quoteType": "EQUITY",
+    "sector": "Industrials",
+    "industry": "Aerospace & Defense"
+  },
+  "RKLB": {
+    "quoteType": "EQUITY",
+    "sector": "Industrials",
+    "industry": "Aerospace & Defense"
+  },
+  "SMR": {
+    "quoteType": "EQUITY",
+    "sector": "Industrials",
+    "industry": "Specialty Industrial Machinery"
+  },
+  "EUDF": {
+    "quoteType": "ETF"
+  },
+  "IGL": {
+    "quoteType": "EQUITY"
+  }
+}

@@ -19,132 +19,6 @@ export function sortPos(col) {
   renderPositionsTable(state.lastLatest);
 }
 
-// ── Position modal ────────────────────────────────────────────────────────────
-
-export function closePosModal() {
-  const el = document.getElementById('posModal');
-  if (el?.open) el.close();
-  if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
-}
-
-export function showPosModal(ticker) {
-  const meta      = state.TICKER_META[ticker] || {};
-  const color     = getColor(ticker);
-  const txs       = state.RAW_TRANSACTIONS.filter(t => t.ticker === ticker).slice().sort((a, b) => b.date.localeCompare(a.date));
-  const latest    = (ticker in state.lastLatest ? state.lastLatest : state.chartData.at(-1)) ?? {};
-
-  const val       = latest[ticker] || 0;
-  const cost      = latest[`${ticker}_cost`] || 0;
-  const pl        = val - cost;
-  const pct       = cost > 0 ? (pl / cost * 100) : 0;
-  const sh        = latest[`${ticker}_shares`] || 0;
-  const realPl    = state.realizedPlPerTicker?.[ticker] || 0;
-  const cls       = pl >= 0 ? 'c-pos' : 'c-neg';
-  const realCls   = realPl >= 0 ? 'c-pos' : 'c-neg';
-  const sign      = pl >= 0 ? '+' : '';
-  const realSign  = realPl >= 0 ? '+' : '';
-
-  const high52  = meta.high52;
-  const low52   = meta.low52;
-  const peRatio = meta.pe;
-  // 52W values come from Yahoo in native currency, not EUR
-  const nativeCcy  = meta.currency || 'EUR';
-  const ccySymbol  = nativeCcy === 'EUR' ? '€' : nativeCcy === 'USD' ? '$' : nativeCcy === 'GBP' ? '£' : nativeCcy;
-
-  const txRows = txs.map(t => {
-    const isDividendTx = t.type === 'dividend';
-    const isSale = !isDividendTx && t.shares < 0;
-    const price  = isDividendTx ? null : Math.abs(t.costEur / t.shares);
-    const note   = t.note ? `<div class="c-neutral" style="font-size:10px;margin-top:2px">${t.note}</div>` : '';
-    let typeLabel, typeColor;
-    if (isDividendTx)    { typeLabel = 'Dividend'; typeColor = '#f59e0b'; }
-    else if (isSale)     { typeLabel = 'Verkoop';  typeColor = '#ef4444'; }
-    else                 { typeLabel = 'Koop';     typeColor = '#16a34a'; }
-    return `<tr>
-      <td>${t.date}</td>
-      <td style="color:${typeColor}">${typeLabel}</td>
-      <td>${isDividendTx ? '—' : Math.abs(t.shares).toLocaleString('nl-BE', { maximumFractionDigits: 4 })}</td>
-      <td>${fmt(Math.abs(t.costEur))}</td>
-      <td>${price != null ? `€${price.toFixed(2)}` : '—'}${note}</td>
-    </tr>`;
-  }).join('');
-
-  const divIncome = state.dividendsPerTicker?.[ticker] || 0;
-  const fxPl      = meta.fxPl ?? null;
-  const extraAttrs = [
-    high52     ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">52W Hoog</div><div class="pos-modal-stat-val">${ccySymbol}${high52.toFixed(2)}</div></div>` : '',
-    low52      ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">52W Laag</div><div class="pos-modal-stat-val">${ccySymbol}${low52.toFixed(2)}</div></div>` : '',
-    peRatio    ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">P/E</div><div class="pos-modal-stat-val">${peRatio.toFixed(1)}</div></div>` : '',
-    divIncome  ? `<div class="pos-modal-stat"><div class="pos-modal-stat-label">Dividenden</div><div class="pos-modal-stat-val c-pos privacy-val">+${fmt(divIncome)}</div></div>` : '',
-    fxPl != null ? (() => {
-      const fxSign = fxPl >= 0 ? '+' : '';
-      const fxCls  = fxPl >= 0 ? 'c-pos' : 'c-neg';
-      const fxPct  = cost > 0 ? (fxPl / cost * 100).toFixed(1) : null;
-      return `<div class="pos-modal-stat"><div class="pos-modal-stat-label">Valuta effect</div><div class="pos-modal-stat-val ${fxCls} privacy-val">${fxSign}${fmt(fxPl)}</div>${fxPct != null ? `<div class="pos-modal-stat-sub ${fxCls}">${fxSign}${fxPct}%</div>` : ''}</div>`;
-    })() : '',
-  ].join('');
-
-  const modal = document.getElementById('posModal');
-  modal.innerHTML = `<div class="pos-modal-inner">
-    <div class="pos-modal-header">
-      <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></span>
-      <span style="font-size:16px;font-weight:700;flex-shrink:0">${ticker}</span>
-      <span class="pos-modal-header-label" style="font-size:13px;color:#888">${meta.label || ''}</span>
-      <button class="pos-modal-close" onclick="globalThis._closePosModal()">✕</button>
-    </div>
-    <div class="pos-modal-stats">
-      <div class="pos-modal-stat"><div class="pos-modal-stat-label">Aandelen</div><div class="pos-modal-stat-val privacy-val">${sh.toLocaleString('nl-BE', { maximumFractionDigits: 4 })}</div></div>
-      <div class="pos-modal-stat"><div class="pos-modal-stat-label">Geïnvesteerd</div><div class="pos-modal-stat-val privacy-val">${fmt(cost)}</div></div>
-      <div class="pos-modal-stat"><div class="pos-modal-stat-label">Huidig</div><div class="pos-modal-stat-val privacy-val">${fmt(val)}</div></div>
-      <div class="pos-modal-stat"><div class="pos-modal-stat-label">Ongerealiseerd</div><div class="pos-modal-stat-val ${cls} privacy-val">${sign}${fmt(pl)}</div><div class="pos-modal-stat-sub ${cls}">${sign}${pct.toFixed(1)}%</div></div>
-      <div class="pos-modal-stat"><div class="pos-modal-stat-label">Gerealiseerd</div><div class="pos-modal-stat-val ${realCls} privacy-val">${realSign}${fmt(realPl)}</div></div>
-      ${extraAttrs}
-    </div>
-    <div class="pos-modal-chart-wrap"><canvas id="posModalChart"></canvas></div>
-    <table class="pos-modal-tx-table">
-      <thead><tr><th>Datum</th><th>Type</th><th>Aandelen</th><th>Kosten €</th><th>Prijs/stuk</th></tr></thead>
-      <tbody>${txRows}</tbody>
-    </table>
-  </div>`;
-
-  modal.showModal();
-
-  if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
-
-  // Chart shows % return vs FIFO cost basis
-  const points = state.chartData
-    .filter(row => row[ticker] != null && (row[`${ticker}_cost`] || 0) > 0)
-    .map(row => {
-      const pct = ((row[ticker] - row[`${ticker}_cost`]) / row[`${ticker}_cost`] * 100);
-      return { x: row.date, y: Number.parseFloat(pct.toFixed(2)) };
-    });
-  const ct = chartTheme();
-  state.chartInstances.__posModal = new Chart(document.getElementById('posModalChart').getContext('2d'), {
-    type: 'line',
-    data: { datasets: [{ data: points, borderColor: color, borderWidth: 2, fill: true, backgroundColor: color + '22', tension: 0.3, pointRadius: 0 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: ct.tooltipBg, borderColor: ct.tooltipBorder, borderWidth: 1,
-          titleColor: ct.titleColor, bodyColor: ct.bodyColor,
-          titleFont: { family: "'DM Sans'", size: 11, weight: 700 }, bodyFont: { family: "'JetBrains Mono'", size: 11 },
-          padding: 10, cornerRadius: 8,
-          callbacks: {
-            title: items => new Date(items[0].parsed.x).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }),
-            label: item => ` ${item.raw.y >= 0 ? '+' : ''}${item.raw.y.toFixed(1)}%`,
-          },
-        },
-      },
-      scales: {
-        x: { type: 'time', time: { unit: 'month' }, grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 } } },
-        y: { grid: { color: ct.gridColor }, ticks: { color: ct.tickColor, font: { size: 9 }, callback: v => `${v >= 0 ? '+' : ''}${v.toFixed(0)}%` } },
-      },
-    },
-  });
-}
-
 // ── Charts ────────────────────────────────────────────────────────────────────
 
 export function renderBarChart(latest) {
@@ -583,7 +457,7 @@ export function renderPositionsTable(latest) {
     totalCost += cost; totalVal += val; totalRealPl += realPl;
     const cls     = pl >= 0 ? 'c-pos' : 'c-neg';
     const realCls = realPl >= 0 ? 'c-pos' : 'c-neg';
-    return `<tr onclick="window._showPosModal('${ticker}')">
+    return `<tr onclick="window._navigateToStock('${ticker}')">
       <td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${getColor(ticker)};margin-right:7px"></span>${ticker}</td>
       <td>${state.TICKER_META[ticker]?.label || ''}</td>
       <td>${sh.toLocaleString('nl-BE')}</td>

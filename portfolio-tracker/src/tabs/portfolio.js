@@ -780,7 +780,7 @@ export function renderLegend(visibleTickers) {
     el.innerHTML = visibleTickers
       .map(
         (t) => `
-      <div class="legend-item" style="cursor:pointer" onclick="window._showPosModal('${t}')">
+      <div class="legend-item" style="cursor:pointer" onclick="window._navigateToStock('${t}')">
         <div class="legend-dot" style="background:${getColor(t)}"></div>
         ${t}${state.CURRENT_TICKERS.includes(t) ? "" : '<span style="color:#374151"> gesloten</span>'}
       </div>`,

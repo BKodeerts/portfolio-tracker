@@ -321,7 +321,7 @@ export function renderIntradaySection() {
   gridEl.innerHTML = fxCard + entries.map(({ ticker, yahoo, data }) => {
     const hasData = data?.points?.length > 0;
     if (!hasData) {
-      return `<div class="intraday-card clickable" style="opacity:0.45" onclick="window._showPosModal('${ticker}')">
+      return `<div class="intraday-card clickable" style="opacity:0.45" onclick="window._navigateToStock('${ticker}')">
         <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
           <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
         </div>
@@ -358,7 +358,7 @@ export function renderIntradaySection() {
       const extCls  = extPct >= 0 ? '#4ade80' : '#f87171';
       extHoursHtml = ` <span style="color:#64748b">·</span> <span style="color:${extCls}">post ${extSign}${extPct.toFixed(2)}%</span>`;
     }
-    return `<div class="intraday-card clickable" style="${isStale ? 'opacity:0.5' : ''}" onclick="window._showPosModal('${ticker}')">
+    return `<div class="intraday-card clickable" style="${isStale ? 'opacity:0.5' : ''}" onclick="window._navigateToStock('${ticker}')">
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#888;margin-bottom:2px">
         <span class="pos-dot" style="background:${window._getColor(ticker)}"></span>${ticker}
         ${statusLabel}
