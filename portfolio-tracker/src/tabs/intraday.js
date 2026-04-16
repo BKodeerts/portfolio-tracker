@@ -166,11 +166,9 @@ export function sparklineSVG(points, prevClose, tradingMins, muted = false) {
     xs.slice(1).map((x, i) => `L${x.toFixed(1)},${ys[i + 1].toFixed(1)}`).join(' ') +
     ` L${xs[xs.length - 1].toFixed(1)},${H} L${xs[0].toFixed(1)},${H} Z`;
   const zeroY = ((H - 3) - ((-min) / range) * (H - 6)).toFixed(1);
-  const clr = pcts[pcts.length - 1] >= 0
-    ? (muted ? '#7abe90' : '#4ade80')
-    : (muted ? '#c49090' : '#f87171');
+  const clr = pcts[pcts.length - 1] >= 0 ? '#4ade80' : '#f87171';
   const uid = `sp${Math.random().toString(36).slice(2, 7)}`;
-  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;margin-top:8px">
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;margin-top:8px" opacity="${muted ? '0.45' : '1'}">
     <defs><linearGradient id="${uid}" x1="0" x2="0" y1="0" y2="1">
       <stop offset="0%" stop-color="${clr}" stop-opacity="0.2"/>
       <stop offset="100%" stop-color="${clr}" stop-opacity="0.02"/>
