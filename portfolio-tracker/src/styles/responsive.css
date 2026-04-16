@@ -110,4 +110,8 @@
     -webkit-overflow-scrolling: touch; scrollbar-width: none;
   }
   .stock-detail-controls .period-pills::-webkit-scrollbar { display: none; }
+
+  /* Bonus detail page mobile */
+  .bd-total-value  { font-size: 22px; }
+  .bd-label        { font-size: 18px; }
 }

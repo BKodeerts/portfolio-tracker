@@ -12,6 +12,7 @@ import { loadData } from './data.js';
 import { renderApp, renderPortfolioChart } from './tabs/portfolio.js';
 import { renderAnalyse, renderAnalyseCharts, sortPos, saveTickerMetaUI, resetSectorsUI, setBreakdownTab, setBenchmark, exportPositionsCsv, exportTransactionsCsv } from './tabs/analyse.js';
 import { renderStockDetail, setStockDetailPeriod } from './tabs/stock-detail.js';
+import { renderBonusDetail, setBonusDetailShowPrior } from './tabs/bonus-detail.js';
 import { handleCSVFile, updateYahooGuess, saveImport, saveTickerRenames } from './tabs/import.js';
 import { renderTransacties, filterTx, deleteTx, saveTxAll, toggleAddTx, addManualTx, onAddTypeChange } from './tabs/transacties.js';
 import { renderSettings } from './tabs/settings.js';
@@ -85,15 +86,17 @@ async function init() {
 // the in-app state stays in sync.  A guard at the bottom of popstate
 // prevents the user from accidentally leaving the app.
 
-function _applyTab(t, ticker) {
+function _applyTab(t, id) {
   state.currentTab = t;
-  if (ticker !== undefined) state.selectedTicker = ticker;
+  if (t === 'aandeel' && id !== undefined) state.selectedTicker  = id;
+  if (t === 'bonus'   && id !== undefined) state.selectedBonusId = id;
   if      (t === 'portefeuille') renderApp();
   else if (t === 'analyse')      renderAnalyse();
   else if (t === 'transacties')  renderTransacties();
   else if (t === 'import')       renderTransacties();
   else if (t === 'instellingen') renderSettings();
   else if (t === 'aandeel')      renderStockDetail();
+  else if (t === 'bonus')        renderBonusDetail();
 }
 
 function setTab(t) {
@@ -109,11 +112,11 @@ function navigateToStock(ticker) {
 }
 
 function stockDetailBack() { history.back(); }
+function bonusDetailBack() { history.back(); }
 
-function closePosModal() {
-  const el = document.getElementById('posModal');
-  if (el?.open) el.close();
-  if (state.chartInstances.__posModal) { state.chartInstances.__posModal.destroy(); delete state.chartInstances.__posModal; }
+function navigateToBonusDetail(id) {
+  history.pushState({ _ptab: true, tab: 'bonus', bonusId: id }, '');
+  _applyTab('bonus', id);
 }
 
 function renderAppKeepScroll() { const y = globalThis.scrollY; renderApp(); globalThis.scrollTo(0, y); }
@@ -182,10 +185,12 @@ globalThis._updateYahooGuess = updateYahooGuess;
 globalThis._saveImport       = saveImport;
 globalThis._getColor         = getColor;
 globalThis._sortPos          = sortPos;
-globalThis._closePosModal            = closePosModal;
 globalThis._navigateToStock          = navigateToStock;
 globalThis._stockDetailBack          = stockDetailBack;
 globalThis._setStockDetailPeriod     = setStockDetailPeriod;
+globalThis._navigateToBonusDetail    = navigateToBonusDetail;
+globalThis._bonusDetailBack          = bonusDetailBack;
+globalThis._setBonusDetailPrior      = setBonusDetailShowPrior;
 globalThis._filterTx         = filterTx;
 globalThis._deleteTx         = deleteTx;
 globalThis._saveTxAll           = saveTxAll;
@@ -214,11 +219,6 @@ document.addEventListener('touchend', e => {
 }, { passive: true });
 
 
-// Modal: close on backdrop click or native Escape (bonus detail modal)
-const posModalEl = document.getElementById('posModal');
-posModalEl.addEventListener('click', e => { if (e.target === posModalEl) closePosModal(); });
-posModalEl.addEventListener('close', () => closePosModal());
-
 // Seed the history stack so the initial tab has a state entry.
 // This ensures popstate always receives our {_ptab} object.
 history.replaceState({ _ptab: true, tab: 'portefeuille', ticker: null }, '');
@@ -228,7 +228,7 @@ history.replaceState({ _ptab: true, tab: 'portefeuille', ticker: null }, '');
 // push the current state back immediately so they stay in the app.
 window.addEventListener('popstate', e => {
   if (e.state?._ptab) {
-    _applyTab(e.state.tab, e.state.ticker);
+    _applyTab(e.state.tab, e.state.ticker ?? e.state.bonusId);
   } else {
     history.pushState({ _ptab: true, tab: state.currentTab, ticker: state.selectedTicker }, '');
   }
