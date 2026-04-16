@@ -119,6 +119,8 @@ body.theme-dark .perf-table th                         { color: #909090; border-
 body.theme-dark .perf-table td                         { border-bottom-color: rgba(255,255,255,0.05); }
 body.theme-dark .risk-stat                             { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); }
 body.theme-dark .risk-stat-label                       { color: #909090; }
+body.theme-dark .sd-nav-back                           { color: #808080; }
+body.theme-dark .sd-nav-back:hover                     { color: #e2e2e2; }
 
 @media (max-width: 640px) {
   body.theme-dark .tx-table tr { border-color: rgba(255,255,255,0.09); background: rgba(255,255,255,0.03); }

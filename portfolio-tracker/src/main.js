@@ -107,6 +107,7 @@ function setTab(t) {
 }
 
 function navigateToStock(ticker) {
+  state.prevTab = state.currentTab;
   history.pushState({ _ptab: true, tab: 'aandeel', ticker }, '');
   _applyTab('aandeel', ticker);
 }
@@ -115,6 +116,7 @@ function stockDetailBack() { history.back(); }
 function bonusDetailBack() { history.back(); }
 
 function navigateToBonusDetail(id) {
+  state.prevTab = state.currentTab;
   history.pushState({ _ptab: true, tab: 'bonus', bonusId: id }, '');
   _applyTab('bonus', id);
 }
