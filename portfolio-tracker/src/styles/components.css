@@ -54,7 +54,7 @@
 .display-controls { display: flex; flex-direction: row; gap: 2px; flex-shrink: 0; align-items: center; }
 
 /* ── App header ── */
-.app-header { display: flex; align-items: center; }
+.app-header { display: flex; align-items: center; gap: 8px; }
 .app-nav { display: flex; gap: 2px; background: rgba(0,0,0,0.05); border-radius: 10px; padding: 3px; flex: 1; }
 .nav-btn {
   padding: 6px 14px; border-radius: 7px; border: none;
@@ -418,7 +418,7 @@ body.privacy .pos-modal-tx-table td:nth-child(4) {
 .sd-nav-back:hover { color: #1c1c1c; }
 
 /* ── Stock detail page ── */
-.stock-detail-page { max-width: 820px; margin: 0 auto; padding: 0 16px 48px; }
+.stock-detail-page { padding: 0 0 48px; }
 
 /* Desktop: single flex row — identity · name (fills) · price+change · badge */
 .stock-detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }

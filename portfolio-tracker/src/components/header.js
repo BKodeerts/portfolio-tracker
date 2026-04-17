@@ -14,10 +14,20 @@ export function renderAppHeader() {
   let inner;
   if (tab === 'aandeel') {
     const label = BACK_LABELS[state.prevTab] || 'Overzicht';
-    inner = `<button class="sd-nav-back" onclick="globalThis._stockDetailBack()">← ${label}</button>`;
+    inner = `<button class="sd-nav-back" onclick="globalThis._stockDetailBack()">← ${label}</button>
+      <nav class="app-nav desktop-only">
+        <button class="nav-btn" onclick="globalThis._setTab('portefeuille')">${ICON_GRID}Overzicht</button>
+        <button class="nav-btn" onclick="globalThis._setTab('analyse')">${ICON_CHART}Analyse</button>
+        <button class="nav-btn" onclick="globalThis._setTab('transacties')">${ICON_LIST}Transacties</button>
+      </nav>`;
   } else if (tab === 'bonus') {
     const label = BACK_LABELS[state.prevTab] || 'Overzicht';
-    inner = `<button class="sd-nav-back" onclick="globalThis._bonusDetailBack()">← ${label}</button>`;
+    inner = `<button class="sd-nav-back" onclick="globalThis._bonusDetailBack()">← ${label}</button>
+      <nav class="app-nav desktop-only">
+        <button class="nav-btn" onclick="globalThis._setTab('portefeuille')">${ICON_GRID}Overzicht</button>
+        <button class="nav-btn" onclick="globalThis._setTab('analyse')">${ICON_CHART}Analyse</button>
+        <button class="nav-btn" onclick="globalThis._setTab('transacties')">${ICON_LIST}Transacties</button>
+      </nav>`;
   } else {
     inner = `<nav class="app-nav">
       <button class="nav-btn ${tab === 'portefeuille'  ? 'active' : ''}" onclick="globalThis._setTab('portefeuille')">${ICON_GRID}Overzicht</button>
