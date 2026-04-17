@@ -10,6 +10,7 @@
   .summary-today-pct  { font-size: 9px; }
   .summary-secondary { padding-top: 7px; }
   .summary-secondary-item { padding: 0 8px; }
+  .summary-secondary-item:last-child { text-align: right; }
   .summary-secondary-item .metric-value { font-size: 12px; }
 
   .metrics-grid       { grid-template-columns: 1fr 1fr; }
@@ -27,7 +28,9 @@
   .chart-controls-mobile { display: flex; gap: 6px; flex: 1; }
 
   /* Tighter root padding on mobile */
-  #root { padding: 14px 12px 48px; }
+  #root { padding: 20px 12px 48px; }
+
+  .nav-with-controls { margin-top: 8px; }
 
   /* Positions table: scrollable + tighter padding */
   #positionsTableWrap       { overflow-x: auto; -webkit-overflow-scrolling: touch; }
