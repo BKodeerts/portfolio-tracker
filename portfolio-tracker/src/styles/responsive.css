@@ -2,7 +2,7 @@
 
 /* ── Desktop: merge summary rows into a single flex line ── */
 @media (min-width: 641px) {
-  #summary-bar { display: flex; align-items: center; gap: 0; }
+  #summary-bar { display: flex; align-items: flex-start; gap: 0; }
 
   /* unwrap .summary-hero so its children become direct flex items */
   .summary-hero { display: contents; }
@@ -15,10 +15,12 @@
   .summary-secondary {
     order: 2; flex: 1;
     border-top: none; padding-top: 0;
+    justify-content: flex-start;
   }
-  /* restore inner padding stripped by default first/last-child rules */
+  /* prevent items from stretching apart; restore padding stripped by default rules */
+  .summary-secondary-item { flex: 0 0 auto; }
   .summary-secondary-item:first-child { padding-left: 12px; }
-  .summary-secondary-item:last-child  { padding-right: 12px; }
+  .summary-secondary-item:last-child  { padding-right: 12px; border-right: none; }
 
   .summary-hero-today {
     order: 3; flex: 0 0 auto;
