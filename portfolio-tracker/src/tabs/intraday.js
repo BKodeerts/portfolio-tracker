@@ -187,7 +187,7 @@ export function sparklineSVG(points, prevClose, tradingMins, muted = false) {
 }
 
 export function computeTodayPL() {
-  const today = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD local
+  const today = new Date().toISOString().slice(0, 10); // UTC, matches data.date from server
   // If no ticker has data from today, markets haven't traded today (weekend/holiday)
   const hasToday = state.CURRENT_TICKERS.some(t => {
     const d = state.intradayData[state.TICKER_META[t]?.yahoo];
@@ -238,12 +238,49 @@ export function computeTodayPL() {
   return baseEur > 0 ? { pl: plEur, pct: (plEur / baseEur) * 100 } : null;
 }
 
+// Compute current portfolio value from latest available intraday prices.
+// Falls back to historical value for any position without intraday data.
+function computeCurrentValueFromIntraday() {
+  const latest = state.chartData.at(-1);
+  if (!latest || !state.intradayLoaded) return null;
+  let total = 0;
+  let hasAnyIntraday = false;
+  for (const ticker of state.CURRENT_TICKERS) {
+    const meta  = state.TICKER_META[ticker];
+    const data  = state.intradayData[meta?.yahoo];
+    const shares = latest[`${ticker}_shares`];
+    if (!shares) continue;
+    if (!data?.points?.length) {
+      total += latest[ticker] || 0;
+      continue;
+    }
+    hasAnyIntraday = true;
+    const lastPrice = data.points[data.points.length - 1].close;
+    if (meta.currency && meta.currency !== 'EUR') {
+      const fxDef  = FX_DEFS[meta.currency];
+      const fxData = fxDef && state.intradayData[fxDef.symbol];
+      const fxRate = fxData?.points?.length
+        ? fxData.points[fxData.points.length - 1].close
+        : (fxDef?.fallback || 1);
+      total += shares * lastPrice / fxRate / (fxDef?.scale || 1);
+    } else {
+      total += shares * lastPrice;
+    }
+  }
+  return hasAnyIntraday ? total : null;
+}
+
 export function renderTodayMetric() {
   const el = document.getElementById('metricToday');
   if (!el) return;
   const r = computeTodayPL();
   if (!r) {
     el.innerHTML = `<div class="summary-today-value c-neutral">—</div><div class="summary-today-pct c-neutral">geen data</div>`;
+    // Still update the portfolio header from latest available intraday prices
+    // (covers the case where markets haven't opened today but yesterday's prices are loaded)
+    const currentVal = computeCurrentValueFromIntraday();
+    const portfolioEl = document.getElementById('metricPortfolio');
+    if (portfolioEl && currentVal !== null) portfolioEl.textContent = fmt(currentVal);
     return;
   }
   const cls  = r.pl >= 0 ? 'c-pos' : 'c-neg';
