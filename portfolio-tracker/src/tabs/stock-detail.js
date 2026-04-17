@@ -232,15 +232,24 @@ async function renderStockDetailChart(ticker, period) {
     // Fallback: US extended day is ~16h from pre-market start; EU regular session ~9h.
     const isEU   = /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL|CL|TO|AX|T|MX)$/i.test(yahoo);
     const dayLen = isEU ? 9 * 3600 : 16 * 3600;
-    const xMinTs = periods?.pre?.start ?? periods?.regular?.start ?? allPts[0].ts;
-    const xMaxTs = periods?.post?.end  ?? periods?.regular?.end   ?? (xMinTs + dayLen);
+    let xMinTs = periods?.pre?.start ?? periods?.regular?.start ?? allPts[0].ts;
+    let xMaxTs = periods?.post?.end  ?? periods?.regular?.end   ?? (xMinTs + dayLen);
 
     // Regular session bounds for open/close lines.
     // When tradingPeriods is absent, estimate from known exchange offsets:
     // US: pre-market starts at 4 AM ET, regular opens 5.5 h later at 9:30 AM, closes 12 h later at 4 PM.
     // EU: no extended hours — full day IS the regular session.
-    const regStart = periods?.regular?.start ?? (isEU ? xMinTs : xMinTs + 5.5 * 3600);
-    const regEnd   = periods?.regular?.end   ?? (isEU ? xMaxTs : xMinTs + 12  * 3600);
+    let regStart = periods?.regular?.start ?? (isEU ? xMinTs : xMinTs + 5.5 * 3600);
+    let regEnd   = periods?.regular?.end   ?? (isEU ? xMaxTs : xMinTs + 12  * 3600);
+
+    // If all data falls before xMinTs, tradingPeriods points to a future session (e.g. pre-market
+    // before open showing yesterday's data). Re-anchor bounds to the actual data range.
+    if (allPts[allPts.length - 1].ts < xMinTs) {
+      xMinTs   = allPts[0].ts;
+      xMaxTs   = allPts[allPts.length - 1].ts + 3600;
+      regStart = isEU ? xMinTs : xMinTs + 5.5 * 3600;
+      regEnd   = isEU ? xMaxTs : xMinTs + 12  * 3600;
+    }
 
     const datasets = buildIntradayDatasets(allPts, regStart, regEnd, { lineColor, fillColor, dimColor, dimFillColor }, prevClose, ct);
     // Extend the ref line to cover the full session so Chart.js doesn't clip the axis to sparse data
