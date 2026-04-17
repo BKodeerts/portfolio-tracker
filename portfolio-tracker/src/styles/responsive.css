@@ -27,7 +27,9 @@
   .chart-controls-mobile { display: flex; gap: 6px; flex: 1; }
 
   /* Tighter root padding on mobile */
-  #root { padding: 14px 12px 48px; }
+  #root { padding: 20px 12px 48px; }
+
+  .nav-with-controls { margin-top: 8px; }
 
   /* Positions table: scrollable + tighter padding */
   #positionsTableWrap       { overflow-x: auto; -webkit-overflow-scrolling: touch; }
