@@ -6,9 +6,46 @@
   border-bottom: 1px solid rgba(0,0,0,0.07);
 }
 .top-bar-inner { max-width: 980px; margin: 0 auto; padding: 12px 20px; }
-.summary-bar-grid { margin-top: 0; margin-bottom: 10px; }
-.summary-bar-grid .metric-card { padding: 10px 14px; }
-.summary-bar-grid .metric-value { font-size: 16px !important; }
+
+/* ── Redesigned summary bar ── */
+.summary-hero {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 12px; margin-bottom: 10px;
+}
+.summary-hero-main { min-width: 0; }
+.summary-hero-value {
+  font-size: 26px; font-weight: 700;
+  font-family: 'JetBrains Mono', monospace; letter-spacing: -0.03em; line-height: 1;
+}
+.summary-hero-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em;
+  color: #888; font-weight: 600; margin-top: 4px;
+}
+.summary-hero-today { text-align: right; flex-shrink: 0; }
+.summary-today-label {
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em;
+  color: #888; font-weight: 600; margin-bottom: 3px;
+}
+.summary-today-value {
+  font-size: 17px; font-weight: 700;
+  font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em; line-height: 1.1;
+}
+.summary-today-pct {
+  font-size: 10px; font-family: 'JetBrains Mono', monospace; margin-top: 2px;
+}
+.summary-secondary {
+  display: flex; padding-top: 9px; border-top: 1px solid rgba(0,0,0,0.07);
+}
+.summary-secondary-item {
+  flex: 1; min-width: 0; padding: 0 12px;
+  border-right: 1px solid rgba(0,0,0,0.07);
+  display: flex; flex-direction: column; gap: 1px;
+}
+.summary-secondary-item:first-child { padding-left: 0; }
+.summary-secondary-item:last-child  { border-right: none; padding-right: 0; }
+.summary-secondary-item .metric-label { margin-bottom: 0; font-size: 9px; }
+.summary-secondary-item .metric-value { font-size: 13px; }
+.summary-secondary-item .metric-sub  { font-size: 9px; margin-top: 0; }
 
 /* ── Nav + controls row ── */
 .nav-with-controls { display: flex; align-items: center; gap: 6px; }
@@ -20,12 +57,16 @@
 .app-header { display: flex; align-items: center; }
 .app-nav { display: flex; gap: 2px; background: rgba(0,0,0,0.05); border-radius: 10px; padding: 3px; flex: 1; }
 .nav-btn {
-  padding: 6px 16px; border-radius: 7px; border: none;
+  padding: 6px 14px; border-radius: 7px; border: none;
   background: transparent; color: #888; font-size: 12px; font-weight: 600;
   cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 5px;
 }
 .nav-btn:hover { color: #444; }
 .nav-btn.active { background: rgba(255,255,255,0.88); color: #1c1c1c; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.nav-icon { flex-shrink: 0; opacity: 0.6; }
+.nav-btn:hover .nav-icon { opacity: 0.8; }
+.nav-btn.active .nav-icon { opacity: 1; }
 
 /* ── Metric cards ── */
 .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
@@ -304,11 +345,16 @@
 
 /* Intraday sparklines */
 .intraday-section { margin-bottom: 12px; }
-.intraday-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.intraday-section-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;
+  background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.05);
+  border-radius: 10px; padding: 6px 10px;
+}
 .intraday-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .intraday-card {
   background: rgba(255,255,255,0.7); border: 1px solid rgba(0,0,0,0.06);
-  border-radius: 14px; padding: 14px 16px; overflow: hidden; min-width: 0;
+  border-left: 3px solid transparent;
+  border-radius: 14px; padding: 14px 13px 14px 13px; overflow: hidden; min-width: 0;
 }
 .market-badge {
   display: inline-flex; align-items: center; gap: 4px;
@@ -324,6 +370,13 @@
   font-family: 'JetBrains Mono', monospace;
   background: rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.10);
   border-radius: 5px; padding: 2px 5px;
+}
+.session-badge-closed {
+  background: rgba(100,116,139,0.07);
+  border-color: rgba(100,116,139,0.15);
+  border-radius: 20px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
 }
 .intraday-card.clickable { cursor: pointer; transition: transform 0.12s ease, box-shadow 0.12s ease; }
 .intraday-card.clickable:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
