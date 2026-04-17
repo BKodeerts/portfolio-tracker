@@ -30,6 +30,7 @@
 }
 
 @media (max-width: 640px) {
+  .mobile-only { display: initial !important; }
   .top-bar-inner { padding: 10px 14px; }
 
   /* Summary bar: compact on mobile */

@@ -65,6 +65,7 @@
 .nav-btn:hover { color: #444; }
 .nav-btn.active { background: rgba(255,255,255,0.88); color: #1c1c1c; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
 .nav-icon { flex-shrink: 0; opacity: 0.6; }
+.sd-back-pill { border-right: 1px solid rgba(0,0,0,0.1); padding-right: 12px; margin-right: 1px; }
 .nav-btn:hover .nav-icon { opacity: 0.8; }
 .nav-btn.active .nav-icon { opacity: 1; }
 
