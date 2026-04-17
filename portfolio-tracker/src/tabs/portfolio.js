@@ -796,24 +796,29 @@ export function renderSummaryBar() {
   if (!latest) return;
   const plClass = latest.profit >= 0 ? "c-pos" : "c-neg";
   const profitSign = latest.profit >= 0 ? "+" : "";
-  el.innerHTML = `<div class="metrics-grid summary-bar-grid">
-    <div class="metric-card">
+  el.innerHTML = `<div class="summary-hero">
+    <div class="summary-hero-main">
+      <div id="metricPortfolio" class="summary-hero-value c-brand privacy-val">${fmt(latest.total)}</div>
+      <div class="summary-hero-label">Portefeuille</div>
+    </div>
+    <div class="summary-hero-today">
+      <div class="summary-today-label">Vandaag</div>
+      <div id="metricToday">
+        <div class="summary-today-value c-neutral">—</div>
+        <div class="summary-today-pct c-neutral">laden…</div>
+      </div>
+    </div>
+  </div>
+  <div class="summary-secondary">
+    <div class="summary-secondary-item">
       <div class="metric-label">Kostprijs</div>
       <div class="metric-value c-neutral privacy-val">${fmt(latest.totalCost)}</div>
       ${state.totalInvested > 0 ? `<div class="metric-sub c-neutral privacy-val">${fmt(state.totalInvested)} ingelegd</div>` : ""}
     </div>
-    <div class="metric-card">
-      <div class="metric-label">Portefeuille</div>
-      <div id="metricPortfolio" class="metric-value c-brand privacy-val">${fmt(latest.total)}</div>
-    </div>
-    <div class="metric-card">
+    <div class="summary-secondary-item">
       <div class="metric-label">P&amp;L totaal</div>
       <div class="metric-value ${plClass} privacy-val">${profitSign}${fmt(latest.profit)}</div>
       <div class="metric-sub ${plClass}">${fmtPct(latest.pctReturn)}</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">Vandaag</div>
-      <div id="metricToday"><div class="metric-value c-neutral">—</div><div class="metric-sub">laden…</div></div>
     </div>
   </div>`;
   if (state.intradayLoaded) renderTodayMetric();
@@ -831,7 +836,6 @@ export function renderApp() {
   document.getElementById("root").innerHTML = `
     <div class="intraday-section">
       <div class="intraday-section-header">
-        <div class="card-title" style="margin-bottom:0">Vandaag</div>
         <div id="marketStatus"></div>
         <div id="intradayStatus" style="font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace;margin-left:auto"></div>
         <button class="refresh-btn" onclick="window._refreshIntraday()" title="Intraday verversen">↻</button>
