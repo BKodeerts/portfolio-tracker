@@ -1,0 +1,1 @@
+const i=t=>`€${Math.round(t).toLocaleString("nl-BE")}`,n=t=>`${t>=0?"+":""}${t.toFixed(1)}%`,a=(t,o=2)=>t.toLocaleString("nl-BE",{minimumFractionDigits:o,maximumFractionDigits:o});export{i as a,a as b,n as f};

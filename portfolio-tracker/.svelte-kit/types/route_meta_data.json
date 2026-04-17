@@ -1,0 +1,30 @@
+{
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/analysis": [
+		"src/routes/+layout.ts"
+	],
+	"/bonus": [
+		"src/routes/+layout.ts"
+	],
+	"/bonus/[id]": [
+		"src/routes/+layout.ts"
+	],
+	"/import": [
+		"src/routes/+layout.ts"
+	],
+	"/intraday": [
+		"src/routes/+layout.ts"
+	],
+	"/settings": [
+		"src/routes/+layout.ts"
+	],
+	"/stock/[ticker]": [
+		"src/routes/+layout.ts"
+	],
+	"/transactions": [
+		"src/routes/+layout.ts"
+	]
+}
