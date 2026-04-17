@@ -1,5 +1,32 @@
 .chart-controls-mobile { display: none; }
 
+/* ── Desktop: merge summary rows into a single flex line ── */
+@media (min-width: 641px) {
+  #summary-bar { display: flex; align-items: center; gap: 0; }
+
+  /* unwrap .summary-hero so its children become direct flex items */
+  .summary-hero { display: contents; }
+
+  .summary-hero-main {
+    order: 1; flex: 0 0 auto;
+    padding-right: 16px;
+    border-right: 1px solid rgba(0,0,0,0.07);
+  }
+  .summary-secondary {
+    order: 2; flex: 1;
+    border-top: none; padding-top: 0;
+  }
+  /* restore inner padding stripped by default first/last-child rules */
+  .summary-secondary-item:first-child { padding-left: 12px; }
+  .summary-secondary-item:last-child  { padding-right: 12px; }
+
+  .summary-hero-today {
+    order: 3; flex: 0 0 auto;
+    border-left: 1px solid rgba(0,0,0,0.07);
+    padding-left: 16px;
+  }
+}
+
 @media (max-width: 640px) {
   .top-bar-inner { padding: 10px 14px; }
 
