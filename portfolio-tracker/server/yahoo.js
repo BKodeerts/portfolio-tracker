@@ -202,10 +202,14 @@ async function fetchIntraday(yahooSymbol) {
 
   const { sessionPoints, previousClose } = deriveSession(points, periods, lastDate, meta);
 
-  // All points spanning today's full extended session (pre + regular + post)
+  // All points spanning today's full extended session (pre + regular + post).
+  // When currentTradingPeriod is a future session (market closed, data is stale),
+  // dayStart is tomorrow — filtering by it yields nothing. Fall back to lastDate so
+  // yesterday's pre-market data is preserved in allPoints.
   const dayStart = periods?.pre?.start ?? periods?.regular?.start;
   const dayEnd   = periods?.post?.end  ?? periods?.regular?.end;
-  const allPoints = (dayStart && dayEnd)
+  const futureSession = dayStart && points[points.length - 1].ts < dayStart;
+  const allPoints = (dayStart && dayEnd && !futureSession)
     ? points.filter(p => p.ts >= dayStart && p.ts < dayEnd)
     : points.filter(p => new Date(p.ts * 1000).toISOString().slice(0, 10) === lastDate);
 
