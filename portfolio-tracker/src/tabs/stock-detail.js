@@ -180,7 +180,7 @@ function buildSingleMarketBadge(iData, yahoo) {
   return `<span class="market-badge"><span class="dot" style="background:${dot}"></span>${label}</span>`;
 }
 
-function periodToFrom(period) {
+export function periodToFrom(period) {
   const now = new Date();
   if (period === 'all') return '2000-01-01';
   if (period === 'ytd') return `${now.getFullYear()}-01-01`;
@@ -194,7 +194,7 @@ function periodToFrom(period) {
   return '2000-01-01';
 }
 
-function periodToXUnit(period) {
+export function periodToXUnit(period) {
   if (period === '1m') return 'day';
   if (period === '3m' || period === '6m') return 'week';
   return 'month';
@@ -325,7 +325,7 @@ function showChartMsg(msg) {
 
 // Split intraday points into pre/regular/post datasets.
 // Pre and post use a dimmed dashed line; regular gets the full color + fill.
-function buildIntradayDatasets(allPts, regStart, regEnd, colors, prevClose, ct) {
+export function buildIntradayDatasets(allPts, regStart, regEnd, colors, prevClose, ct) {
   const { lineColor, fillColor, dimColor, dimFillColor } = colors;
   const toXY = p => ({ x: p.ts * 1000, y: p.close });
   const datasets = [];
@@ -394,7 +394,7 @@ function buildIntradayDatasets(allPts, regStart, regEnd, colors, prevClose, ct) 
 
 // Returns vertical break-line descriptors for regular market open/close,
 // only when the displayed range actually includes pre or post points.
-function buildBreakLines(regStart, regEnd, xMinTs, xMaxTs) {
+export function buildBreakLines(regStart, regEnd, xMinTs, xMaxTs) {
   const lines = [];
   if (!regStart || !regEnd) return lines;
   // Show open/close lines whenever the chart spans beyond the regular session
@@ -406,7 +406,7 @@ function buildBreakLines(regStart, regEnd, xMinTs, xMaxTs) {
 }
 
 // Inline Chart.js plugin: draws vertical dashed lines at market open/close.
-const sdBreakLinesPlugin = {
+export const sdBreakLinesPlugin = {
   id: 'sdBreakLines',
   afterDraw(chart, _args, opts) {
     const lines = opts?.lines;
