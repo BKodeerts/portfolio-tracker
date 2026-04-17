@@ -2,9 +2,12 @@ body.theme-dark #top-bar {
   background: rgba(18, 18, 20, 0.9);
   border-bottom-color: rgba(255,255,255,0.08);
 }
-@media (max-width: 640px) {
-  body.theme-dark .summary-bar-grid .metric-card { border-right-color: rgba(255,255,255,0.1); }
-}
+body.theme-dark .summary-secondary                             { border-top-color: rgba(255,255,255,0.09); }
+body.theme-dark .summary-secondary-item                        { border-right-color: rgba(255,255,255,0.09); }
+body.theme-dark .summary-hero-label                            { color: #909090; }
+body.theme-dark .summary-today-label                          { color: #909090; }
+body.theme-dark .intraday-section-header                       { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.07); }
+body.theme-dark .session-badge-closed                          { background: rgba(100,116,139,0.12); border-color: rgba(100,116,139,0.2); }
 
 body.theme-dark {
   background: linear-gradient(145deg, #18181b 0%, #1f1f23 50%, #18181b 100%);

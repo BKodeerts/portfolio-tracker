@@ -3,18 +3,14 @@
 @media (max-width: 640px) {
   .top-bar-inner { padding: 10px 14px; }
 
-  /* Summary bar: strip cards, show as compact inline row */
-  .summary-bar-grid { display: flex; gap: 0; margin-bottom: 8px; }
-  .summary-bar-grid .metric-card {
-    background: none; border: none; box-shadow: none; border-radius: 0;
-    border-right: 1px solid rgba(0,0,0,0.1);
-    padding: 0 10px; flex: 1; min-width: 0;
-  }
-  .summary-bar-grid .metric-card:first-child { padding-left: 0; }
-  .summary-bar-grid .metric-card:last-child  { border-right: none; padding-right: 0; }
-  .summary-bar-grid .metric-label { font-size: 8px; margin-bottom: 2px; }
-  .summary-bar-grid .metric-value { font-size: 13px !important; }
-  .summary-bar-grid .metric-sub   { font-size: 9px; margin-top: 1px; }
+  /* Summary bar: compact on mobile */
+  .summary-hero { margin-bottom: 8px; align-items: flex-start; }
+  .summary-hero-value { font-size: 22px; }
+  .summary-today-value { font-size: 14px; }
+  .summary-today-pct  { font-size: 9px; }
+  .summary-secondary { padding-top: 7px; }
+  .summary-secondary-item { padding: 0 8px; }
+  .summary-secondary-item .metric-value { font-size: 12px; }
 
   .metrics-grid       { grid-template-columns: 1fr 1fr; }
   .risk-metrics-grid  { grid-template-columns: 1fr 1fr; }
