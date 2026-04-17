@@ -12,7 +12,6 @@ import {
 } from "../utils.js";
 import { renderAppHeader } from "../components/header.js";
 import {
-  renderMarketStatus,
   renderIntradaySection,
   loadIntradayData,
   computeTodayPL,
@@ -188,10 +187,6 @@ function buildRenderContext(filtered) {
   const periodChangeHtml = hasPeriod
     ? `<div id="periodChange" style="font-family:'JetBrains Mono',monospace;font-size:12px;display:flex;gap:5px;align-items:center;white-space:nowrap">${periodDetail}</div>`
     : "";
-  const refreshAction =
-    state.currentPeriod === "1d"
-      ? "window._refreshIntraday()"
-      : "window._clearCache()";
   return {
     latest,
     plClass,
@@ -199,7 +194,6 @@ function buildRenderContext(filtered) {
     visibleTickers,
     closedToggleHtml,
     periodChangeHtml,
-    refreshAction,
   };
 }
 
@@ -827,17 +821,13 @@ export function renderApp() {
   renderAppHeader();
   renderSummaryBar();
 
-  const { visibleTickers, closedToggleHtml, periodChangeHtml, refreshAction } =
+  const { visibleTickers, closedToggleHtml, periodChangeHtml } =
     buildRenderContext(getFilteredData());
 
   document.getElementById("root").innerHTML = `
     <div class="intraday-section">
-      <div class="intraday-section-header">
-        <div id="marketStatus"></div>
-        <div id="intradayStatus" style="font-size:10px;color:#334155;font-family:'JetBrains Mono',monospace;margin-left:auto"></div>
-        <button class="refresh-btn" onclick="window._refreshIntraday()" title="Intraday verversen">↻</button>
-      </div>
       <div id="intradayGrid" class="intraday-grid"></div>
+      <div id="intradayStatus" style="font-size:9px;color:#aaa;font-family:'JetBrains Mono',monospace;text-align:right;margin-top:6px"></div>
     </div>
 
     <div class="chart-card">
@@ -880,7 +870,6 @@ export function renderApp() {
           </select>
         </div>
         ${periodChangeHtml}
-        <button class="refresh-btn" onclick="${refreshAction}" title="Koersen verversen">↻</button>
       </div>
       <div style="height:400px"><canvas id="mainChart"></canvas></div>
       <div class="legend" id="legend"></div>
@@ -892,7 +881,6 @@ export function renderApp() {
 
   renderPortfolioChart(visibleTickers);
   renderLegend(visibleTickers);
-  renderMarketStatus();
   renderIntradaySection();
   initBonus();
   reloadBonusCards();

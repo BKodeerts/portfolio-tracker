@@ -46,8 +46,6 @@ body.theme-dark .toggle-track                          { background: rgba(255,25
 body.theme-dark .toggle-track.on                       { background: rgba(255,255,255,0.28); }
 body.theme-dark .toggle-track::after                   { background: #999; }
 body.theme-dark .toggle-track.on::after                { background: #e0e0e0; }
-body.theme-dark .refresh-btn                           { background: rgba(255,255,255,0.07); color: #909090; }
-body.theme-dark .refresh-btn:hover                     { background: rgba(255,255,255,0.13); color: #c0c0c0; }
 body.theme-dark .pos-row                               { border-bottom-color: rgba(255,255,255,0.07); }
 body.theme-dark .pos-row.total-row                     { border-top-color: rgba(255,255,255,0.1); }
 body.theme-dark .pos-row.total-row .pos-row-ticker     { color: #a0a0a0; }
@@ -56,7 +54,6 @@ body.theme-dark .pos-table th                          { color: #909090; border-
 body.theme-dark .pos-table td                          { border-bottom-color: rgba(255,255,255,0.05); }
 body.theme-dark .pos-table td:nth-child(2)             { color: #a0a0a0; }
 body.theme-dark .pos-table tfoot td                    { border-top-color: rgba(255,255,255,0.1); }
-body.theme-dark .market-badge                          { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); color: #a0a0a0; }
 body.theme-dark .session-badge                         { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.13); }
 body.theme-dark .intraday-card.clickable:hover         { box-shadow: 0 4px 14px rgba(0,0,0,0.35); }
 body.theme-dark .drop-zone                             { border-color: rgba(255,255,255,0.13); }
