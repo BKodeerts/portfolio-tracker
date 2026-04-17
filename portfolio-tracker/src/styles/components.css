@@ -48,7 +48,7 @@
 .summary-secondary-item .metric-sub  { font-size: 9px; margin-top: 0; }
 
 /* ── Nav + controls row ── */
-.nav-with-controls { display: flex; align-items: center; gap: 6px; }
+.nav-with-controls { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
 #app-header { flex: 1; min-width: 0; }
 #summary-bar { min-width: 0; }
 .display-controls { display: flex; flex-direction: row; gap: 2px; flex-shrink: 0; align-items: center; }
