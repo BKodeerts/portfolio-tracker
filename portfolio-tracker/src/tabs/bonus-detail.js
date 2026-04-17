@@ -101,14 +101,11 @@ export async function renderBonusDetail() {
     ${renderAppHeader()}
     <div class="bonus-detail-page">
 
-      <div class="bonus-detail-topbar">
-        <button class="btn" style="font-size:11px;padding:5px 12px" onclick="globalThis._openBonusEdit('${item.id}')">Bewerken</button>
-      </div>
-
       <div class="bd-header">
         <div class="bd-header-id">
           <span class="pos-dot" style="background:#a78bfa;width:11px;height:11px;flex-shrink:0"></span>
           <span class="bd-label">${item.label}</span>
+          <button class="btn" style="font-size:11px;padding:5px 12px" onclick="globalThis._openBonusEdit('${item.id}')">Bewerken</button>
         </div>
         <div class="bd-badges">
           <span class="bd-type-tag">${isCall ? 'call optie' : 'warrant'}</span>
