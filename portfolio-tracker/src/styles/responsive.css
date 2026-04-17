@@ -10,6 +10,7 @@
   .summary-today-pct  { font-size: 9px; }
   .summary-secondary { padding-top: 7px; }
   .summary-secondary-item { padding: 0 8px; }
+  .summary-secondary-item:last-child { text-align: right; }
   .summary-secondary-item .metric-value { font-size: 12px; }
 
   .metrics-grid       { grid-template-columns: 1fr 1fr; }
