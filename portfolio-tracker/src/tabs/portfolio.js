@@ -36,26 +36,23 @@ function buildIntradayChartData(visibleTickers) {
       fxPtMap[p.ts] = p.close;
     });
 
-  // Pick the trading date: prefer today if any ticker has data for today (even if sparse,
-  // e.g. EU just opened while US hasn't yet). Only fall back to the date with the most
-  // data points when today has zero points (weekend/holiday/after-hours).
-  const today = new Date().toLocaleDateString("sv-SE");
+  // Pick the trading date using data.date (server UTC date) so that US after-hours candles
+  // crossing midnight in the user's local timezone don't get misclassified as "today".
+  // data.date is always set in UTC (toISOString().slice(0,10)) by the server.
+  const today = new Date().toISOString().slice(0, 10); // UTC, matches data.date
   const dateCounts = {};
   for (const ticker of visibleTickers) {
     const d = state.intradayData[state.TICKER_META[ticker]?.yahoo];
-    if (!d?.points) continue;
-    for (const p of d.points) {
-      const pd = new Date(p.ts * 1000).toLocaleDateString("sv-SE");
-      dateCounts[pd] = (dateCounts[pd] || 0) + 1;
-    }
+    if (!d?.date || !d?.points?.length) continue;
+    dateCounts[d.date] = (dateCounts[d.date] || 0) + d.points.length;
   }
   let tradingDate = today;
   if (Object.keys(dateCounts).length > 0 && !dateCounts[today]) {
-    // Today has no data (weekend/holiday) — pick the most recent date with data
+    // Today has no data (weekend/holiday/pre-market) — pick the most recent date with data
     tradingDate = Object.keys(dateCounts).sort().at(-1);
   }
   const isToday = (p) =>
-    new Date(p.ts * 1000).toLocaleDateString("sv-SE") === tradingDate;
+    new Date(p.ts * 1000).toISOString().slice(0, 10) === tradingDate;
   const equityTsSet = new Set();
   visibleTickers.forEach((ticker) => {
     const data = state.intradayData[state.TICKER_META[ticker]?.yahoo];
@@ -152,7 +149,7 @@ function buildIntradayChartData(visibleTickers) {
     tickerVals[ticker] = { prevValueEur, values };
   });
 
-  const isLive = tradingDate === new Date().toLocaleDateString("sv-SE");
+  const isLive = tradingDate === new Date().toISOString().slice(0, 10);
   return { labels, timestamps, tickerVals, tradingDate, isLive };
 }
 
