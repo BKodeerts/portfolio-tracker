@@ -13,12 +13,6 @@ function staleDayLabel(dateStr) {
 
 export const EU_EXCHANGE_RE = /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i;
 
-// Maps Yahoo exchange codes to display labels for US exchanges
-const US_EXCHANGE_LABELS = {
-  NMS: 'NASDAQ', NGM: 'NASDAQ', NCM: 'NASDAQ',
-  NYQ: 'NYSE', NYSEArca: 'NYSE',
-};
-
 // Per-exchange config: yahoo suffix → { label, tz, open [h,m], close [h,m] }
 // Empty string = US stocks (no Yahoo suffix) — label used as fallback only
 const EXCHANGE_DEFS = {
@@ -72,89 +66,6 @@ export function isExchangeOpen(yahooSymbol) {
   const sfx = yahooSuffix(yahooSymbol);
   const def = EXCHANGE_DEFS[sfx] || EXCHANGE_DEFS[''];
   return isOpen(def.tz, ...def.open, ...def.close);
-}
-
-// Returns 'open' | 'closed' (trades today, not now) | 'dark' (no trading today)
-// Holiday detection is left to Yahoo — we only know weekends and trading hours here.
-function exchangeState(def) {
-  const now   = new Date();
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: def.tz, weekday: 'short', hour: 'numeric', minute: 'numeric', hour12: false,
-  }).formatToParts(now);
-  const get = t => parts.find(p => p.type === t)?.value;
-  if (['Sat', 'Sun'].includes(get('weekday'))) return 'dark';
-  const cur       = (Number.parseInt(get('hour')) % 24) * 60 + Number.parseInt(get('minute'));
-  const openMins  = def.open[0]  * 60 + def.open[1];
-  const closeMins = def.close[0] * 60 + def.close[1];
-  if (cur >= openMins && cur < closeMins) return 'open';
-  if (cur >= closeMins) return 'dark'; // past close, done for today
-  return 'closed'; // pre-market, will open later
-}
-
-export function getMarketStatus() {
-  // state: 'open' = regular hours, 'closed' = trades today but not now, 'dark' = no trading today
-  const badge = (label, state) => {
-    const dot   = state === 'open' ? '#4ade80' : '#334155';
-    const dim   = state === 'dark' ? 'opacity:0.45;' : '';
-    const title = state === 'open' ? '' : state === 'closed' ? 'opent later vandaag' : 'gesloten';
-    return `<span class="market-badge" style="${dim}" title="${title}"><span class="dot" style="background:${dot}"></span>${label}</span>`;
-  };
-
-  // Collect unique exchange suffixes from currently tracked tickers
-  const seen = new Map();
-  for (const ticker of (state.CURRENT_TICKERS || [])) {
-    const yahoo = state.TICKER_META?.[ticker]?.yahoo || '';
-    const sfx = yahooSuffix(yahoo);
-    if (EXCHANGE_DEFS[sfx] && !seen.has(sfx)) seen.set(sfx, EXCHANGE_DEFS[sfx]);
-  }
-  // Fallback when no tickers loaded yet
-  if (seen.size === 0) {
-    seen.set('', EXCHANGE_DEFS['']);
-    seen.set('.DE', EXCHANGE_DEFS['.DE']);
-  }
-
-  const todayStr = new Date().toLocaleDateString('sv-SE');
-  const exchanges = new Map(); // label → open (bool)
-  const coveredSfx = new Set();
-
-  const portfolioYahooSyms = new Set(
-    (state.CURRENT_TICKERS || []).map(t => state.TICKER_META?.[t]?.yahoo).filter(Boolean),
-  );
-
-  if (state.intradayData) {
-    for (const [sym, data] of Object.entries(state.intradayData)) {
-      if (sym.endsWith('=X') || !data) continue;
-      // Only portfolio symbols determine market badges — not watchlist
-      if (!portfolioYahooSyms.has(sym)) continue;
-      const sfx = yahooSuffix(sym);
-      const def = EXCHANGE_DEFS[sfx];
-      if (!def || !seen.has(sfx)) continue;
-      // For US stocks use the actual exchange code (NASDAQ/NYSE), fall back to 'US'
-      const label = !sfx ? (US_EXCHANGE_LABELS[data.exchange] ?? def.label) : def.label;
-      if (!exchanges.has(label)) {
-        let state;
-        if (data.date !== todayStr)             state = 'dark';   // stale — no trading today
-        else if (data.marketState === 'REGULAR') state = 'open';
-        else                                     state = 'closed'; // PRE/POST/etc.
-        exchanges.set(label, state);
-      }
-      coveredSfx.add(sfx);
-    }
-  }
-  // Fallback: portfolio suffixes not present in intradayData
-  for (const [sfx, def] of seen.entries()) {
-    if (!coveredSfx.has(sfx)) exchanges.set(def.label, exchangeState(def));
-  }
-  if (exchanges.size === 0) {
-    exchanges.set('US',    exchangeState(EXCHANGE_DEFS['']));
-    exchanges.set('XETRA', exchangeState(EXCHANGE_DEFS['.DE']));
-  }
-  return [...exchanges.entries()].map(([label, state]) => badge(label, state)).join('');
-}
-
-export function renderMarketStatus() {
-  const el = document.getElementById('marketStatus');
-  if (el) el.innerHTML = getMarketStatus();
 }
 
 export function sparklineSVG(points, prevClose, tradingMins, muted = false) {
@@ -477,7 +388,6 @@ export function renderIntradaySection() {
     }
   }
 
-  renderMarketStatus();
   renderTodayMetric();
 }
 
