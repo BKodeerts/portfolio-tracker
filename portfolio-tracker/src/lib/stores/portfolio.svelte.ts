@@ -1,7 +1,6 @@
 import type { PortfolioResponse, Position, ChartPoint, BenchmarkPoint, RiskMetrics, RollingReturn, AnnualPl, WatchlistEntry, TickerMeta } from '$lib/types/portfolio';
 import type { Transaction } from '$lib/types/transaction';
 import type { BonusItem } from '$lib/types/bonus';
-import { seedColors } from '$lib/utils/color';
 import { fetchPortfolio, fetchTransactions } from '$lib/api/portfolio';
 import { fetchBonus } from '$lib/api/bonus';
 
@@ -86,13 +85,6 @@ function createPortfolioStore() {
     baseCurrency     = p.baseCurrency;
     twrPct           = p.twrPct;
     irrPct           = p.irrPct;
-    // Seed color palette from positions so colors are stable
-    const colors: Record<string, string> = {};
-    for (const pos of p.positions) {
-      // Colors are assigned lazily by getColor(); seeding happens separately if needed
-      void pos;
-    }
-    seedColors(colors);
   }
 
   function sortPositions(col: SortCol) {

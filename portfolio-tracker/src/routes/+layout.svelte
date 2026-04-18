@@ -11,9 +11,9 @@
   interface Props { children: import('svelte').Snippet }
   const { children }: Props = $props();
 
-  // Detail pages (aandeel / bonus/[id]) use their own back-nav header
+  // Detail pages (stock/[ticker] and bonus/[id]) use their own back-nav header
   const isDetailPage = $derived(
-    $page.url.pathname.startsWith('/aandeel/') ||
+    $page.url.pathname.startsWith('/stock/') ||
     ($page.url.pathname.startsWith('/bonus/') && $page.url.pathname !== '/bonus'),
   );
   const isSettingsPage = $derived($page.url.pathname === '/settings');

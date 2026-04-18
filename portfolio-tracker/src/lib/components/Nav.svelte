@@ -3,7 +3,7 @@
 
   const tabs = [
     { path: '/',            label: 'Portfolio' },
-    { path: '/analyse',     label: 'Analysis' },
+    { path: '/analysis',    label: 'Analysis' },
     { path: '/intraday',    label: 'Intraday' },
     { path: '/transactions', label: 'Transactions' },
     { path: '/bonus',       label: 'Bonus' },

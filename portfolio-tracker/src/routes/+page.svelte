@@ -14,13 +14,8 @@
 
   let period = $state<Period>('total');
   let view   = $state<View>('total');
-  let showClosed = $state(false);
 
-  const visibleTickers = $derived(
-    showClosed
-      ? portfolioStore.currentTickers
-      : portfolioStore.currentTickers,
-  );
+  const visibleTickers = $derived(portfolioStore.currentTickers);
 
   const filtered = $derived(
     period === '1d'
