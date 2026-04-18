@@ -12,16 +12,17 @@
 
   let container: HTMLDivElement;
   let chart: ECharts | null = null;
+  let ro: ResizeObserver | null = null;
+  let disposed = false;
 
   onMount(() => {
-    let ro: ResizeObserver;
     import('echarts').then((echarts) => {
+      if (disposed) return;
       chart = echarts.init(container, null, { renderer: 'canvas' });
       chart.setOption(option);
       ro = new ResizeObserver(() => chart?.resize());
       ro.observe(container);
     });
-    return () => ro?.disconnect();
   });
 
   $effect(() => {
@@ -31,6 +32,9 @@
   });
 
   onDestroy(() => {
+    disposed = true;
+    ro?.disconnect();
+    ro = null;
     chart?.dispose();
     chart = null;
   });
