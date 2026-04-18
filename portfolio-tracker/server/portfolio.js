@@ -933,16 +933,24 @@ async function computeFullPortfolio() {
   // Summary positions from the latest chartData row
   const latest = chartData.at(-1);
   const positions = latest
-    ? currentTickers.map(ticker => ({
-        ticker,
-        label:      meta[ticker].label,
-        value:      latest[ticker]              || 0,
-        cost:       latest[`${ticker}_cost`]    || 0,
-        pl:         (latest[ticker] || 0) - (latest[`${ticker}_cost`] || 0),
-        plPct:      Number.parseFloat(latest[`${ticker}_pct`] || '0'),
-        shares:     latest[`${ticker}_shares`]  || 0,
-        realizedPl: realizedPlPerTicker[ticker] || 0,
-      }))
+    ? currentTickers.map(ticker => {
+        const value   = latest[ticker]              || 0;
+        const costEur = latest[`${ticker}_cost`]    || 0;
+        const shares  = latest[`${ticker}_shares`]  || 0;
+        return {
+          ticker,
+          label:      meta[ticker].label,
+          yahoo:      meta[ticker].yahoo,
+          currency:   meta[ticker].currency || 'EUR',
+          value,
+          costEur,
+          avgCost:    shares > 0 ? costEur / shares : 0,
+          pl:         value - costEur,
+          plPct:      Number.parseFloat(latest[`${ticker}_pct`] || '0'),
+          shares,
+          realizedPl: realizedPlPerTicker[ticker] || 0,
+        };
+      })
     : [];
 
   // Enrich positions with 52w data + auto-populate quoteType/sector in ticker_meta (parallel)
@@ -959,7 +967,7 @@ async function computeFullPortfolio() {
     const ccy = meta[pos.ticker].currency;
     if (ccy && ccy !== 'EUR' && FX_DEFS[ccy] && fxMaps[ccy]) {
       const nativeEur = fifoCostNativeEur(txByTicker[pos.ticker] || [], pos.ticker, adjSharesFn, fxMaps, ccy, sortedDates.at(-1));
-      pos.fxPl = nativeEur != null ? Math.round((nativeEur - pos.cost) * 100) / 100 : null;
+      pos.fxPl = nativeEur != null ? Math.round((nativeEur - pos.costEur) * 100) / 100 : null;
     } else {
       pos.fxPl = null;
     }
@@ -1029,8 +1037,15 @@ async function computeFullPortfolio() {
     totalInvested:  Math.round(totalInvested * 100) / 100,
   });
 
+  // Map internal keys to frontend-expected keys
+  const frontendChartData = chartData.map(row => ({
+    ...row,
+    value:    row.total,
+    invested: row.totalCost,
+  }));
+
   return {
-    chartData, benchmarkData, sp500Data, meta, currentTickers, latestFxRate, positions,
+    chartData: frontendChartData, benchmarkData, sp500Data, meta, currentTickers, latestFxRate, positions,
     realizedPl, realizedPlPerTicker, usdExposurePct, currencyExposure,
     totalDividends, dividendsPerTicker, annualPl,
     totalInvested: Math.round(totalInvested * 100) / 100,

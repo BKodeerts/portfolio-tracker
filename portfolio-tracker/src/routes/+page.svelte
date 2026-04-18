@@ -5,6 +5,7 @@
   import { fmt, fmtPct } from '$lib/utils/fmt';
   import { filterByPeriod } from '$lib/utils/period';
   import { getColor } from '$lib/utils/color';
+  import { EU_EXCHANGE_RE } from '$lib/utils/exchange';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
   import Chart from '$lib/components/Chart.svelte';
   import type { Period } from '$lib/utils/period';
@@ -230,7 +231,145 @@
     };
   }
 
-  const chartOption = $derived(buildOption(filtered, view));
+  function build1DOption(): echarts.EChartsOption | null {
+    const tickers = portfolioStore.currentTickers;
+    if (!tickers.length || !intradayStore.loaded) return null;
+
+    const fxRate  = intradayStore.liveEurUsd ?? 1.1;
+    const isDark  = themeStore.isDark;
+    const gridColor   = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    const textColor   = isDark ? '#94a3b8' : '#64748b';
+    const tooltipBg   = isDark ? '#1e293b' : '#ffffff';
+    const tooltipBord = isDark ? '#334155' : '#e2e8f0';
+
+    // Collect all timestamps (pre + regular + post) across tickers
+    const allTsSet = new Set<number>();
+    const priceMap:     Record<string, Map<number, number>> = {};
+    const prevCloseMap: Record<string, number> = {};
+    let sessionOpen:  number | null = null;
+    let sessionClose: number | null = null;
+
+    for (const ticker of tickers) {
+      const yahoo = (portfolioStore.tickerMeta[ticker]?.['yahoo'] as string) ?? ticker;
+      const intra = intradayStore.data[yahoo];
+      if (!intra) continue;
+      prevCloseMap[ticker] = intra.previousClose ?? 0;
+      const pts = intra.allPoints ?? intra.points ?? [];
+      priceMap[ticker] = new Map(pts.map((p) => [p.ts, p.close]));
+      for (const pt of pts) allTsSet.add(pt.ts);
+      if (!sessionOpen && intra.tradingPeriods?.regular?.[0]) {
+        sessionOpen  = intra.tradingPeriods.regular[0].start;
+        sessionClose = intra.tradingPeriods.regular[0].end ?? null;
+      }
+    }
+
+    if (allTsSet.size === 0) return null;
+    const sortedTs = [...allTsSet].sort((a, b) => a - b);
+
+    // Build portfolio value using fill-forward prices
+    const lastPrice: Record<string, number> = {};
+    const seriesValues: number[] = [];
+    for (const ts of sortedTs) {
+      let total = 0;
+      for (const ticker of tickers) {
+        const yahoo  = (portfolioStore.tickerMeta[ticker]?.['yahoo'] as string) ?? ticker;
+        const shares = portfolioStore.positions.find((p) => p.ticker === ticker)?.shares ?? 0;
+        const price  = priceMap[ticker]?.get(ts);
+        if (price != null) lastPrice[ticker] = price;
+        const p = lastPrice[ticker] ?? 0;
+        total += (shares * p) / (EU_EXCHANGE_RE.test(yahoo) ? 1 : fxRate);
+      }
+      seriesValues.push(Math.round(total * 100) / 100);
+    }
+
+    // Previous-close portfolio value
+    let prevCloseTotal = 0;
+    for (const ticker of tickers) {
+      const yahoo  = (portfolioStore.tickerMeta[ticker]?.['yahoo'] as string) ?? ticker;
+      const shares = portfolioStore.positions.find((p) => p.ticker === ticker)?.shares ?? 0;
+      prevCloseTotal += (shares * (prevCloseMap[ticker] ?? 0)) / (EU_EXCHANGE_RE.test(yahoo) ? 1 : fxRate);
+    }
+    prevCloseTotal = Math.round(prevCloseTotal * 100) / 100;
+
+    const labels = sortedTs.map((ts) =>
+      new Date(ts * 1000).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' }),
+    );
+
+    const lastVal = seriesValues[seriesValues.length - 1] ?? 0;
+    const isUp    = lastVal >= prevCloseTotal;
+    const lineClr = isUp ? '#4ade80' : '#f87171';
+    const areaClr = isUp ? 'rgba(74,222,128,' : 'rgba(248,113,113,';
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const markLineData: any[] = [
+      {
+        name: 'Vorige slotkoers',
+        yAxis: prevCloseTotal,
+        lineStyle: { color: isDark ? '#475569' : '#94a3b8', type: 'dashed', width: 1 },
+        label: {
+          formatter: () => themeStore.privacyMode ? '●●' : (prevCloseTotal >= 1000 ? `€${(prevCloseTotal / 1000).toFixed(1)}k` : `€${Math.round(prevCloseTotal)}`),
+          position: 'insideEndTop', fontSize: 10, color: textColor,
+        },
+      },
+    ];
+    if (sessionOpen != null) {
+      const openIdx = sortedTs.findIndex((ts) => ts >= sessionOpen!);
+      if (openIdx >= 0) markLineData.push({ name: 'Open', xAxis: openIdx, lineStyle: { color: '#4ade80', type: 'dashed', width: 1, opacity: 0.6 }, label: { formatter: 'Open', fontSize: 9, color: '#4ade80' } });
+    }
+    if (sessionClose != null) {
+      const closeIdx = sortedTs.findLastIndex((ts) => ts <= sessionClose!);
+      if (closeIdx >= 0) markLineData.push({ name: 'Sluit', xAxis: closeIdx, lineStyle: { color: '#f87171', type: 'dashed', width: 1, opacity: 0.6 }, label: { formatter: 'Sluit', fontSize: 9, color: '#f87171' } });
+    }
+
+    return {
+      backgroundColor: 'transparent',
+      grid: { top: 16, right: 16, bottom: 32, left: 60, containLabel: false },
+      xAxis: {
+        type: 'category', data: labels,
+        axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+        axisLabel: { color: textColor, fontSize: 10, interval: 'auto' },
+      },
+      yAxis: {
+        type: 'value', scale: true,
+        splitLine: { lineStyle: { color: gridColor } },
+        axisLabel: {
+          color: textColor, fontSize: 10,
+          formatter: (v: number) => themeStore.privacyMode ? '●●' : (Math.abs(v) >= 1000 ? `€${+(v / 1000).toFixed(1)}k` : `€${Math.round(v)}`),
+        },
+      },
+      tooltip: {
+        trigger: 'axis', backgroundColor: tooltipBg, borderColor: tooltipBord, borderWidth: 1,
+        textStyle: { color: isDark ? '#e2e8f0' : '#1c1c1c', fontSize: 11 },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        formatter: (params: any) => {
+          if (!Array.isArray(params) || !params[0]) return '';
+          const val  = params[0].value as number;
+          const diff = val - prevCloseTotal;
+          const pct  = prevCloseTotal > 0 ? (diff / prevCloseTotal) * 100 : 0;
+          const sign = diff >= 0 ? '+' : '';
+          const clr  = diff >= 0 ? '#4ade80' : '#f87171';
+          const valStr  = themeStore.privacyMode ? '●●●' : fmt(val);
+          const diffStr = themeStore.privacyMode ? '●●' : fmt(diff);
+          return `<div style="font-weight:600;margin-bottom:4px">${params[0].axisValue}</div>` +
+            `<div>${valStr}</div>` +
+            `<div style="color:${clr}">${sign}${diffStr} (${sign}${pct.toFixed(2)}%)</div>`;
+        },
+      },
+      series: [{
+        name: 'Portefeuille',
+        type: 'line',
+        data: seriesValues,
+        smooth: false,
+        symbol: 'none',
+        lineStyle: { color: lineClr, width: 2 },
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: areaClr + '0.2)' }, { offset: 1, color: areaClr + '0.02)' }] } },
+        markLine: { silent: true, symbol: 'none', data: markLineData },
+      }],
+    };
+  }
+
+  const chartOption = $derived(period === '1d' ? build1DOption() : buildOption(filtered, view));
+  const periodPlValue = $derived(period !== 'total' ? periodPl() : null);
 </script>
 
 <div class="page-root">
@@ -270,19 +409,22 @@
       </div>
 
       <!-- Period P&L badge -->
-      {#if period !== 'total' && periodPl()}
-        {@const pp = periodPl()!}
-        <div class="period-change" class:c-pos={pp.pl >= 0} class:c-neg={pp.pl < 0}>
-          <PrivacyValue value={`${pp.pl >= 0 ? '+' : ''}${fmt(pp.pl)}`} />
-          <span style="opacity:0.7">{fmtPct(pp.pct)}</span>
-        </div>
-      {/if}
+      <div class="period-change" class:c-pos={(periodPlValue?.pl ?? 0) >= 0} class:c-neg={(periodPlValue?.pl ?? 0) < 0} style:visibility={periodPlValue ? 'visible' : 'hidden'}>
+        {#if periodPlValue}
+          <PrivacyValue value={`${periodPlValue.pl >= 0 ? '+' : ''}${fmt(periodPlValue.pl)}`} />
+          <span style="opacity:0.7">{fmtPct(periodPlValue.pct)}</span>
+        {:else}
+          &nbsp;
+        {/if}
+      </div>
     </div>
 
     <div class="chart-wrap">
-      {#if filtered.length > 1}
+      {#if chartOption}
         <Chart option={chartOption} height="380px" />
-      {:else}
+      {:else if period === '1d'}
+        <div class="chart-empty" style="height:380px">Intraday data laden…</div>
+      {:else if filtered.length <= 1}
         <div class="chart-empty" style="height:380px">Niet genoeg data voor deze periode</div>
       {/if}
     </div>

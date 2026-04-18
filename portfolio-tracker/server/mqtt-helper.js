@@ -481,7 +481,7 @@ async function publishPositionStates(mqttClient, positions) {
     currentSlugs.add(slug);
     await mqttClient.publishAsync(`portfolio_tracker/positions/${slug}/state`, JSON.stringify({
       value:               +pos.value.toFixed(2),
-      cost:                +(pos.cost   ?? 0).toFixed(2),
+      cost:                +(pos.costEur?? 0).toFixed(2),
       pl:                  +pos.pl.toFixed(2),
       pl_pct:              +pos.plPct.toFixed(2),
       shares:              pos.shares ?? 0,

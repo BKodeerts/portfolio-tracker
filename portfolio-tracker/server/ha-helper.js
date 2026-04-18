@@ -343,7 +343,7 @@ async function pushPositionSensors(token, positions) {
     await pushState(token, `sensor.portfolio_${slug}`, value, {
       unit_of_measurement: '€', state_class: 'measurement', device_class: 'monetary',
       friendly_name: `${pos.label} Waarde`,
-      cost: +(pos.cost ?? 0).toFixed(2),       pl_eur: +pos.pl.toFixed(2),
+      cost: +(pos.costEur ?? 0).toFixed(2),       pl_eur: +pos.pl.toFixed(2),
       pl_pct: +pos.plPct.toFixed(2),           shares: pos.shares ?? 0,
       ticker: pos.ticker,
       realized_pl: +(pos.realizedPl ?? 0).toFixed(2),

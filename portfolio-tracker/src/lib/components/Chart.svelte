@@ -11,7 +11,7 @@
   let { option, height = '300px', class: cls = '' }: Props = $props();
 
   let container: HTMLDivElement;
-  let chart: ECharts | null = null;
+  let chart = $state<ECharts | null>(null);
   let ro: ResizeObserver | null = null;
   let disposed = false;
 
@@ -19,7 +19,6 @@
     import('echarts').then((echarts) => {
       if (disposed) return;
       chart = echarts.init(container, null, { renderer: 'canvas' });
-      chart.setOption(option);
       ro = new ResizeObserver(() => chart?.resize());
       ro.observe(container);
     });
@@ -27,7 +26,7 @@
 
   $effect(() => {
     if (chart) {
-      chart.setOption(option, { notMerge: false, lazyUpdate: true });
+      chart.setOption(option, { notMerge: true });
     }
   });
 
