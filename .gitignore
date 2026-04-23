@@ -2,3 +2,4 @@ node_modules/
 cache/
 .env
 portfolio-tracker/dist/
+portfolio-tracker/.svelte-kit/

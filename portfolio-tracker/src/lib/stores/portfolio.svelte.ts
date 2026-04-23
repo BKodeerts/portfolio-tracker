@@ -52,7 +52,7 @@ function createPortfolioStore() {
         fetchTransactions(),
         fetchBonus().catch(() => [] as BonusItem[]),
       ]);
-      applyPortfolio(portfolio);
+      if (portfolio) applyPortfolio(portfolio);
       rawTransactions = txs;
       bonusItems = bonus;
       loaded = true;

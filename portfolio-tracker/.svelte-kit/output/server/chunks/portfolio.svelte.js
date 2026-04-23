@@ -1,18 +1,4 @@
 import { f as derived } from "./renderer.js";
-import { P as PRESET_COLORS, C as COLOR_PALETTE } from "./constants.js";
-const assigned = {};
-let paletteIdx = 0;
-function getColor(ticker) {
-  if (!assigned[ticker]) {
-    assigned[ticker] = PRESET_COLORS[ticker] ?? COLOR_PALETTE[paletteIdx++ % COLOR_PALETTE.length] ?? "#818cf8";
-  }
-  return assigned[ticker];
-}
-function seedColors(colors) {
-  for (const [ticker, color] of Object.entries(colors)) {
-    assigned[ticker] = color;
-  }
-}
 async function apiFetch(path, init) {
   const res = await fetch(path, init);
   if (!res.ok) {
@@ -21,8 +7,13 @@ async function apiFetch(path, init) {
   }
   return res.json();
 }
+async function apiGet(path) {
+  const body = await apiFetch(path);
+  if (body.status !== "ok") throw new Error(body.message);
+  return body.data;
+}
 async function fetchPortfolio() {
-  return apiFetch("/api/portfolio");
+  return apiGet("/api/portfolio");
 }
 async function fetchTransactions() {
   const body = await apiFetch("/api/transactions");
@@ -71,7 +62,7 @@ function createPortfolioStore() {
         fetchTransactions(),
         fetchBonus().catch(() => [])
       ]);
-      applyPortfolio(portfolio);
+      if (portfolio) applyPortfolio(portfolio);
       rawTransactions = txs;
       bonusItems = bonus;
       loaded = true;
@@ -103,10 +94,6 @@ function createPortfolioStore() {
     baseCurrency = p.baseCurrency;
     twrPct = p.twrPct;
     irrPct = p.irrPct;
-    const colors = {};
-    for (const pos of p.positions) {
-    }
-    seedColors(colors);
   }
   function sortPositions(col) {
     if (posSort.col === col) {
@@ -256,6 +243,5 @@ function createPortfolioStore() {
 const portfolioStore = createPortfolioStore();
 export {
   apiFetch as a,
-  getColor as g,
   portfolioStore as p
 };

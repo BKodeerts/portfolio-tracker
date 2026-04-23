@@ -1,0 +1,515 @@
+[
+  {
+    "date": "2021-05-06",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 3,
+    "costEur": 272.4,
+    "currency": "EUR"
+  },
+  {
+    "date": "2021-06-14",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 3,
+    "costEur": 277.95,
+    "currency": "EUR"
+  },
+  {
+    "date": "2021-07-05",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 3,
+    "costEur": 285.54,
+    "currency": "EUR"
+  },
+  {
+    "date": "2021-08-16",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 3,
+    "costEur": 291.09,
+    "currency": "EUR"
+  },
+  {
+    "date": "2021-09-14",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 3,
+    "costEur": 292.98,
+    "currency": "EUR"
+  },
+  {
+    "date": "2021-10-04",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 3,
+    "costEur": 286.89,
+    "currency": "EUR"
+  },
+  {
+    "date": "2021-11-12",
+    "ticker": "CH0445689208",
+    "yahoo": "CH0445689208.SG",
+    "isin": "CH0445689208",
+    "shares": 10,
+    "costEur": 230.11,
+    "currency": "EUR"
+  },
+  {
+    "date": "2022-01-03",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 4,
+    "costEur": 419.2,
+    "currency": "EUR"
+  },
+  {
+    "date": "2022-02-02",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 3,
+    "costEur": 304.92,
+    "currency": "EUR"
+  },
+  {
+    "date": "2022-03-17",
+    "ticker": "ZIM",
+    "yahoo": "ZIM",
+    "isin": "IL0065100930",
+    "shares": 1,
+    "costEur": 80.85,
+    "currency": "USD"
+  },
+  {
+    "date": "2022-04-19",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 8,
+    "costEur": 805.6,
+    "currency": "EUR"
+  },
+  {
+    "date": "2022-05-06",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 3,
+    "costEur": 288.9,
+    "currency": "EUR"
+  },
+  {
+    "date": "2022-06-13",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 4,
+    "costEur": 362.8,
+    "currency": "EUR"
+  },
+  {
+    "date": "2022-08-04",
+    "ticker": "EXSA",
+    "yahoo": "EXSA.DE",
+    "isin": "DE0002635307",
+    "shares": 13,
+    "costEur": 567.45,
+    "currency": "EUR"
+  },
+  {
+    "date": "2022-09-06",
+    "ticker": "EXSA",
+    "yahoo": "EXSA.DE",
+    "isin": "DE0002635307",
+    "shares": 8,
+    "costEur": 329.6,
+    "currency": "EUR"
+  },
+  {
+    "date": "2022-11-14",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 6,
+    "costEur": 571.8,
+    "currency": "EUR"
+  },
+  {
+    "date": "2022-12-12",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 3,
+    "costEur": 280.5,
+    "currency": "EUR"
+  },
+  {
+    "date": "2023-02-08",
+    "ticker": "EXSA",
+    "yahoo": "EXSA.DE",
+    "isin": "DE0002635307",
+    "shares": 14,
+    "costEur": 638.4,
+    "currency": "EUR"
+  },
+  {
+    "date": "2023-03-15",
+    "ticker": "EXSA",
+    "yahoo": "EXSA.DE",
+    "isin": "DE0002635307",
+    "shares": 7,
+    "costEur": 302.33,
+    "currency": "EUR"
+  },
+  {
+    "date": "2023-05-24",
+    "ticker": "EXSA",
+    "yahoo": "EXSA.DE",
+    "isin": "DE0002635307",
+    "shares": 13,
+    "costEur": 599,
+    "currency": "EUR"
+  },
+  {
+    "date": "2023-06-19",
+    "ticker": "EXSA",
+    "yahoo": "EXSA.DE",
+    "isin": "DE0002635307",
+    "shares": 7,
+    "costEur": 322.65,
+    "currency": "EUR"
+  },
+  {
+    "date": "2023-07-05",
+    "ticker": "EXSA",
+    "yahoo": "EXSA.DE",
+    "isin": "DE0002635307",
+    "shares": 7,
+    "costEur": 319.88,
+    "currency": "EUR"
+  },
+  {
+    "date": "2023-09-26",
+    "ticker": "EXSA",
+    "yahoo": "EXSA.DE",
+    "isin": "DE0002635307",
+    "shares": 14,
+    "costEur": 618.4,
+    "currency": "EUR"
+  },
+  {
+    "date": "2023-10-13",
+    "ticker": "EXSA",
+    "yahoo": "EXSA.DE",
+    "isin": "DE0002635307",
+    "shares": 7,
+    "costEur": 313.24,
+    "currency": "EUR"
+  },
+  {
+    "date": "2023-11-08",
+    "ticker": "ZIM",
+    "yahoo": "ZIM",
+    "isin": "IL0065100930",
+    "shares": -1,
+    "costEur": 5.01,
+    "currency": "USD"
+  },
+  {
+    "date": "2024-01-05",
+    "ticker": "EXSA",
+    "yahoo": "EXSA.DE",
+    "isin": "DE0002635307",
+    "shares": 19,
+    "costEur": 890.3,
+    "currency": "EUR"
+  },
+  {
+    "date": "2024-01-25",
+    "ticker": "IUI",
+    "yahoo": "IUIT.L",
+    "isin": "IE00B3WJKG14",
+    "shares": 211,
+    "costEur": 5110.36,
+    "currency": "EUR"
+  },
+  {
+    "date": "2024-01-25",
+    "ticker": "EXSA",
+    "yahoo": "EXSA.DE",
+    "isin": "DE0002635307",
+    "shares": -109,
+    "costEur": 5128.72,
+    "currency": "EUR"
+  },
+  {
+    "date": "2024-01-25",
+    "ticker": "IUI",
+    "yahoo": "IUIT.L",
+    "isin": "IE00B3WJKG14",
+    "shares": 5,
+    "costEur": 122.1,
+    "currency": "EUR"
+  },
+  {
+    "date": "2024-01-25",
+    "ticker": "CH0445689208",
+    "yahoo": "CH0445689208.SG",
+    "isin": "CH0445689208",
+    "shares": -10,
+    "costEur": 87.46,
+    "currency": "EUR"
+  },
+  {
+    "date": "2024-02-07",
+    "ticker": "IUI",
+    "yahoo": "IUIT.L",
+    "isin": "IE00B3WJKG14",
+    "shares": 12,
+    "costEur": 294.22,
+    "currency": "EUR"
+  },
+  {
+    "date": "2024-03-25",
+    "ticker": "IUI",
+    "yahoo": "IUIT.L",
+    "isin": "IE00B3WJKG14",
+    "shares": 12,
+    "costEur": 310.6,
+    "currency": "EUR"
+  },
+  {
+    "date": "2024-08-05",
+    "ticker": "ASTS",
+    "yahoo": "ASTS",
+    "isin": "US00217D1000",
+    "shares": 64,
+    "costEur": 1107.66,
+    "currency": "USD"
+  },
+  {
+    "date": "2024-08-05",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": 12,
+    "costEur": 1376.2,
+    "currency": "EUR"
+  },
+  {
+    "date": "2024-08-21",
+    "ticker": "VWR",
+    "yahoo": "VWRA.L",
+    "isin": "IE00BK5BQT80",
+    "shares": -61,
+    "costEur": 7432.9,
+    "currency": "EUR"
+  },
+  {
+    "date": "2024-08-21",
+    "ticker": "IUI",
+    "yahoo": "IUIT.L",
+    "isin": "IE00B3WJKG14",
+    "shares": -240,
+    "costEur": 6875,
+    "currency": "EUR"
+  },
+  {
+    "date": "2024-08-23",
+    "ticker": "LUNR",
+    "yahoo": "LUNR",
+    "isin": "US46125A1007",
+    "shares": 250,
+    "costEur": 1130.03,
+    "currency": "USD"
+  },
+  {
+    "date": "2024-08-23",
+    "ticker": "RKLB",
+    "yahoo": "RKLB",
+    "isin": "US7731221062",
+    "shares": 200,
+    "costEur": 1247.35,
+    "currency": "USD"
+  },
+  {
+    "date": "2024-08-28",
+    "ticker": "ASTS",
+    "yahoo": "ASTS",
+    "isin": "US00217D1000",
+    "shares": 200,
+    "costEur": 4980.73,
+    "currency": "USD"
+  },
+  {
+    "date": "2024-09-05",
+    "ticker": "ASTS",
+    "yahoo": "ASTS",
+    "isin": "US00217D1000",
+    "shares": 280,
+    "costEur": 6828.030000000001,
+    "currency": "USD"
+  },
+  {
+    "date": "2024-10-24",
+    "ticker": "ACHR",
+    "yahoo": "ACHR",
+    "isin": "US03945R1023",
+    "shares": 20,
+    "costEur": 60.45,
+    "currency": "USD"
+  },
+  {
+    "date": "2024-11-01",
+    "ticker": "ASTS",
+    "yahoo": "ASTS",
+    "isin": "US00217D1000",
+    "shares": 220,
+    "costEur": 4929.1,
+    "currency": "USD"
+  },
+  {
+    "date": "2024-11-07",
+    "ticker": "ASTS",
+    "yahoo": "ASTS",
+    "isin": "US00217D1000",
+    "shares": 236,
+    "costEur": 4817.56,
+    "currency": "USD"
+  },
+  {
+    "date": "2024-11-25",
+    "ticker": "EQEU.DE",
+    "yahoo": "EQEU.DE",
+    "isin": "IE00BYVTMS52",
+    "shares": 25,
+    "costEur": 9253,
+    "currency": "EUR"
+  },
+  {
+    "date": "2024-12-03",
+    "ticker": "SMR",
+    "yahoo": "SMR",
+    "isin": "US67079K1007",
+    "shares": 40,
+    "costEur": 1004.6,
+    "currency": "USD"
+  },
+  {
+    "date": "2024-12-31",
+    "ticker": "LODE",
+    "yahoo": "LODE",
+    "isin": "US2057503003",
+    "shares": 750,
+    "costEur": 581.43,
+    "currency": "USD"
+  },
+  {
+    "date": "2025-01-13",
+    "ticker": "LODE",
+    "yahoo": "LODE",
+    "isin": "US2057503003",
+    "shares": 2000,
+    "costEur": 630.35,
+    "currency": "USD"
+  },
+  {
+    "date": "2025-01-23",
+    "ticker": "ASTS",
+    "yahoo": "ASTS",
+    "isin": "US00217D1000",
+    "shares": 200,
+    "costEur": 3652.55,
+    "currency": "USD"
+  },
+  {
+    "date": "2025-06-09",
+    "ticker": "EQEU.DE",
+    "yahoo": "EQEU.DE",
+    "isin": "IE00BYVTMS52",
+    "shares": -25,
+    "costEur": 9637,
+    "currency": "EUR"
+  },
+  {
+    "date": "2025-06-12",
+    "ticker": "EUDF",
+    "yahoo": "EUDF.DE",
+    "isin": "IE0002Y8CX98",
+    "shares": 85,
+    "costEur": 2530.48,
+    "currency": "EUR"
+  },
+  {
+    "date": "2025-06-18",
+    "ticker": "ACHR",
+    "yahoo": "ACHR",
+    "isin": "US03945R1023",
+    "shares": -20,
+    "costEur": 174.52,
+    "currency": "USD"
+  },
+  {
+    "date": "2025-06-18",
+    "ticker": "IE00B5",
+    "yahoo": "IE00B5",
+    "isin": "IE00B53L3W79",
+    "shares": 35,
+    "costEur": 6982.7,
+    "currency": "EUR"
+  },
+  {
+    "date": "2025-06-20",
+    "ticker": "ASTS",
+    "yahoo": "ASTS",
+    "isin": "US00217D1000",
+    "shares": -200,
+    "costEur": 8056.379999999999,
+    "currency": "USD"
+  },
+  {
+    "date": "2025-07-23",
+    "ticker": "IGL",
+    "yahoo": "IGLN.L",
+    "isin": "IE00B4ND3602",
+    "shares": 145,
+    "costEur": 8228.85,
+    "currency": "EUR"
+  },
+  {
+    "date": "2025-08-29",
+    "ticker": "US0021202025.SG",
+    "yahoo": "US0021202025.SG",
+    "isin": "US0021202025",
+    "shares": 500,
+    "costEur": 2255.4500000000003,
+    "currency": "USD"
+  },
+  {
+    "date": "2025-10-03",
+    "ticker": "US0021202025.SG",
+    "yahoo": "US0021202025.SG",
+    "isin": "US0021202025",
+    "shares": -500,
+    "costEur": 298.76,
+    "currency": "USD"
+  },
+  {
+    "date": "2026-03-05",
+    "ticker": "LODE",
+    "yahoo": "LODE",
+    "isin": "US2057504092",
+    "shares": -275,
+    "costEur": 802.02,
+    "currency": "USD"
+  }
+]

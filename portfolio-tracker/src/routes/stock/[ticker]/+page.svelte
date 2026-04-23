@@ -6,7 +6,7 @@
   import { fetchCandles } from '$lib/api/candles';
   import { fmt, fmtPct } from '$lib/utils/fmt';
   import { getColor } from '$lib/utils/color';
-  import { isExchangeOpen, normalizeMarketState, EU_EXCHANGE_RE } from '$lib/utils/exchange';
+  import { isExchangeOpen, normalizeMarketState, EU_EXCHANGE_RE, sessionBounds } from '$lib/utils/exchange';
   import { periodCutoff } from '$lib/utils/period';
   import Chart from '$lib/components/Chart.svelte';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
@@ -42,17 +42,38 @@
 
   // Intraday data
   const iData = $derived(intradayStore.data[yahoo] as IntradayData | null | undefined);
+  // `points` is regular-session only (server-side filtered). `allPoints` spans
+  // pre + regular + post for the most recent trading day.
   const pts   = $derived(iData?.points ?? []);
+  const allPts = $derived(iData?.allPoints ?? pts);
   const prevClose   = $derived(iData?.previousClose ?? null);
-  const lastPt      = $derived(pts[pts.length - 1] ?? null);
-  const currentPrice = $derived(lastPt?.close ?? prevClose ?? null);
+  // Absolute-latest tick (may be post-market) → header price
+  const lastAllPt   = $derived(allPts[allPts.length - 1] ?? null);
+  const currentPrice = $derived(lastAllPt?.close ?? prevClose ?? null);
+  // Last regular-session tick → reference point for regular vs extended split
+  const lastRegularClose = $derived(pts[pts.length - 1]?.close ?? null);
+
+  const rawMarketState = $derived(iData?.marketState ?? (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
+  const marketState    = $derived(normalizeMarketState(yahoo, rawMarketState));
+
+  // Regular-session move (market open → close). Always versus prevClose.
+  const regularChangePct = $derived(
+    lastRegularClose != null && prevClose && prevClose !== 0
+      ? ((lastRegularClose - prevClose) / prevClose) * 100
+      : null,
+  );
+  // Extended-hours move relative to last regular close (shown only in PRE/POST).
+  const extChangePct = $derived(
+    currentPrice != null && lastRegularClose && lastRegularClose !== 0 && marketState !== 'REGULAR'
+      ? ((currentPrice - lastRegularClose) / lastRegularClose) * 100
+      : null,
+  );
+  // Combined day change (fallback when we can't split, or during REGULAR).
   const dayChangePct = $derived(
     currentPrice != null && prevClose && prevClose !== 0
       ? ((currentPrice - prevClose) / prevClose) * 100
       : null,
   );
-  const rawMarketState = $derived(iData?.marketState ?? (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
-  const marketState    = $derived(normalizeMarketState(yahoo, rawMarketState));
 
   // Period + candles
   let period   = $state<Period>('1d');
@@ -78,29 +99,61 @@
     const tooltipBord = isDark ? '#334155' : '#e2e8f0';
 
     if (period === '1d') {
-      if (!pts.length || !prevClose) return {};
-      // Use all points (pre + regular + post) for full picture
-      const allPts = (iData?.allPoints ?? pts);
-      const tradingPeriods = iData?.tradingPeriods;
-      const regularStart = tradingPeriods?.regular?.[0]?.start;
-      const regularEnd   = tradingPeriods?.regular?.[0]?.end;
+      if (!allPts.length || !prevClose) return {};
+      // Use `pts` (server-computed regular-only points) to identify the actual
+      // session boundaries. tradingPeriods.regular points to the NEXT session
+      // when the market is closed, so we can't trust it for segmentation.
+      const regOpenTs  = pts[0]?.ts    ?? null;
+      const regCloseTs = pts[pts.length - 1]?.ts ?? null;
 
-      // Group points into pre/regular/post segments
-      const labels = allPts.map((p) => new Date(p.ts * 1000).toISOString());
+      // Pad the timestamp grid to cover the full trading session so the x-axis
+      // always spans the whole day (same behaviour as the dashboard 1D chart).
+      const tsSet = new Set<number>(allPts.map((p) => p.ts));
+      const sessionDate = iData?.date ?? null;
+      const bounds = sessionDate ? sessionBounds(yahoo, sessionDate) : null;
+      if (bounds) {
+        for (let ts = bounds.open; ts <= bounds.close; ts += 300) tsSet.add(ts);
+      }
+      const sortedTs = [...tsSet].sort((a, b) => a - b);
+      const ptMap    = new Map(allPts.map((p) => [p.ts, p]));
 
-      const regularData = allPts.map((p) => {
-        if (regularStart && regularEnd && p.ts >= regularStart && p.ts <= regularEnd) {
-          return ((p.close - prevClose) / prevClose) * 100;
-        }
-        return null;
+      const labels = sortedTs.map((ts) => new Date(ts * 1000).toISOString());
+
+      // Solid line for regular hours, dashed for extended (pre/post); null for padded timestamps.
+      const regularData = sortedTs.map((ts) => {
+        const p = ptMap.get(ts);
+        if (!p) return null;
+        return regOpenTs && regCloseTs && p.ts >= regOpenTs && p.ts <= regCloseTs
+          ? ((p.close - prevClose) / prevClose) * 100
+          : null;
       });
-      const extData = allPts.map((p) => {
-        const inRegular = regularStart && regularEnd && p.ts >= regularStart && p.ts <= regularEnd;
-        return !inRegular ? ((p.close - prevClose) / prevClose) * 100 : null;
+      const extData = sortedTs.map((ts) => {
+        const p = ptMap.get(ts);
+        if (!p) return null;
+        return !regOpenTs || !regCloseTs || p.ts < regOpenTs || p.ts > regCloseTs
+          ? ((p.close - prevClose) / prevClose) * 100
+          : null;
       });
+      const zeroLine = sortedTs.map(() => 0);
 
-      // Prev-close reference line
-      const zeroLine = allPts.map(() => 0);
+      // Symmetric y-axis: equal space above and below the zero/prevClose line.
+      const allPcts = [...regularData, ...extData].filter((v): v is number => v !== null);
+      const maxAbs  = Math.max(...allPcts.map(Math.abs), 0.5);
+      const yPad    = maxAbs * 1.1;
+
+      // Green/red based on current day move vs prev close.
+      const lastPct  = lastAllPt && prevClose ? ((lastAllPt.close - prevClose) / prevClose) * 100 : 0;
+      const lineClr  = lastPct >= 0 ? '#4ade80' : '#f87171';
+
+      // Open marker: first actual data point; Close marker: scheduled session end.
+      const openIdx  = regOpenTs   ? sortedTs.findIndex((ts) => ts === regOpenTs)  : -1;
+      const closeIdx = bounds?.close ? sortedTs.findIndex((ts) => ts >= bounds.close) : -1;
+      const openLabel  = openIdx  >= 0 ? (labels[openIdx]  ?? null) : null;
+      const closeLabel = closeIdx >= 0 ? (labels[closeIdx] ?? null) : null;
+      const sessionMarkers = [
+        openLabel  ? { xAxis: openLabel,  label: { formatter: 'Open',  position: 'insideEndTop'   as const, color: textColor, fontSize: 9 } } : null,
+        closeLabel ? { xAxis: closeLabel, label: { formatter: 'Close', position: 'insideStartTop' as const, color: textColor, fontSize: 9 } } : null,
+      ].filter((m): m is NonNullable<typeof m> => m !== null);
 
       return {
         backgroundColor: 'transparent',
@@ -112,11 +165,16 @@
           axisLabel: {
             color: textColor, fontSize: 9,
             formatter: (v: string) => new Date(v).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' }),
-            interval: Math.floor(allPts.length / 6),
+            interval: ((index: number) => {
+              const ts = sortedTs[index];
+              return ts !== undefined && new Date(ts * 1000).getMinutes() === 0;
+            }) as unknown as number,
           },
         },
         yAxis: {
           type: 'value',
+          min: -yPad,
+          max:  yPad,
           splitLine: { lineStyle: { color: gridColor } },
           axisLabel: { color: textColor, fontSize: 10, formatter: (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%` },
         },
@@ -139,36 +197,44 @@
             type: 'line',
             data: regularData,
             smooth: false, symbol: 'none', connectNulls: false,
-            lineStyle: { color: color, width: 2 },
-            areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: color + '33' }, { offset: 1, color: color + '05' }] } },
+            lineStyle: { color: lineClr, width: 2 },
+            areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: lineClr + '33' }, { offset: 1, color: lineClr + '05' }] } },
+            markLine: sessionMarkers.length ? {
+              symbol: 'none', silent: true, animation: false,
+              lineStyle: { color: isDark ? '#64748b' : '#94a3b8', width: 1, type: 'solid' as const, opacity: 0.6 },
+              data: sessionMarkers,
+            } : undefined,
           },
           {
             name: 'Extended',
             type: 'line',
             data: extData,
             smooth: false, symbol: 'none', connectNulls: false,
-            lineStyle: { color: color + '88', width: 1.5, type: 'dashed' },
+            lineStyle: { color: lineClr + '88', width: 1.5, type: 'dashed' as const },
           },
           {
             name: '__zero',
             type: 'line',
             data: zeroLine,
             smooth: false, symbol: 'none',
-            lineStyle: { color: isDark ? '#334155' : '#94a3b8', width: 1, type: 'dashed' },
+            lineStyle: { color: isDark ? '#334155' : '#94a3b8', width: 1, type: 'dashed' as const },
             tooltip: { show: false },
           },
         ],
       };
     }
 
-    // Historical candle chart
-    if (!candles.length) return {};
+    // Historical candle chart. Server may return a cached superset (back to 2021)
+    // regardless of our `from` query, so always filter to the selected period.
+    const cutoff = periodCutoff(period);
+    const visible = cutoff ? candles.filter((c) => c.date >= cutoff) : candles;
+    if (!visible.length) return {};
     return {
       backgroundColor: 'transparent',
       grid: { top: 16, right: 16, bottom: 32, left: 64 },
       xAxis: {
         type: 'category',
-        data: candles.map((c) => c.date),
+        data: visible.map((c) => c.date),
         axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
         axisLabel: { color: textColor, fontSize: 10, interval: 'auto' },
       },
@@ -194,7 +260,7 @@
       series: [{
         name: ticker,
         type: 'line',
-        data: candles.map((c) => c.close),
+        data: visible.map((c) => c.close),
         smooth: false, symbol: 'none',
         lineStyle: { color, width: 2 },
         areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: color + '33' }, { offset: 1, color: color + '05' }] } },
@@ -223,32 +289,41 @@
   }
 </script>
 
-<!-- Back navigation header (replaces layout nav for detail pages) -->
-<header class="detail-header">
-  <a href="/" class="back-btn">← Portfolio</a>
-  <div class="sd-identity">
-    <span class="color-dot" style="background:{color}"></span>
-    <span class="sd-ticker">{ticker}</span>
-    {#if meta['label']}
-      <span class="sd-name">{meta['label'] as string}</span>
-    {/if}
-  </div>
-  <div class="sd-price-row">
-    {#if currentPrice != null}
-      <span class="sd-price">
-        <PrivacyValue value="{ccySym}{currentPrice.toFixed(2)}" />
-      </span>
-    {/if}
-    {#if dayChangePct != null}
-      <span class="sd-change {dayChangePct >= 0 ? 'c-pos' : 'c-neg'}">
-        {dayChangePct >= 0 ? '+' : ''}{dayChangePct.toFixed(2)}%
-      </span>
-    {/if}
-    <span class="badge {msBadgeClass(marketState)}">{msBadgeLabel(marketState)}</span>
-  </div>
-</header>
-
 <div class="page-root">
+  <div class="sd-page-header">
+    <div class="sd-identity">
+      <span class="color-dot" style="background:{color}"></span>
+      <span class="sd-ticker">{ticker}</span>
+      {#if meta['label']}
+        <span class="sd-name">{meta['label'] as string}</span>
+      {/if}
+    </div>
+    <div class="sd-price-row">
+      {#if currentPrice != null}
+        <span class="sd-price">
+          <PrivacyValue value="{ccySym}{currentPrice.toFixed(2)}" />
+        </span>
+      {/if}
+      {#if extChangePct != null && regularChangePct != null}
+        <span class="sd-change-group">
+          <span class="sd-change-lbl">Markt</span>
+          <span class="sd-change {regularChangePct >= 0 ? 'c-pos' : 'c-neg'}">
+            {regularChangePct >= 0 ? '+' : ''}{regularChangePct.toFixed(2)}%
+          </span>
+          <span class="sd-change-sep">·</span>
+          <span class="sd-change-lbl">{marketState === 'PRE' ? 'Pre' : 'Post'}</span>
+          <span class="sd-change {extChangePct >= 0 ? 'c-pos' : 'c-neg'}">
+            {extChangePct >= 0 ? '+' : ''}{extChangePct.toFixed(2)}%
+          </span>
+        </span>
+      {:else if dayChangePct != null}
+        <span class="sd-change {dayChangePct >= 0 ? 'c-pos' : 'c-neg'}">
+          {dayChangePct >= 0 ? '+' : ''}{dayChangePct.toFixed(2)}%
+        </span>
+      {/if}
+      <span class="badge {msBadgeClass(marketState)}">{msBadgeLabel(marketState)}</span>
+    </div>
+  </div>
   <!-- Stats row -->
   <div class="stats-grid card">
     <div class="stat">
@@ -323,7 +398,7 @@
     </div>
     {#if loading}
       <div class="chart-placeholder">Laden…</div>
-    {:else if period === '1d' && pts.length > 1}
+    {:else if period === '1d' && allPts.length > 0 && prevClose != null}
       <Chart option={chartOption()} height="280px" />
     {:else if period !== '1d' && candles.length > 1}
       <Chart option={chartOption()} height="280px" />
@@ -372,25 +447,21 @@
 </div>
 
 <style>
-  .detail-header {
-    position: sticky; top: 0; z-index: 10;
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 16px;
-    background: var(--bg-solid, var(--card-bg));
-    border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
+  .sd-page-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 0 12px; flex-wrap: wrap;
   }
-  .back-btn { text-decoration: none; color: var(--fg-muted); font-size: 13px; white-space: nowrap; }
-  .back-btn:hover { color: var(--fg); }
-
   .sd-identity { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
   .color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-  .sd-ticker { font-size: 15px; font-weight: 700; }
+  .sd-ticker { font-size: 18px; font-weight: 700; }
   .sd-name { font-size: 12px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .sd-price-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .sd-price { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; }
   .sd-change { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+  .sd-change-group { display: inline-flex; align-items: baseline; gap: 4px; font-family: 'JetBrains Mono', monospace; }
+  .sd-change-lbl { font-size: 10px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .sd-change-sep { color: var(--fg-muted); opacity: 0.5; margin: 0 2px; }
 
   .badge {
     font-size: 9px; font-weight: 600; letter-spacing: 0.05em;

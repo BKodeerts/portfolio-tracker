@@ -4,12 +4,13 @@ export interface BonusItem {
   id: string;
   label: string;
   type: BonusType;
-  underlying: string;     // Yahoo symbol of underlying
-  strike: number;
-  expiry: string;         // YYYY-MM-DD
+  symbol: string;         // Yahoo symbol of underlying
+  grantDate: string;      // YYYY-MM-DD
+  strikePrice?: number;
+  expiryDate?: string;    // YYYY-MM-DD
   quantity: number;
   grantPrice: number;     // price paid per unit in EUR
-  multiplier?: number;    // contracts multiplier (default 1)
+  ratio?: number;         // contracts multiplier (default 1)
   // Computed fields from server Black-Scholes
   currentPrice?: number;
   underlyingPrice?: number;

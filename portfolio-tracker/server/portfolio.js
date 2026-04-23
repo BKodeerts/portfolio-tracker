@@ -845,10 +845,13 @@ async function fetchWatchlistPrices(symbols) {
     const q = await getQuote(sym);
     if (!q) continue;
     result.push({
-      symbol:     sym,
-      price:      q.close,
-      high52:     q.fiftyTwoWeekHigh,
-      low52:      q.fiftyTwoWeekLow,
+      symbol:      sym,
+      ticker:      sym,
+      yahoo:       sym,
+      label:       sym,
+      price:       q.close,
+      high52:      q.fiftyTwoWeekHigh,
+      low52:       q.fiftyTwoWeekLow,
       change1dPct: q.change1dPct,
     });
   }
@@ -1190,4 +1193,4 @@ async function computeCurrentSnapshot(options = {}) {
   return { totalValue, totalCost, dailyPl, positions, realizedPl, usdExposurePct, currencyExposure, watchlistData };
 }
 
-module.exports = { computeFullPortfolio, computeCurrentSnapshot };
+module.exports = { computeFullPortfolio, computeCurrentSnapshot, FX_DEFS };

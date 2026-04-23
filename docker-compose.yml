@@ -7,5 +7,7 @@ services:
       - "3069:3069"
     volumes:
       - ./cache:/app/cache
+      - ./data:/app/data
     environment:
       - PORT=3069
+      - DATA_DIR=/app/data

@@ -13,23 +13,25 @@
   // Form fields
   let fType       = $state<BonusType>('warrant');
   let fLabel      = $state('');
-  let fUnderlying = $state('^STOXX50E');
+  let fSymbol     = $state('^STOXX50E');
+  let fGrantDate  = $state('');
   let fQty        = $state('');
   let fGrantPrice = $state('10');
-  let fExpiry     = $state('');
+  let fExpiryDate = $state('');
   let fStrike     = $state('');
-  let fMultiplier = $state('1');
+  let fRatio      = $state('1');
 
   function openAdd() {
     editItem    = null;
     fType       = 'warrant';
     fLabel      = '';
-    fUnderlying = '^STOXX50E';
+    fSymbol     = '^STOXX50E';
+    fGrantDate  = '';
     fQty        = '';
     fGrantPrice = '10';
-    fExpiry     = '';
+    fExpiryDate = '';
     fStrike     = '';
-    fMultiplier = '1';
+    fRatio      = '1';
     showDialog  = true;
   }
 
@@ -37,12 +39,13 @@
     editItem    = item;
     fType       = item.type;
     fLabel      = item.label;
-    fUnderlying = item.underlying;
+    fSymbol     = item.symbol;
+    fGrantDate  = item.grantDate ?? '';
     fQty        = String(item.quantity);
     fGrantPrice = String(item.grantPrice);
-    fExpiry     = item.expiry ?? '';
-    fStrike     = String(item.strike ?? '');
-    fMultiplier = String(item.multiplier ?? 1);
+    fExpiryDate = item.expiryDate ?? '';
+    fStrike     = String(item.strikePrice ?? '');
+    fRatio      = String(item.ratio ?? 1);
     showDialog  = true;
   }
 
@@ -54,12 +57,13 @@
         id: editItem?.id,
         type: fType,
         label: fLabel,
-        underlying: fUnderlying,
+        symbol: fSymbol,
+        grantDate: fGrantDate,
         quantity: parseInt(fQty) || 0,
         grantPrice: parseFloat(fGrantPrice) || 0,
-        expiry: fExpiry || undefined,
-        strike: parseFloat(fStrike) || undefined,
-        multiplier: parseFloat(fMultiplier) || 1,
+        expiryDate: fExpiryDate || undefined,
+        strikePrice: parseFloat(fStrike) || undefined,
+        ratio: parseFloat(fRatio) || 1,
       };
       const saved = await saveBonus(entry);
       if (editItem) {
@@ -111,7 +115,7 @@
             <div class="bonus-card-title">{item.label}</div>
             <span class="type-badge" class:call={item.type === 'call_option'}>{typeLabel(item.type)}</span>
           </div>
-          <div class="bonus-card-sub">{item.underlying}</div>
+          <div class="bonus-card-sub">{item.symbol}</div>
 
           <div class="bonus-metrics">
             <div class="bonus-metric">
@@ -150,10 +154,10 @@
 
           <div class="bonus-footer">
             <span class="c-muted" style="font-size:11px">
-              {item.quantity} × {item.type === 'call_option' ? `Strike ${item.strike}` : `@${item.grantPrice}`}
+              {item.quantity} × {item.type === 'call_option' ? `Strike ${item.strikePrice}` : `@${item.grantPrice}`}
             </span>
-            {#if item.expiry}
-              <span class="c-muted" style="font-size:11px">Verloopt {item.expiry}</span>
+            {#if item.expiryDate}
+              <span class="c-muted" style="font-size:11px">Verloopt {item.expiryDate}</span>
             {/if}
             <button
               class="edit-btn"
@@ -181,44 +185,48 @@
     <div class="dialog-body">
       <!-- Type toggle -->
       <div class="form-group">
-        <label class="form-label">Type</label>
+        <span class="form-label">Type</span>
         <div class="seg">
           <button class="seg-btn" class:on={fType === 'warrant'} onclick={() => (fType = 'warrant')}>Warrant</button>
           <button class="seg-btn" class:on={fType === 'call_option'} onclick={() => (fType = 'call_option')}>Call optie</button>
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Naam</label>
-        <input class="form-input" type="text" bind:value={fLabel} placeholder="Warrants EuroStoxx" />
+        <label class="form-label" for="fLabel">Naam</label>
+        <input id="fLabel" class="form-input" type="text" bind:value={fLabel} placeholder="Warrants EuroStoxx" />
       </div>
       <div class="form-group">
-        <label class="form-label">Onderliggende (Yahoo)</label>
-        <input class="form-input" type="text" bind:value={fUnderlying} placeholder="^STOXX50E" />
+        <label class="form-label" for="fSymbol">Onderliggende (Yahoo)</label>
+        <input id="fSymbol" class="form-input" type="text" bind:value={fSymbol} placeholder="^STOXX50E" />
       </div>
       <div class="form-row">
         <div class="form-group" style="flex:1">
-          <label class="form-label">Aantal</label>
-          <input class="form-input" type="number" bind:value={fQty} placeholder="250" step="1" min="1" />
+          <label class="form-label" for="fQty">Aantal</label>
+          <input id="fQty" class="form-input" type="number" bind:value={fQty} placeholder="250" step="1" min="1" />
         </div>
         <div class="form-group" style="flex:1">
-          <label class="form-label">Prijs bij toekenning</label>
-          <input class="form-input" type="number" bind:value={fGrantPrice} placeholder="10" step="0.01" />
+          <label class="form-label" for="fGrantPrice">Prijs bij toekenning</label>
+          <input id="fGrantPrice" class="form-input" type="number" bind:value={fGrantPrice} placeholder="10" step="0.01" />
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="fGrantDate">Toekenningsdatum</label>
+        <input id="fGrantDate" class="form-input" type="date" bind:value={fGrantDate} />
       </div>
       {#if fType === 'call_option'}
         <div class="form-row">
           <div class="form-group" style="flex:2">
-            <label class="form-label">Strike</label>
-            <input class="form-input" type="number" bind:value={fStrike} placeholder="45.00" step="0.01" />
+            <label class="form-label" for="fStrike">Strike</label>
+            <input id="fStrike" class="form-input" type="number" bind:value={fStrike} placeholder="45.00" step="0.01" />
           </div>
           <div class="form-group" style="flex:1">
-            <label class="form-label">Multiplier</label>
-            <input class="form-input" type="number" bind:value={fMultiplier} placeholder="1" step="0.01" />
+            <label class="form-label" for="fRatio">Multiplier</label>
+            <input id="fRatio" class="form-input" type="number" bind:value={fRatio} placeholder="1" step="0.01" />
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Vervaldatum</label>
-          <input class="form-input" type="date" bind:value={fExpiry} />
+          <label class="form-label" for="fExpiryDate">Vervaldatum</label>
+          <input id="fExpiryDate" class="form-input" type="date" bind:value={fExpiryDate} />
         </div>
       {/if}
     </div>

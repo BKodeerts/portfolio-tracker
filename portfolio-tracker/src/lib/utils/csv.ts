@@ -107,7 +107,7 @@ export function parseDeGiroCSV(text: string): ParsedRow[] {
     const date = `${parts[2]}-${parts[1]}-${parts[0]}`;
     const rawCcy   = iPriceCcy >= 0 ? (cols[iPriceCcy] ?? '').trim().toUpperCase() : '';
     const currency = rawCcy || ((!isNaN(fxRate) && Math.abs(fxRate - 1) > 0.01) ? 'USD' : 'EUR');
-    rows.push({ date, rawDate, product, isin, exchange, shares: quantity, fxRate, costEur: totalEur, orderId, currency });
+    rows.push({ date, rawDate, product, isin, exchange, shares: quantity, fxRate, costEur: Math.abs(totalEur), orderId, currency });
   }
   return rows;
 }

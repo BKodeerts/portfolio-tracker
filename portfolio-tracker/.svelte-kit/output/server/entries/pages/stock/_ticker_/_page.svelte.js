@@ -1,9 +1,10 @@
 import { i as attr_style, d as stringify, c as escape_html, b as attr_class, e as ensure_array_like, f as derived, s as store_get, u as unsubscribe_stores } from "../../../../chunks/renderer.js";
 import { p as page } from "../../../../chunks/stores.js";
-import { p as portfolioStore, g as getColor } from "../../../../chunks/portfolio.svelte.js";
+import { p as portfolioStore } from "../../../../chunks/portfolio.svelte.js";
 import { n as normalizeMarketState, i as intradayStore, a as isExchangeOpen } from "../../../../chunks/exchange.js";
 import { t as themeStore } from "../../../../chunks/theme.svelte.js";
 import { f as fmt, a as fmtPct } from "../../../../chunks/fmt.js";
+import { g as getColor } from "../../../../chunks/color.js";
 import { C as Chart } from "../../../../chunks/Chart.js";
 import { P as PrivacyValue } from "../../../../chunks/PrivacyValue.js";
 function _page($$renderer, $$props) {
@@ -37,12 +38,16 @@ function _page($$renderer, $$props) {
     const ccySym = derived(() => nativeCcy() === "EUR" ? "€" : nativeCcy() === "GBP" ? "£" : nativeCcy() === "USD" ? "$" : nativeCcy());
     const iData = derived(() => intradayStore.data[yahoo()]);
     const pts = derived(() => iData()?.points ?? []);
+    const allPts = derived(() => iData()?.allPoints ?? pts());
     const prevClose = derived(() => iData()?.previousClose ?? null);
-    const lastPt = derived(() => pts()[pts().length - 1] ?? null);
-    const currentPrice = derived(() => lastPt()?.close ?? prevClose() ?? null);
-    const dayChangePct = derived(() => currentPrice() != null && prevClose() && prevClose() !== 0 ? (currentPrice() - prevClose()) / prevClose() * 100 : null);
+    const lastAllPt = derived(() => allPts()[allPts().length - 1] ?? null);
+    const currentPrice = derived(() => lastAllPt()?.close ?? prevClose() ?? null);
+    const lastRegularClose = derived(() => pts()[pts().length - 1]?.close ?? null);
     const rawMarketState = derived(() => iData()?.marketState ?? (isExchangeOpen(yahoo()) ? "REGULAR" : "CLOSED"));
     const marketState = derived(() => normalizeMarketState(yahoo(), rawMarketState()));
+    const regularChangePct = derived(() => lastRegularClose() != null && prevClose() && prevClose() !== 0 ? (lastRegularClose() - prevClose()) / prevClose() * 100 : null);
+    const extChangePct = derived(() => currentPrice() != null && lastRegularClose() && lastRegularClose() !== 0 && marketState() !== "REGULAR" ? (currentPrice() - lastRegularClose()) / lastRegularClose() * 100 : null);
+    const dayChangePct = derived(() => currentPrice() != null && prevClose() && prevClose() !== 0 ? (currentPrice() - prevClose()) / prevClose() * 100 : null);
     let period = "1d";
     const chartOption = derived(() => () => {
       const isDark = themeStore.isDark;
@@ -52,22 +57,9 @@ function _page($$renderer, $$props) {
       const tooltipBord = isDark ? "#334155" : "#e2e8f0";
       {
         if (!pts().length || !prevClose()) return {};
-        const allPts = iData()?.allPoints ?? pts();
-        const tradingPeriods = iData()?.tradingPeriods;
-        const regularStart = tradingPeriods?.regular?.[0]?.start;
-        const regularEnd = tradingPeriods?.regular?.[0]?.end;
-        const labels = allPts.map((p) => new Date(p.ts * 1e3).toISOString());
-        const regularData = allPts.map((p) => {
-          if (regularStart && regularEnd && p.ts >= regularStart && p.ts <= regularEnd) {
-            return (p.close - prevClose()) / prevClose() * 100;
-          }
-          return null;
-        });
-        const extData = allPts.map((p) => {
-          const inRegular = regularStart && regularEnd && p.ts >= regularStart && p.ts <= regularEnd;
-          return !inRegular ? (p.close - prevClose()) / prevClose() * 100 : null;
-        });
-        const zeroLine = allPts.map(() => 0);
+        const labels = pts().map((p) => new Date(p.ts * 1e3).toISOString());
+        const regularData = pts().map((p) => (p.close - prevClose()) / prevClose() * 100);
+        const zeroLine = pts().map(() => 0);
         return {
           backgroundColor: "transparent",
           grid: { top: 16, right: 16, bottom: 32, left: 56 },
@@ -81,7 +73,7 @@ function _page($$renderer, $$props) {
               color: textColor,
               fontSize: 9,
               formatter: (v) => new Date(v).toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" }),
-              interval: Math.floor(allPts.length / 6)
+              interval: Math.floor(pts().length / 6)
             }
           },
           yAxis: {
@@ -132,15 +124,6 @@ function _page($$renderer, $$props) {
               }
             },
             {
-              name: "Extended",
-              type: "line",
-              data: extData,
-              smooth: false,
-              symbol: "none",
-              connectNulls: false,
-              lineStyle: { color: color() + "88", width: 1.5, type: "dashed" }
-            },
-            {
               name: "__zero",
               type: "line",
               data: zeroLine,
@@ -188,8 +171,11 @@ function _page($$renderer, $$props) {
       $$renderer2.push("<!--[-1-->");
     }
     $$renderer2.push(`<!--]--> `);
-    if (dayChangePct() != null) {
+    if (extChangePct() != null && regularChangePct() != null) {
       $$renderer2.push("<!--[0-->");
+      $$renderer2.push(`<span class="sd-change-group svelte-1fn2yme"><span class="sd-change-lbl svelte-1fn2yme">Markt</span> <span${attr_class(`sd-change ${stringify(regularChangePct() >= 0 ? "c-pos" : "c-neg")}`, "svelte-1fn2yme")}>${escape_html(regularChangePct() >= 0 ? "+" : "")}${escape_html(regularChangePct().toFixed(2))}%</span> <span class="sd-change-sep svelte-1fn2yme">·</span> <span class="sd-change-lbl svelte-1fn2yme">${escape_html(marketState() === "PRE" ? "Pre" : "Post")}</span> <span${attr_class(`sd-change ${stringify(extChangePct() >= 0 ? "c-pos" : "c-neg")}`, "svelte-1fn2yme")}>${escape_html(extChangePct() >= 0 ? "+" : "")}${escape_html(extChangePct().toFixed(2))}%</span></span>`);
+    } else if (dayChangePct() != null) {
+      $$renderer2.push("<!--[1-->");
       $$renderer2.push(`<span${attr_class(`sd-change ${stringify(dayChangePct() >= 0 ? "c-pos" : "c-neg")}`, "svelte-1fn2yme")}>${escape_html(dayChangePct() >= 0 ? "+" : "")}${escape_html(dayChangePct().toFixed(2))}%</span>`);
     } else {
       $$renderer2.push("<!--[-1-->");

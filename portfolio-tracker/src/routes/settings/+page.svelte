@@ -3,6 +3,7 @@
   import { themeStore } from '$lib/stores/theme.svelte';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { fetchSettings, saveSettings, fetchTickerMeta, saveTickerMeta, clearCache, pushToHa } from '$lib/api/settings';
+  import { intradayStore } from '$lib/stores/intraday.svelte';
   import type { Settings } from '$lib/types/settings';
   import type { TickerMeta } from '$lib/types/portfolio';
 
@@ -50,6 +51,8 @@
         intradayDuringMarketHours: intradayAuto,
       });
       settings = updated;
+      await portfolioStore.load();
+      await intradayStore.load(true);
       saveMsg  = 'Opgeslagen!';
       setTimeout(() => { saveMsg = ''; }, 2000);
     } catch (e) {

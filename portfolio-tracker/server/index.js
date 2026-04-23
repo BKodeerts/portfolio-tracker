@@ -1,5 +1,5 @@
 const express = require('express');
-const path    = require('node:path');
+const path = require('node:path');
 
 const app = express();
 
@@ -9,7 +9,9 @@ const app = express();
 // the Vite dev proxy (localhost:5173) and any HA ingress proxy.
 // Set CORS_ORIGIN env var (comma-separated) to allow additional origins (e.g. Nabu Casa URL).
 const _extraOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()).filter(Boolean)
+  ? process.env.CORS_ORIGIN.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
   : [];
 const ALLOWED_ORIGINS = new Set([
   'http://localhost:3069',
@@ -35,8 +37,10 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 
 // ── Startup environment validation ────────────────────────────────────────────
-if (!process.env.DATA_DIR)  console.warn('[Startup] DATA_DIR not set — using default ./data (OK for local dev)');
-if (!process.env.CACHE_DIR) console.warn('[Startup] CACHE_DIR not set — using default ./cache (OK for local dev)');
+if (!process.env.DATA_DIR)
+  console.warn('[Startup] DATA_DIR not set — using default ./data (OK for local dev)');
+if (!process.env.CACHE_DIR)
+  console.warn('[Startup] CACHE_DIR not set — using default ./cache (OK for local dev)');
 
 const PORT = process.env.PORT || 3069;
 
@@ -48,8 +52,10 @@ if (API_TOKEN) {
   console.log('[Auth] API_TOKEN is set — mutating endpoints require X-API-Token header');
   app.use('/api', (req, res, next) => {
     if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
-    const provided = req.headers['x-api-token'] || (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '');
-    if (provided !== API_TOKEN) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+    const provided =
+      req.headers['x-api-token'] || (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '');
+    if (provided !== API_TOKEN)
+      return res.status(401).json({ status: 'error', message: 'Unauthorized' });
     next();
   });
 }
@@ -67,9 +73,18 @@ app.use('/api/ticker-meta', require('./routes/ticker-meta.js'));
 const fs = require('node:fs');
 app.get('/health', (req, res) => {
   const { CACHE_DIR: cDir } = require('./cache.js');
-  const cacheWritable = (() => { try { fs.accessSync(cDir, fs.constants.W_OK); return true; } catch { return false; } })();
+  const cacheWritable = (() => {
+    try {
+      fs.accessSync(cDir, fs.constants.W_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
   const status = cacheWritable ? 'ok' : 'degraded';
-  res.status(cacheWritable ? 200 : 503).json({ status, cache_dir: cDir, cache_writable: cacheWritable });
+  res
+    .status(cacheWritable ? 200 : 503)
+    .json({ status, cache_dir: cDir, cache_writable: cacheWritable });
 });
 
 // Serve built frontend
@@ -79,7 +94,7 @@ app.get('*', (req, res) => res.sendFile(path.join(distDir, 'index.html')));
 
 // Copy Lovelace card to /config/www/ so it's accessible via /local/ (works with Nabu Casa)
 try {
-  const wwwDir  = '/config/www/portfolio-tracker';
+  const wwwDir = '/config/www/portfolio-tracker';
   const cardSrc = path.join(__dirname, '..', 'dist', 'portfolio-card.js');
   const cardDst = path.join(wwwDir, 'portfolio-card.js');
   if (!fs.existsSync(wwwDir)) fs.mkdirSync(wwwDir, { recursive: true });

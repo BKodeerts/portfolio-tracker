@@ -19,8 +19,8 @@ export interface IntradayData {
   date: string;
   marketState?: string;
   tradingPeriods?: {
-    pre?: { start: number; end: number }[];
-    regular?: { start: number; end: number }[];
-    post?: { start: number; end: number }[];
+    pre?: { start: number; end: number };
+    regular?: { start: number; end: number };
+    post?: { start: number; end: number };
   };
 }

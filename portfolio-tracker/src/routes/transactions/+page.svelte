@@ -123,6 +123,7 @@
     <button class="btn" onclick={() => (showAdd = !showAdd)}>
       {showAdd ? 'Annuleren' : '+ Transactie'}
     </button>
+    <a href="/import" class="btn">CSV importeren</a>
     {#if dirty}
       <button class="btn success" disabled={saving} onclick={save}>
         {saving ? 'Opslaan…' : 'Opslaan'}

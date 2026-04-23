@@ -151,8 +151,51 @@ function deriveSession(points, periods, lastDate, meta) {
     };
   }
 
-  // No regular-session data today — use the 24 h window before regular start
-  const stalePts  = points.filter(p => p.ts < regular.start && p.ts >= regular.start - 86400);
+  // todayPts is empty: either the market hasn't opened yet, or Yahoo's
+  // currentTradingPeriod doesn't align with the actual data (stale CDN, period
+  // pointing to next session, etc.).  Before falling back to yesterday, check
+  // whether any points from today's calendar date fall inside the regular-hours
+  // window defined by time-of-day.  This handles the common case of Yahoo
+  // returning the next-session's regular.start even when today's candles exist.
+  const serverToday = new Date().toISOString().slice(0, 10);
+  if (lastDate === serverToday) {
+    const DAY_S_EARLY = 86400;
+    const regStartTodE = ((regular.start % DAY_S_EARLY) + DAY_S_EARLY) % DAY_S_EARLY;
+    const regEndTodE   = ((regular.end   % DAY_S_EARLY) + DAY_S_EARLY) % DAY_S_EARLY;
+    const inRegTodE    = (ts) => {
+      const tod = ((ts % DAY_S_EARLY) + DAY_S_EARLY) % DAY_S_EARLY;
+      return regEndTodE > regStartTodE
+        ? (tod >= regStartTodE && tod < regEndTodE)
+        : (tod >= regStartTodE || tod < regEndTodE);
+    };
+    const todayByDatePts = points.filter(p =>
+      new Date(p.ts * 1000).toISOString().slice(0, 10) === serverToday && inRegTodE(p.ts),
+    );
+    if (todayByDatePts.length > 0) {
+      return {
+        sessionPoints: todayByDatePts,
+        previousClose: derivePreviousClose(points, periods, lastDate, meta),
+      };
+    }
+  }
+
+  // No regular-session data today — fall back to the last calendar day that has data,
+  // narrowed to that day's regular-hours window (by time-of-day). This excludes pre /
+  // post points so the dashboard shows the actual market move, not the extended move.
+  const DAY_S = 86400;
+  const regStartTod = ((regular.start % DAY_S) + DAY_S) % DAY_S;
+  const regEndTod   = ((regular.end   % DAY_S) + DAY_S) % DAY_S;
+  const inRegularTod = (ts) => {
+    const tod = ((ts % DAY_S) + DAY_S) % DAY_S;
+    return regEndTod > regStartTod
+      ? (tod >= regStartTod && tod < regEndTod)
+      : (tod >= regStartTod || tod < regEndTod);
+  };
+  const stalePts = points.filter(p =>
+    p.ts < regular.start &&
+    new Date(p.ts * 1000).toISOString().slice(0, 10) === lastDate &&
+    inRegularTod(p.ts),
+  );
   const preStart  = periods?.pre?.start;
   const inPreToday = preStart && points.some(p => p.ts >= preStart);
 
@@ -161,12 +204,13 @@ function deriveSession(points, periods, lastDate, meta) {
     return { sessionPoints: stalePts, previousClose: derivePreviousClose(points, periods, lastDate, meta) };
   }
 
-  // Fully closed — find last close before the stale session began so % isn't always 0
-  const sessionStart = stalePts.length > 0 ? stalePts[0].ts : null;
-  if (sessionStart) {
+  // Fully closed — anchor previousClose to the last regular close BEFORE lastDate
+  // (not just before stalePts[0], which would pick up lastDate's own pre-market).
+  if (stalePts.length > 0) {
+    const lastDayStart = Date.parse(lastDate + 'T00:00:00Z') / 1000;
     let found = null;
     for (let i = points.length - 1; i >= 0; i--) {
-      if (points[i].ts < sessionStart) { found = points[i].close; break; }
+      if (points[i].ts < lastDayStart && inRegularTod(points[i].ts)) { found = points[i].close; break; }
     }
     const previousClose = found ?? meta.regularMarketPreviousClose ?? meta.chartPreviousClose ?? null;
     return { sessionPoints: stalePts, previousClose };

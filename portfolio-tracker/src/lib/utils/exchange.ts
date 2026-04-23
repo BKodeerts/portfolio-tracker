@@ -28,6 +28,7 @@ const EXCHANGE_DEFS: Record<string, ExchangeDef> = {
 };
 
 function yahooSuffix(symbol: string): string {
+  if (!symbol) return '';
   const m = symbol.match(/\.([A-Z]{1,2})$/i);
   return m?.[1] ? `.${m[1].toUpperCase()}` : '';
 }
@@ -57,6 +58,28 @@ export function getTradingMins(yahooSymbol: string): number {
 export function normalizeMarketState(yahooSymbol: string, rawState: string): string {
   if (rawState === 'POST' && EU_EXCHANGE_RE.test(yahooSymbol)) return 'CLOSED';
   return rawState;
+}
+
+/** Return Unix timestamps (seconds) for session open and close on a given date. */
+export function sessionBounds(yahooSymbol: string, dateStr: string): { open: number; close: number } | null {
+  if (!dateStr) return null;
+  const sfx = yahooSuffix(yahooSymbol);
+  const def = EXCHANGE_DEFS[sfx] ?? EXCHANGE_DEFS['']!;
+  const unixAtLocal = (h: number, m: number): number => {
+    const [y, mo, d] = dateStr.split('-').map(Number);
+    const naiveUtc = Date.UTC(y!, mo! - 1, d!, h, m);
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: def.tz, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(new Date(naiveUtc));
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+    const tzAsUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'), get('second'));
+    return Math.floor((naiveUtc - (tzAsUtc - naiveUtc)) / 1000);
+  };
+  return {
+    open:  unixAtLocal(def.open[0],  def.open[1]),
+    close: unixAtLocal(def.close[0], def.close[1]),
+  };
 }
 
 /** Build an inline SVG sparkline from intraday points. */

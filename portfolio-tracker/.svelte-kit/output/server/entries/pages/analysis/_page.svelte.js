@@ -1,10 +1,18 @@
 import { e as ensure_array_like, b as attr_class, c as escape_html, i as attr_style, d as stringify, f as derived } from "../../../chunks/renderer.js";
-import { p as portfolioStore, g as getColor } from "../../../chunks/portfolio.svelte.js";
+import { p as portfolioStore } from "../../../chunks/portfolio.svelte.js";
 import { t as themeStore } from "../../../chunks/theme.svelte.js";
 import { a as fmtPct, f as fmt, b as fmtNum } from "../../../chunks/fmt.js";
-import { f as filterByPeriod } from "../../../chunks/period.js";
+import { g as getColor } from "../../../chunks/color.js";
 import { C as Chart } from "../../../chunks/Chart.js";
 import { P as PrivacyValue } from "../../../chunks/PrivacyValue.js";
+function periodCutoff(period) {
+  return null;
+}
+function filterByPeriod(data, period) {
+  const cutoff = periodCutoff();
+  if (!cutoff) return data;
+  return data.filter((d) => d.date >= cutoff);
+}
 function _page($$renderer, $$props) {
   $$renderer.component(($$renderer2) => {
     let analysePeriod = "total";
@@ -71,7 +79,7 @@ function _page($$renderer, $$props) {
         }
       };
     }
-    const allocationLabels = derived(() => portfolioStore.currentTickers.sort((a, b) => (latest()?.[b] ?? 0) - (latest()?.[a] ?? 0)));
+    const allocationLabels = derived(() => [...portfolioStore.currentTickers].sort((a, b) => (latest()?.[b] ?? 0) - (latest()?.[a] ?? 0)));
     const allocationValues = derived(() => allocationLabels().map((t) => latest()?.[t] ?? 0));
     const allocationColors = derived(() => allocationLabels().map((t) => getColor(t)));
     const allocationOption = derived(() => donutOption(allocationLabels(), allocationValues(), allocationColors()));
@@ -177,6 +185,75 @@ function _page($$renderer, $$props) {
         ]
       };
     });
+    const annualOption = derived(() => () => {
+      if (!portfolioStore.annualPl.length) return {};
+      const rows = [...portfolioStore.annualPl].sort((a, b) => a.year.localeCompare(b.year));
+      const isDark = themeStore.isDark;
+      const textColor = isDark ? "#94a3b8" : "#64748b";
+      const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+      return {
+        backgroundColor: "transparent",
+        grid: { top: 24, right: 16, bottom: 32, left: 64 },
+        legend: {
+          data: ["Gerealiseerd", "Dividenden"],
+          textStyle: { color: textColor, fontSize: 11 },
+          itemWidth: 10,
+          itemHeight: 10,
+          top: 0
+        },
+        xAxis: {
+          type: "category",
+          data: rows.map((a) => a.year),
+          axisLabel: { color: textColor, fontSize: 10 },
+          axisLine: { show: false },
+          axisTick: { show: false },
+          splitLine: { show: false }
+        },
+        yAxis: {
+          type: "value",
+          splitLine: { lineStyle: { color: gridColor } },
+          axisLabel: {
+            color: textColor,
+            fontSize: 10,
+            formatter: (v) => themeStore.privacyMode ? "●●" : Math.abs(v) >= 1e3 ? `€${+(v / 1e3).toFixed(0)}k` : `€${Math.round(v)}`
+          }
+        },
+        tooltip: {
+          trigger: "axis",
+          axisPointer: { type: "shadow" },
+          backgroundColor: isDark ? "#1e293b" : "#ffffff",
+          borderColor: isDark ? "#334155" : "#e2e8f0",
+          borderWidth: 1,
+          textStyle: { fontSize: 11, color: isDark ? "#e2e8f0" : "#1c1c1c" },
+          formatter: (params) => {
+            const arr = params;
+            const year = arr[0]?.name ?? "";
+            const lines = arr.filter((p) => p.value !== 0 && p.value != null).map((p) => `${p.marker}${p.seriesName}: ${themeStore.privacyMode ? "●●●" : fmt(p.value)}`);
+            const total = arr.reduce((s, p) => s + (p.value ?? 0), 0);
+            lines.push(`<b>Totaal: ${themeStore.privacyMode ? "●●●" : fmt(total)}</b>`);
+            return `${year}<br>${lines.join("<br>")}`;
+          }
+        },
+        series: [
+          {
+            name: "Gerealiseerd",
+            type: "bar",
+            stack: "pl",
+            data: rows.map((a) => ({
+              value: a.realizedPl,
+              itemStyle: { color: a.realizedPl >= 0 ? "#4ade80" : "#f87171" }
+            }))
+          },
+          {
+            name: "Dividenden",
+            type: "bar",
+            stack: "pl",
+            data: rows.map((a) => a.dividends),
+            itemStyle: { color: "#818cf8" }
+          }
+        ]
+      };
+    });
     const benchmarkOption = derived(() => () => {
       const filtered = filterByPeriod(portfolioStore.chartData);
       if (filtered.length < 2) return {};
@@ -275,52 +352,6 @@ function _page($$renderer, $$props) {
         series
       };
     });
-    const annualOption = derived(() => () => {
-      if (!portfolioStore.annualPl.length) return {};
-      const isDark = themeStore.isDark;
-      const textColor = isDark ? "#94a3b8" : "#64748b";
-      const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
-      return {
-        backgroundColor: "transparent",
-        grid: { top: 16, right: 16, bottom: 32, left: 64 },
-        xAxis: {
-          type: "category",
-          data: portfolioStore.annualPl.map((a) => String(a.year)),
-          axisLabel: { color: textColor, fontSize: 10 },
-          axisLine: { show: false },
-          axisTick: { show: false },
-          splitLine: { show: false }
-        },
-        yAxis: {
-          type: "value",
-          splitLine: { lineStyle: { color: gridColor } },
-          axisLabel: {
-            color: textColor,
-            fontSize: 10,
-            formatter: (v) => themeStore.privacyMode ? "●●" : Math.abs(v) >= 1e3 ? `€${+(v / 1e3).toFixed(0)}k` : `€${Math.round(v)}`
-          }
-        },
-        tooltip: {
-          backgroundColor: isDark ? "#1e293b" : "#ffffff",
-          borderColor: isDark ? "#334155" : "#e2e8f0",
-          borderWidth: 1,
-          textStyle: { fontSize: 11, color: isDark ? "#e2e8f0" : "#1c1c1c" },
-          formatter: (p) => `${p.name}: ${themeStore.privacyMode ? "●●●" : fmt(p.value)}`
-        },
-        series: [
-          {
-            type: "bar",
-            data: portfolioStore.annualPl.map((a) => ({
-              value: a.pl,
-              itemStyle: {
-                color: a.pl >= 0 ? "#4ade80" : "#f87171",
-                borderRadius: a.pl >= 0 ? [3, 3, 0, 0] : [0, 0, 3, 3]
-              }
-            }))
-          }
-        ]
-      };
-    });
     $$renderer2.push(`<div class="page-root"><div class="section-header svelte-8pceb3"><h2 class="section-title svelte-8pceb3">Analyse</h2> <div class="period-pills"><!--[-->`);
     const each_array = ensure_array_like(PERIODS);
     for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
@@ -416,7 +447,7 @@ function _page($$renderer, $$props) {
     if (portfolioStore.annualPl.length > 0) {
       $$renderer2.push("<!--[0-->");
       $$renderer2.push(`<div class="card chart-card" style="margin-top:16px"><div class="card-title" style="padding:12px 16px">Jaarlijks resultaat</div> `);
-      Chart($$renderer2, { option: annualOption()(), height: "200px" });
+      Chart($$renderer2, { option: annualOption()(), height: "220px" });
       $$renderer2.push(`<!----></div>`);
     } else {
       $$renderer2.push("<!--[-1-->");

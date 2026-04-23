@@ -8,10 +8,10 @@ function Nav($$renderer, $$props) {
   $$renderer.component(($$renderer2) => {
     var $$store_subs;
     const tabs = [
-      { path: "/", label: "Portfolio" },
-      { path: "/analyse", label: "Analysis" },
-      { path: "/intraday", label: "Intraday" },
+      { path: "/", label: "Dashboard" },
+      { path: "/analysis", label: "Analysis" },
       { path: "/transactions", label: "Transactions" },
+      { path: "/import", label: "Import" },
       { path: "/bonus", label: "Bonus" }
     ];
     function isActive(path) {
@@ -66,7 +66,7 @@ function _layout($$renderer, $$props) {
   $$renderer.component(($$renderer2) => {
     var $$store_subs;
     const { children } = $$props;
-    const isDetailPage = derived(() => store_get($$store_subs ??= {}, "$page", page).url.pathname.startsWith("/aandeel/") || store_get($$store_subs ??= {}, "$page", page).url.pathname.startsWith("/bonus/") && store_get($$store_subs ??= {}, "$page", page).url.pathname !== "/bonus");
+    const isDetailPage = derived(() => store_get($$store_subs ??= {}, "$page", page).url.pathname.startsWith("/stock/") || store_get($$store_subs ??= {}, "$page", page).url.pathname.startsWith("/bonus/") && store_get($$store_subs ??= {}, "$page", page).url.pathname !== "/bonus");
     const isSettingsPage = derived(() => store_get($$store_subs ??= {}, "$page", page).url.pathname === "/settings");
     $$renderer2.push(`<header class="top-bar"><div class="top-bar-inner">`);
     if (portfolioStore.loaded) {

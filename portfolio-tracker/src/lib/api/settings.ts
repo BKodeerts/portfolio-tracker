@@ -1,9 +1,9 @@
-import { apiFetch } from './client';
+import { apiFetch, apiGet } from './client';
 import type { Settings } from '$lib/types/settings';
 import type { TickerMeta } from '$lib/types/portfolio';
 
 export async function fetchSettings(): Promise<Settings> {
-  return apiFetch<Settings>('/api/settings');
+  return apiGet<Settings>('/api/settings');
 }
 
 export async function saveSettings(settings: Partial<Settings>): Promise<Settings> {
@@ -15,7 +15,7 @@ export async function saveSettings(settings: Partial<Settings>): Promise<Setting
 }
 
 export async function fetchTickerMeta(): Promise<Record<string, TickerMeta>> {
-  return apiFetch<Record<string, TickerMeta>>('/api/ticker-meta');
+  return apiGet<Record<string, TickerMeta>>('/api/ticker-meta');
 }
 
 export async function saveTickerMeta(meta: Record<string, TickerMeta>): Promise<void> {

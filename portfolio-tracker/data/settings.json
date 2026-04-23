@@ -1,0 +1,9 @@
+{
+  "baseCurrency": "EUR",
+  "watchlist": [
+    "SLS"
+  ],
+  "intradayDuringMarketHours": true,
+  "pushInterval": 15,
+  "pushPositions": false
+}

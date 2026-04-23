@@ -144,11 +144,20 @@ router.get('/intraday', async (req, res) => {
   res.json({ status: 'ok', data: results });
 });
 
-// ISIN lookup
+// ISIN lookup — must stay in sync with EXCHANGE_SUFFIXES in src/lib/utils/csv.ts
 const LOOKUP_SUFFIXES = {
-  XETRA:'.DE', XET:'.DE', GER:'.DE', XAMS:'.AS', AMS:'.AS', XPAR:'.PA', EPA:'.PA',
-  XLON:'.L', LSE:'.L', XMIL:'.MI', MIL:'.MI', XBRU:'.BR', BRU:'.BR', XSWX:'.SW', SWX:'.SW',
-  NSQ:'', NYSE:'', XNAS:'', XNYS:'',
+  XETRA: '.DE', XET: '.DE', GER: '.DE', XAMS: '.AS', AMS: '.AS',
+  XPAR: '.PA', EPA: '.PA', XLON: '.L', LSE: '.L', XMIL: '.MI', MIL: '.MI',
+  XBRU: '.BR', BRU: '.BR', XSWX: '.SW', SWX: '.SW',
+  XSTO: '.ST', STO: '.ST', XCSE: '.CO', CSE: '.CO', XHEL: '.HE', XOSL: '.OL',
+  XSGO: '.CL', SCL: '.CL',
+  XTSE: '.TO', TSE: '.TO',
+  XASX: '.AX', ASX: '.AX',
+  XTKS: '.T',  TKS: '.T',
+  XMEX: '.MX', BMV: '.MX',
+  XBOM: '.BO', BSE: '.BO',
+  XNSE: '.NS', NSE: '.NS',
+  NSQ: '', NYSE: '', XNAS: '', XNYS: '',
 };
 const ISIN_RE     = /^[A-Z]{2}[A-Z0-9]{10}$/;
 const EXCHANGE_RE = /^[A-Za-z]{1,10}$/;

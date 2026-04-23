@@ -21,7 +21,7 @@ function _page($$renderer, $$props) {
       const each_array = ensure_array_like(portfolioStore.bonusItems);
       for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
         let item = each_array[$$index];
-        $$renderer2.push(`<a class="bonus-card card svelte-1upw5g8"${attr("href", `/bonus/${stringify(item.id)}`)}><div class="bonus-card-header svelte-1upw5g8"><div class="bonus-card-title svelte-1upw5g8">${escape_html(item.label)}</div> <span${attr_class("type-badge svelte-1upw5g8", void 0, { "call": item.type === "call_option" })}>${escape_html(typeLabel(item.type))}</span></div> <div class="bonus-card-sub svelte-1upw5g8">${escape_html(item.underlying)}</div> <div class="bonus-metrics svelte-1upw5g8"><div class="bonus-metric svelte-1upw5g8"><div class="bm-label svelte-1upw5g8">Waarde</div> <div class="bm-value svelte-1upw5g8">`);
+        $$renderer2.push(`<a class="bonus-card card svelte-1upw5g8"${attr("href", `/bonus/${stringify(item.id)}`)}><div class="bonus-card-header svelte-1upw5g8"><div class="bonus-card-title svelte-1upw5g8">${escape_html(item.label)}</div> <span${attr_class("type-badge svelte-1upw5g8", void 0, { "call": item.type === "call_option" })}>${escape_html(typeLabel(item.type))}</span></div> <div class="bonus-card-sub svelte-1upw5g8">${escape_html(item.symbol)}</div> <div class="bonus-metrics svelte-1upw5g8"><div class="bonus-metric svelte-1upw5g8"><div class="bm-label svelte-1upw5g8">Waarde</div> <div class="bm-value svelte-1upw5g8">`);
         if (item.totalValue != null) {
           $$renderer2.push("<!--[0-->");
           PrivacyValue($$renderer2, { value: fmt(item.totalValue) });
@@ -44,10 +44,10 @@ function _page($$renderer, $$props) {
         } else {
           $$renderer2.push("<!--[-1-->");
         }
-        $$renderer2.push(`<!--]--></div> <div class="bonus-footer svelte-1upw5g8"><span class="c-muted" style="font-size:11px">${escape_html(item.quantity)} × ${escape_html(item.type === "call_option" ? `Strike ${item.strike}` : `@${item.grantPrice}`)}</span> `);
-        if (item.expiry) {
+        $$renderer2.push(`<!--]--></div> <div class="bonus-footer svelte-1upw5g8"><span class="c-muted" style="font-size:11px">${escape_html(item.quantity)} × ${escape_html(item.type === "call_option" ? `Strike ${item.strikePrice}` : `@${item.grantPrice}`)}</span> `);
+        if (item.expiryDate) {
           $$renderer2.push("<!--[0-->");
-          $$renderer2.push(`<span class="c-muted" style="font-size:11px">Verloopt ${escape_html(item.expiry)}</span>`);
+          $$renderer2.push(`<span class="c-muted" style="font-size:11px">Verloopt ${escape_html(item.expiryDate)}</span>`);
         } else {
           $$renderer2.push("<!--[-1-->");
         }

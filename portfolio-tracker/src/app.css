@@ -14,7 +14,7 @@ body {
 /* ── Layout ── */
 .page-root { padding: 28px 20px 60px; max-width: 980px; margin: 0 auto; }
 .mobile-only { display: none !important; }
-.desktop-only { display: initial; }
+.desktop-only { display: revert; }
 .footer { text-align: center; margin-top: 32px; font-size: 10px; color: var(--fg-subtle); line-height: 1.6; }
 
 /* ── Loading / Error states ── */
@@ -65,6 +65,7 @@ body {
   font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em;
   color: var(--fg-muted); font-weight: 600; margin-bottom: 3px;
 }
+.stale-badge { color: #f59e0b; font-size: 8px; vertical-align: middle; }
 .summary-today-value {
   font-size: 17px; font-weight: 700;
   font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em; line-height: 1.1;

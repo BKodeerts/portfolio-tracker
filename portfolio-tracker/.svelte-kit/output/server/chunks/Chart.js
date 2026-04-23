@@ -8,7 +8,10 @@ function Chart($$renderer, $$props) {
   $$renderer.component(($$renderer2) => {
     let { option, height = "300px", class: cls = "" } = $$props;
     let chart = null;
+    let ro = null;
     onDestroy(() => {
+      ro?.disconnect();
+      ro = null;
       chart?.dispose();
       chart = null;
     });

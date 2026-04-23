@@ -1,9 +1,9 @@
-import { apiFetch } from './client';
+import { apiFetch, apiGet } from './client';
 import type { PortfolioResponse } from '$lib/types/portfolio';
 import type { Transaction } from '$lib/types/transaction';
 
 export async function fetchPortfolio(): Promise<PortfolioResponse> {
-  return apiFetch<PortfolioResponse>('/api/portfolio');
+  return apiGet<PortfolioResponse>('/api/portfolio');
 }
 
 export async function fetchTransactions(): Promise<Transaction[]> {

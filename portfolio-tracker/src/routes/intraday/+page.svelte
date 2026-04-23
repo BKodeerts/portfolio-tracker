@@ -65,7 +65,7 @@
     return 'badge-closed';
   }
 
-  const totalDayPl = $derived(portfolioStore.positions.reduce((s, p) => s + (p.dayPl ?? 0), 0));
+  const totalDayPl = $derived(cards().reduce((s, c) => s + (c.changeEur ?? 0), 0));
   const totalValue = $derived(portfolioStore.positions.reduce((s, p) => s + p.value, 0));
   const totalDayPlPct = $derived(totalValue - totalDayPl > 0 ? (totalDayPl / (totalValue - totalDayPl)) * 100 : 0);
 </script>

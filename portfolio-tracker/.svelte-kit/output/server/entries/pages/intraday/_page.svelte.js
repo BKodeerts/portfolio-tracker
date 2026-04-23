@@ -4,11 +4,7 @@ import { i as intradayStore, n as normalizeMarketState, a as isExchangeOpen, s a
 import "../../../chunks/theme.svelte.js";
 import { f as fmt, a as fmtPct } from "../../../chunks/fmt.js";
 import { P as PrivacyValue } from "../../../chunks/PrivacyValue.js";
-function html(value) {
-  var html2 = String(value ?? "");
-  var open = "<!---->";
-  return open + html2 + "<!---->";
-}
+import { h as html } from "../../../chunks/html.js";
 function _page($$renderer, $$props) {
   $$renderer.component(($$renderer2) => {
     const cards = derived(() => () => {
@@ -55,7 +51,7 @@ function _page($$renderer, $$props) {
       if (s === "PRE" || s === "POST") return "badge-ext";
       return "badge-closed";
     }
-    const totalDayPl = derived(() => portfolioStore.positions.reduce((s, p) => s + (p.dayPl ?? 0), 0));
+    const totalDayPl = derived(() => cards()().reduce((s, c) => s + (c.changeEur ?? 0), 0));
     const totalValue = derived(() => portfolioStore.positions.reduce((s, p) => s + p.value, 0));
     const totalDayPlPct = derived(() => totalValue() - totalDayPl() > 0 ? totalDayPl() / (totalValue() - totalDayPl()) * 100 : 0);
     $$renderer2.push(`<div class="page-root">`);

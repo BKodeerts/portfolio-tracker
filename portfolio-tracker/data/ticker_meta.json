@@ -1,0 +1,37 @@
+{
+  "ASTS": {
+    "quoteType": "EQUITY",
+    "sector": "Technology",
+    "industry": "Communication Equipment"
+  },
+  "IGL": {
+    "quoteType": "EQUITY"
+  },
+  "EUDF": {
+    "quoteType": "ETF"
+  },
+  "RKLB": {
+    "quoteType": "EQUITY",
+    "sector": "Industrials",
+    "industry": "Aerospace & Defense"
+  },
+  "LUNR": {
+    "quoteType": "EQUITY",
+    "sector": "Industrials",
+    "industry": "Aerospace & Defense"
+  },
+  "SMR": {
+    "quoteType": "EQUITY",
+    "sector": "Industrials",
+    "industry": "Specialty Industrial Machinery"
+  },
+  "IE00B5": {
+    "quoteType": "MUTUALFUND"
+  },
+  "SXRT": {
+    "quoteType": "ETF"
+  },
+  "PPFB": {
+    "quoteType": "EQUITY"
+  }
+}

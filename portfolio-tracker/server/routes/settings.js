@@ -3,6 +3,7 @@ const fs       = require('node:fs');
 const path     = require('node:path');
 const router   = express.Router();
 const { invalidatePortfolioCache } = require('./portfolio.js');
+const { FX_DEFS } = require('../portfolio.js');
 
 const DATA_DIR      = process.env.DATA_DIR || path.join(__dirname, '..', '..', 'data');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
@@ -15,8 +16,7 @@ const DEFAULTS = {
   pushPositions:             false,
 };
 
-// Must match the currencies supported in server/portfolio.js FX_DEFS plus EUR
-const VALID_CURRENCIES = new Set(['EUR', 'USD', 'GBP', 'GBX', 'CLP', 'CHF']);
+const VALID_CURRENCIES = new Set(['EUR', ...Object.keys(FX_DEFS)]);
 
 function readSettings() {
   try {

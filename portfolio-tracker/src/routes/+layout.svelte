@@ -11,12 +11,17 @@
   interface Props { children: import('svelte').Snippet }
   const { children }: Props = $props();
 
-  // Detail pages (stock/[ticker] and bonus/[id]) use their own back-nav header
-  const isDetailPage = $derived(
-    $page.url.pathname.startsWith('/stock/') ||
-    ($page.url.pathname.startsWith('/bonus/') && $page.url.pathname !== '/bonus'),
-  );
   const isSettingsPage = $derived($page.url.pathname === '/settings');
+
+  // Re-fetch intraday whenever the set of current tickers changes (e.g. after import)
+  let _lastTickerKey = '';
+  $effect(() => {
+    const key = portfolioStore.currentTickers.slice().sort().join(',');
+    if (key && key !== _lastTickerKey) {
+      _lastTickerKey = key;
+      intradayStore.load();
+    }
+  });
 
   onMount(() => {
     // Apply saved theme immediately
@@ -25,7 +30,6 @@
 
     // Boot: load portfolio data then start intraday auto-refresh
     portfolioStore.load().then(() => {
-      intradayStore.load();
       intradayStore.startAutoRefresh();
     });
 
@@ -41,11 +45,7 @@
 
     <div class="nav-with-controls">
       <div class="nav-slot">
-        {#if isDetailPage}
-          <!-- Back navigation rendered by the detail page itself -->
-        {:else}
-          <Nav />
-        {/if}
+        <Nav />
       </div>
 
       <div class="display-controls">

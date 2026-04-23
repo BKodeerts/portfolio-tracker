@@ -52,7 +52,7 @@
 
   // Allocation donut
   const allocationLabels = $derived(
-    portfolioStore.currentTickers.sort((a, b) =>
+    [...portfolioStore.currentTickers].sort((a, b) =>
       ((latest?.[b] as number) ?? 0) - ((latest?.[a] as number) ?? 0),
     ),
   );
@@ -167,6 +167,75 @@
     };
   });
 
+  // ── Annual P&L stacked bar chart ────────────────────────────────────────────
+
+  const annualOption = $derived((): EChartsOption => {
+    if (!portfolioStore.annualPl.length) return {};
+    const rows = [...portfolioStore.annualPl].sort((a, b) => a.year.localeCompare(b.year));
+    const isDark    = themeStore.isDark;
+    const textColor = isDark ? '#94a3b8' : '#64748b';
+    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    return {
+      backgroundColor: 'transparent',
+      grid: { top: 24, right: 16, bottom: 32, left: 64 },
+      legend: {
+        data: ['Gerealiseerd', 'Dividenden'],
+        textStyle: { color: textColor, fontSize: 11 },
+        itemWidth: 10, itemHeight: 10, top: 0,
+      },
+      xAxis: {
+        type: 'category',
+        data: rows.map((a) => a.year),
+        axisLabel: { color: textColor, fontSize: 10 },
+        axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+      },
+      yAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: gridColor } },
+        axisLabel: {
+          color: textColor, fontSize: 10,
+          formatter: (v: number) => themeStore.privacyMode ? '●●' : (Math.abs(v) >= 1000 ? `€${+(v / 1000).toFixed(0)}k` : `€${Math.round(v)}`),
+        },
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        backgroundColor: isDark ? '#1e293b' : '#ffffff',
+        borderColor: isDark ? '#334155' : '#e2e8f0',
+        borderWidth: 1,
+        textStyle: { fontSize: 11, color: isDark ? '#e2e8f0' : '#1c1c1c' },
+        formatter: (params: any) => {
+          const arr = params as any[];
+          const year = arr[0]?.name ?? '';
+          const lines = arr
+            .filter((p) => p.value !== 0 && p.value != null)
+            .map((p) => `${p.marker}${p.seriesName}: ${themeStore.privacyMode ? '●●●' : fmt(p.value)}`);
+          const total = arr.reduce((s, p) => s + (p.value ?? 0), 0);
+          lines.push(`<b>Totaal: ${themeStore.privacyMode ? '●●●' : fmt(total)}</b>`);
+          return `${year}<br>${lines.join('<br>')}`;
+        },
+      },
+      series: [
+        {
+          name: 'Gerealiseerd',
+          type: 'bar',
+          stack: 'pl',
+          data: rows.map((a) => ({
+            value: a.realizedPl,
+            itemStyle: { color: a.realizedPl >= 0 ? '#4ade80' : '#f87171' },
+          })),
+        },
+        {
+          name: 'Dividenden',
+          type: 'bar',
+          stack: 'pl',
+          data: rows.map((a) => a.dividends),
+          itemStyle: { color: '#818cf8' },
+        },
+      ],
+    };
+  });
+
   // ── Benchmark chart ──────────────────────────────────────────────────────────
 
   const benchmarkOption = $derived((): EChartsOption => {
@@ -261,47 +330,6 @@
     };
   });
 
-  // ── Annual P&L bar chart ────────────────────────────────────────────────────
-
-  const annualOption = $derived((): EChartsOption => {
-    if (!portfolioStore.annualPl.length) return {};
-    const isDark    = themeStore.isDark;
-    const textColor = isDark ? '#94a3b8' : '#64748b';
-    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-    return {
-      backgroundColor: 'transparent',
-      grid: { top: 16, right: 16, bottom: 32, left: 64 },
-      xAxis: {
-        type: 'category',
-        data: portfolioStore.annualPl.map((a) => String(a.year)),
-        axisLabel: { color: textColor, fontSize: 10 },
-        axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
-      },
-      yAxis: {
-        type: 'value',
-        splitLine: { lineStyle: { color: gridColor } },
-        axisLabel: {
-          color: textColor, fontSize: 10,
-          formatter: (v: number) => themeStore.privacyMode ? '●●' : (Math.abs(v) >= 1000 ? `€${+(v / 1000).toFixed(0)}k` : `€${Math.round(v)}`),
-        },
-      },
-      tooltip: {
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-        borderColor: isDark ? '#334155' : '#e2e8f0',
-        borderWidth: 1,
-        textStyle: { fontSize: 11, color: isDark ? '#e2e8f0' : '#1c1c1c' },
-        formatter: (p: any) =>
-          `${p.name}: ${themeStore.privacyMode ? '●●●' : fmt(p.value)}`,
-      },
-      series: [{
-        type: 'bar',
-        data: portfolioStore.annualPl.map((a) => ({
-          value: a.pl,
-          itemStyle: { color: a.pl >= 0 ? '#4ade80' : '#f87171', borderRadius: a.pl >= 0 ? [3, 3, 0, 0] : [0, 0, 3, 3] },
-        })),
-      }],
-    };
-  });
 </script>
 
 <div class="page-root">
@@ -496,7 +524,7 @@
   {#if portfolioStore.annualPl.length > 0}
     <div class="card chart-card" style="margin-top:16px">
       <div class="card-title" style="padding:12px 16px">Jaarlijks resultaat</div>
-      <Chart option={annualOption()} height="200px" />
+      <Chart option={annualOption()} height="220px" />
     </div>
   {/if}
 </div>

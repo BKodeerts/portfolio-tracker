@@ -1,0 +1,15 @@
+[
+  {
+    "id": "1a9bb2bc-20ef-4135-949d-4203370afaef",
+    "label": "Optiniti",
+    "symbol": "SC0D.DE",
+    "quantity": 405,
+    "grantDate": "2026-03-17",
+    "grantPrice": 10.05,
+    "type": "call_option",
+    "strikePrice": 160,
+    "ratio": 1,
+    "expiryDate": "2036-03-17",
+    "taxRate": 53.5
+  }
+]

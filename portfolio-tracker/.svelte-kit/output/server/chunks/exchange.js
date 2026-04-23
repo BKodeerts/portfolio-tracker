@@ -16,7 +16,10 @@ function createIntradayStore() {
     const tickers = portfolioStore.currentTickers;
     if (tickers.length === 0) return;
     const yahooSymbols = tickers.map((t) => portfolioStore.tickerMeta[t]?.["yahoo"] ?? t).filter(Boolean);
-    const symbols = [.../* @__PURE__ */ new Set([...yahooSymbols, "EURUSD=X"])];
+    const watchlistSymbols = portfolioStore.watchlistData.map((w) => w.yahoo).filter(Boolean);
+    const symbols = [
+      .../* @__PURE__ */ new Set([...yahooSymbols, ...watchlistSymbols, "EURUSD=X"])
+    ];
     try {
       const result = await fetchIntraday(symbols, force);
       data = { ...data, ...result };
@@ -82,6 +85,7 @@ const EXCHANGE_DEFS = {
   ".MX": { label: "BMV", tz: "America/Mexico_City", open: [8, 30], close: [15, 0] }
 };
 function yahooSuffix(symbol) {
+  if (!symbol) return "";
   const m = symbol.match(/\.([A-Z]{1,2})$/i);
   return m?.[1] ? `.${m[1].toUpperCase()}` : "";
 }

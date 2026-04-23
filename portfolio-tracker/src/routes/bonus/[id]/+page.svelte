@@ -118,7 +118,7 @@
         },
       },
       series: [{
-        name: item?.underlying ?? '',
+        name: item?.symbol ?? '',
         type: 'line',
         data: withUnderlying.map((p) => +((p.underlyingPrice! / first - 1) * 100).toFixed(2)),
         smooth: false, symbol: 'none', connectNulls: true,
@@ -127,17 +127,6 @@
     };
   });
 </script>
-
-<!-- Back nav header (replaces layout nav for detail pages) -->
-<header class="detail-header">
-  <a href="/bonus" class="back-btn">← Bonus</a>
-  {#if item}
-    <span class="detail-title">{item.label}</span>
-    <span class="type-badge" class:call={item.type === 'call_option'}>
-      {item.type === 'call_option' ? 'Call optie' : 'Warrant'}
-    </span>
-  {/if}
-</header>
 
 <div class="page-root">
   {#if !item}
@@ -180,16 +169,16 @@
         <div class="stat-label">Aantal</div>
         <div class="stat-val"><PrivacyValue value={String(item.quantity)} /></div>
       </div>
-      {#if item.expiry}
+      {#if item.expiryDate}
         <div class="stat">
           <div class="stat-label">Vervaldatum</div>
-          <div class="stat-val mono">{item.expiry}</div>
+          <div class="stat-val mono">{item.expiryDate}</div>
         </div>
       {/if}
-      {#if item.strike}
+      {#if item.strikePrice}
         <div class="stat">
           <div class="stat-label">Strike</div>
-          <div class="stat-val mono">{item.strike}</div>
+          <div class="stat-val mono">{item.strikePrice}</div>
         </div>
       {/if}
       {#if item.intrinsicValue != null}
@@ -256,7 +245,7 @@
     {#if history.some((p) => p.underlyingPrice != null)}
       <div class="card chart-card" style="margin-top:12px">
         <div class="chart-header">
-          <span class="card-title">Onderliggende ({item.underlying})</span>
+          <span class="card-title">Onderliggende ({item.symbol})</span>
         </div>
         <Chart option={underlyingOption()} height="200px" />
       </div>
@@ -265,33 +254,6 @@
 </div>
 
 <style>
-  .detail-header {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
-    background: var(--bg-solid, var(--card-bg));
-    border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
-  }
-  .back-btn {
-    text-decoration: none;
-    color: var(--fg-muted);
-    font-size: 13px;
-    white-space: nowrap;
-  }
-  .back-btn:hover { color: var(--fg); }
-  .detail-title { font-size: 15px; font-weight: 700; flex: 1; }
-  .type-badge {
-    font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
-    text-transform: uppercase; padding: 2px 6px; border-radius: 3px;
-    background: rgba(100,116,139,0.15); color: #64748b;
-  }
-  .type-badge.call { background: rgba(167,139,250,0.15); color: #a78bfa; }
-
   .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));

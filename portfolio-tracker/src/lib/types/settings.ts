@@ -3,6 +3,6 @@ export interface Settings {
   watchlist: string[];
   intradayDuringMarketHours: boolean;
   pushInterval: number;
-  pushPositions: 'none' | 'all' | 'select';
-  pushTickers?: string[];
+  /** false = disabled, ["*"] = all tickers, ["ASTS", ...] = specific tickers */
+  pushPositions: false | string[];
 }

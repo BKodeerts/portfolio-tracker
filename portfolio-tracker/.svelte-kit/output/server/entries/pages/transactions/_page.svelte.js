@@ -1,5 +1,4 @@
 import { a as attr, c as escape_html, e as ensure_array_like, b as attr_class, ad as clsx, f as derived } from "../../../chunks/renderer.js";
-import "../../../chunks/constants.js";
 import { f as fmt } from "../../../chunks/fmt.js";
 function _page($$renderer, $$props) {
   $$renderer.component(($$renderer2) => {
@@ -15,7 +14,7 @@ function _page($$renderer, $$props) {
       if (t.shares === 0) return "c-neutral";
       return t.shares > 0 ? "c-pos" : "c-neg";
     }
-    $$renderer2.push(`<div class="page-root"><div class="tx-toolbar svelte-1q0dtg6"><input class="search-input svelte-1q0dtg6" type="text" placeholder="Zoek ticker, ISIN…"${attr("value", search)}/> <button class="btn">${escape_html("+ Transactie")}</button> `);
+    $$renderer2.push(`<div class="page-root"><div class="tx-toolbar svelte-1q0dtg6"><input class="search-input svelte-1q0dtg6" type="text" placeholder="Zoek ticker, ISIN…"${attr("value", search)}/> <button class="btn">${escape_html("+ Transactie")}</button> <a href="/import" class="btn">CSV importeren</a> `);
     {
       $$renderer2.push("<!--[-1-->");
     }

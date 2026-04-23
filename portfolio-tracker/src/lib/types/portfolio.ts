@@ -44,9 +44,10 @@ export interface RollingReturn {
 }
 
 export interface AnnualPl {
-  year: number;
-  pl: number;
-  invested: number;
+  year: string;
+  realizedPl: number;
+  dividends: number;
+  total: number;
 }
 
 export interface WatchlistEntry {

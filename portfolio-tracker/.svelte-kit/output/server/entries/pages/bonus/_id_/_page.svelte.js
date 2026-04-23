@@ -128,7 +128,7 @@ function _page($$renderer, $$props) {
         },
         series: [
           {
-            name: item()?.underlying ?? "",
+            name: item()?.symbol ?? "",
             type: "line",
             data: withUnderlying.map((p) => +((p.underlyingPrice / first - 1) * 100).toFixed(2)),
             smooth: false,
@@ -186,16 +186,16 @@ function _page($$renderer, $$props) {
       $$renderer2.push(`<!--]--></div></div> <div class="stat svelte-1lko5y8"><div class="stat-label svelte-1lko5y8">Huidig / toekenning</div> <div class="stat-val mono svelte-1lko5y8">${escape_html((item().currentPrice ?? item().grantPrice).toFixed(2))} / ${escape_html(item().grantPrice.toFixed(2))}</div></div> <div class="stat svelte-1lko5y8"><div class="stat-label svelte-1lko5y8">Aantal</div> <div class="stat-val svelte-1lko5y8">`);
       PrivacyValue($$renderer2, { value: String(item().quantity) });
       $$renderer2.push(`<!----></div></div> `);
-      if (item().expiry) {
+      if (item().expiryDate) {
         $$renderer2.push("<!--[0-->");
-        $$renderer2.push(`<div class="stat svelte-1lko5y8"><div class="stat-label svelte-1lko5y8">Vervaldatum</div> <div class="stat-val mono svelte-1lko5y8">${escape_html(item().expiry)}</div></div>`);
+        $$renderer2.push(`<div class="stat svelte-1lko5y8"><div class="stat-label svelte-1lko5y8">Vervaldatum</div> <div class="stat-val mono svelte-1lko5y8">${escape_html(item().expiryDate)}</div></div>`);
       } else {
         $$renderer2.push("<!--[-1-->");
       }
       $$renderer2.push(`<!--]--> `);
-      if (item().strike) {
+      if (item().strikePrice) {
         $$renderer2.push("<!--[0-->");
-        $$renderer2.push(`<div class="stat svelte-1lko5y8"><div class="stat-label svelte-1lko5y8">Strike</div> <div class="stat-val mono svelte-1lko5y8">${escape_html(item().strike)}</div></div>`);
+        $$renderer2.push(`<div class="stat svelte-1lko5y8"><div class="stat-label svelte-1lko5y8">Strike</div> <div class="stat-val mono svelte-1lko5y8">${escape_html(item().strikePrice)}</div></div>`);
       } else {
         $$renderer2.push("<!--[-1-->");
       }
@@ -298,7 +298,7 @@ function _page($$renderer, $$props) {
       $$renderer2.push(`<!--]--></div> `);
       if (history.some((p) => p.underlyingPrice != null)) {
         $$renderer2.push("<!--[0-->");
-        $$renderer2.push(`<div class="card chart-card" style="margin-top:12px"><div class="chart-header svelte-1lko5y8"><span class="card-title">Onderliggende (${escape_html(item().underlying)})</span></div> `);
+        $$renderer2.push(`<div class="card chart-card" style="margin-top:12px"><div class="chart-header svelte-1lko5y8"><span class="card-title">Onderliggende (${escape_html(item().symbol)})</span></div> `);
         Chart($$renderer2, { option: underlyingOption()(), height: "200px" });
         $$renderer2.push(`<!----></div>`);
       } else {

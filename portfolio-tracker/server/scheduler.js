@@ -28,7 +28,7 @@ async function writeEodCache() {
       : {};
     const yahooSymbols = [...new Set(transactions.map(t => meta[t.ticker]?.yahoo || t.yahoo || t.ticker).filter(Boolean))];
     if (!yahooSymbols.length) return;
-    const today = new Date().toLocaleDateString('sv-SE');
+    const today = new Date().toISOString().slice(0, 10);
     for (let i = 0; i < yahooSymbols.length; i++) {
       const sym = yahooSymbols[i];
       const existing = readCache(`eod_intraday_${sym}`, 24 * 60 * 60 * 1000);

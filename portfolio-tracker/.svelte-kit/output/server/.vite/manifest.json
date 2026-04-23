@@ -25,9 +25,9 @@
       "_theme.svelte.js"
     ]
   },
-  "_constants.js": {
-    "file": "chunks/constants.js",
-    "name": "constants"
+  "_color.js": {
+    "file": "chunks/color.js",
+    "name": "color"
   },
   "_environment.js": {
     "file": "chunks/environment.js",
@@ -48,6 +48,10 @@
     "file": "chunks/fmt.js",
     "name": "fmt"
   },
+  "_html.js": {
+    "file": "chunks/html.js",
+    "name": "html"
+  },
   "_index.js": {
     "file": "chunks/index.js",
     "name": "index",
@@ -63,16 +67,11 @@
       "_environment.js"
     ]
   },
-  "_period.js": {
-    "file": "chunks/period.js",
-    "name": "period"
-  },
   "_portfolio.svelte.js": {
     "file": "chunks/portfolio.svelte.js",
     "name": "portfolio.svelte",
     "imports": [
-      "_renderer.js",
-      "_constants.js"
+      "_renderer.js"
     ]
   },
   "_render-context.js": {
@@ -186,7 +185,7 @@
       "_PrivacyValue.js"
     ],
     "css": [
-      "_app/immutable/assets/_layout.BNkbbNt6.css"
+      "_app/immutable/assets/_layout.CKRuLSdm.css"
     ]
   },
   "src/routes/+layout.ts": {
@@ -203,14 +202,16 @@
     "imports": [
       "_renderer.js",
       "_portfolio.svelte.js",
+      "_exchange.js",
       "_theme.svelte.js",
       "_fmt.js",
-      "_period.js",
+      "_color.js",
       "_PrivacyValue.js",
-      "_Chart.js"
+      "_Chart.js",
+      "_html.js"
     ],
     "css": [
-      "_app/immutable/assets/_page.VppseFWN.css"
+      "_app/immutable/assets/_page.LZKB48gr.css"
     ]
   },
   "src/routes/analysis/+page.svelte": {
@@ -223,7 +224,7 @@
       "_portfolio.svelte.js",
       "_theme.svelte.js",
       "_fmt.js",
-      "_period.js",
+      "_color.js",
       "_Chart.js",
       "_PrivacyValue.js"
     ],
@@ -288,7 +289,8 @@
       "_exchange.js",
       "_theme.svelte.js",
       "_fmt.js",
-      "_PrivacyValue.js"
+      "_PrivacyValue.js",
+      "_html.js"
     ],
     "css": [
       "_app/immutable/assets/_page.DtpX9Tv8.css"
@@ -300,8 +302,7 @@
     "src": "src/routes/settings/+page.svelte",
     "isEntry": true,
     "imports": [
-      "_theme.svelte.js",
-      "_constants.js"
+      "_theme.svelte.js"
     ],
     "css": [
       "_app/immutable/assets/_page.CuSzL9gL.css"
@@ -319,11 +320,12 @@
       "_exchange.js",
       "_theme.svelte.js",
       "_fmt.js",
+      "_color.js",
       "_Chart.js",
       "_PrivacyValue.js"
     ],
     "css": [
-      "_app/immutable/assets/_page.DO1LRKl2.css"
+      "_app/immutable/assets/_page.DFVF0Ae1.css"
     ]
   },
   "src/routes/transactions/+page.svelte": {
@@ -333,7 +335,6 @@
     "isEntry": true,
     "imports": [
       "_renderer.js",
-      "_constants.js",
       "_fmt.js"
     ],
     "css": [
