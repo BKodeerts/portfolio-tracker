@@ -2,588 +2,491 @@
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { themeStore } from '$lib/stores/theme.svelte';
   import { fmt, fmtPct, fmtNum } from '$lib/utils/fmt';
-  import { filterByPeriod } from '$lib/utils/period';
   import { getColor } from '$lib/utils/color';
   import Chart from '$lib/components/Chart.svelte';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
-  import type { Period } from '$lib/utils/period';
   import type { EChartsOption } from 'echarts';
 
-  type BenchmarkToggle = 'vwce' | 'sp500' | 'both';
+  const SECTOR_COLORS = ['var(--accent)','#8b5cf6','#14b8a6','#f59e0b','#ec4899','#10b981','#f97316','#06b6d4','#e11d48','#84cc16'];
+  const GEO_COLORS    = ['var(--accent)','#8b5cf6','#14b8a6','#f59e0b','#ec4899','#10b981','#f97316'];
+  const CCY_COLORS    = ['var(--accent)','#8b5cf6','#14b8a6','#f59e0b','#ec4899','#10b981','#f97316'];
 
-  let analysePeriod = $state<Period>('total');
+  function chartColors() {
+    const isDark = themeStore.isDark;
+    return {
+      text:        isDark ? '#8b929c' : '#6a6f78',
+      grid:        isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+      tooltipBg:   isDark ? '#15181c' : '#ffffff',
+      tooltipBord: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(16,18,22,0.12)',
+      tooltipText: isDark ? '#f2f4f7' : '#101216',
+      posBar:      isDark ? '#34d399' : '#047857',
+      negBar:      isDark ? '#f87171' : '#b91c1c',
+    };
+  }
 
-  const SECTOR_COLORS  = ['#818cf8','#34d399','#fbbf24','#f87171','#60a5fa','#a78bfa','#fb923c','#4ade80','#38bdf8','#f472b6'];
-  const PALETTE        = ['#fbbf24','#818cf8','#34d399','#f87171','#60a5fa','#a78bfa','#fb923c','#4ade80','#f472b6','#22d3ee'];
+  // ── KPI values ───────────────────────────────────────────────────────────────
 
-  const PERIODS: { key: Period; label: string }[] = [
-    { key: '1m', label: '1M' }, { key: '3m', label: '3M' }, { key: '6m', label: '6M' },
-    { key: 'ytd', label: 'YTD' }, { key: '1y', label: '1Y' }, { key: '2y', label: '2Y' },
-    { key: '3y', label: '3Y' }, { key: 'total', label: 'Max' },
+  const startYear = $derived(() => {
+    const d = portfolioStore.chartData[0];
+    return d ? new Date(d.date as string).getFullYear() : null;
+  });
+
+  const totalValue = $derived(portfolioStore.positions.reduce((s, p) => s + p.value, 0));
+
+  const twr = $derived(() => {
+    const cost = portfolioStore.totalInvested;
+    if (cost <= 0) return null;
+    return ((totalValue - cost) / cost) * 100;
+  });
+
+  const rm = $derived(portfolioStore.riskMetrics);
+
+  // ── Rolling returns chart ────────────────────────────────────────────────────
+
+  // Backend keys: '1w', '1m', '3m', 'ytd', '1y', 'inception'
+  const PERIOD_ORDER: Array<[string, string]> = [
+    ['1w', '1W'], ['1m', '1M'], ['3m', '3M'], ['ytd', 'YTD'], ['1y', '1Y'], ['inception', 'Max'],
   ];
+
+  const orderedRolling = $derived(() => {
+    const rr = portfolioStore.rollingReturns;
+    if (!rr) return [];
+    return PERIOD_ORDER
+      .map(([key, label]) => {
+        const r = rr[key];
+        return r && r.portfolio != null ? { period: label, portfolio: r.portfolio, vwce: r.vwce } : null;
+      })
+      .filter((r): r is NonNullable<typeof r> => r != null);
+  });
+
+  const rollingChartOption = $derived((): EChartsOption => {
+    const rows = orderedRolling();
+    if (!rows.length) return {};
+    const { text, grid, posBar, negBar } = chartColors();
+    const values = rows.map((r) => +(r.portfolio ?? 0));
+    return {
+      backgroundColor: 'transparent',
+      grid: { top: 36, right: 12, bottom: 24, left: 44, containLabel: false },
+      xAxis: {
+        type: 'category',
+        data: rows.map((r) => r.period),
+        axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+        axisLabel: { color: text, fontSize: 10 },
+      },
+      yAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: grid } },
+        axisLabel: { color: text, fontSize: 10, formatter: (v: number) => `${v.toFixed(0)}%` },
+      },
+      tooltip: { show: false },
+      series: [{
+        type: 'bar',
+        barMaxWidth: 36,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: values.map((v) => ({
+          value: v,
+          itemStyle: { color: v >= 0 ? posBar : negBar, borderRadius: v >= 0 ? [3, 3, 0, 0] : [0, 0, 3, 3] },
+          label: {
+            show: true,
+            position: v >= 0 ? 'top' : 'bottom',
+            color: v >= 0 ? posBar : negBar,
+            fontSize: 9,
+            fontWeight: 600,
+            formatter: () => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`,
+          },
+        })),
+      }],
+    };
+  });
+
+  // ── Risk profile bars ────────────────────────────────────────────────────────
+
+  const riskBars = $derived(() => {
+    if (!rm) return [];
+    const isDark = themeStore.isDark;
+    const pos  = isDark ? '#34d399' : '#047857';
+    const neg  = isDark ? '#f87171' : '#b91c1c';
+    const neu  = isDark ? '#8b929c' : '#6a6f78';
+    const acc  = isDark ? '#818cf8' : '#6366f1';
+    const bars = [];
+    if (rm.volatility != null)
+      bars.push({ label: 'Volatiliteit (1J)', display: fmtPct(rm.volatility), barPct: Math.min(100, Math.abs(rm.volatility) / 130 * 100), color: neg });
+    if (rm.beta != null)
+      bars.push({ label: 'Beta', display: fmtNum(rm.beta), barPct: Math.min(100, Math.abs(rm.beta) / 2 * 100), color: acc });
+    if (rm.sharpe != null)
+      bars.push({ label: 'Sharpe', display: fmtNum(rm.sharpe), barPct: Math.min(100, Math.max(0, rm.sharpe) / 3 * 100), color: rm.sharpe >= 1 ? pos : neu });
+    if (portfolioStore.irrPct != null)
+      bars.push({ label: 'Annual return', display: fmtPct(portfolioStore.irrPct), barPct: Math.min(100, Math.abs(portfolioStore.irrPct) / 100 * 100), color: portfolioStore.irrPct >= 0 ? pos : neg });
+    return bars;
+  });
+
+  // ── Risk narrative ────────────────────────────────────────────────────────────
+
+  const riskNarrative = $derived(() => {
+    if (!rm) return '';
+    const parts: string[] = [];
+    if (rm.sharpe != null) parts.push(rm.sharpe > 1 ? 'Hoog rendement' : rm.sharpe < 0.5 ? 'Laag rendement' : 'Gemiddeld rendement');
+    if (rm.volatility != null) parts.push(rm.volatility > 30 ? 'hoge volatiliteit' : rm.volatility < 10 ? 'lage volatiliteit' : 'gemiddelde volatiliteit');
+    const top3 = [...portfolioStore.positions].sort((a, b) => b.value - a.value).slice(0, 3);
+    const top3val = top3.reduce((s, p) => s + p.value, 0);
+    const conc = totalValue > 0 ? Math.round(top3val / totalValue * 100) : 0;
+    if (conc > 50 && top3.length >= 3) parts.push(`Concentratierisico: ${conc}% van portefeuille in ${top3.length} namen`);
+    if (!parts.length) return '';
+    return parts.join(', ') + '.';
+  });
+
+  // ── Allocation panels ────────────────────────────────────────────────────────
 
   const latest = $derived(portfolioStore.chartData[portfolioStore.chartData.length - 1]);
 
-  // ── Donut helpers ────────────────────────────────────────────────────────────
-
-  function donutOption(labels: string[], values: number[], colors: string[]): EChartsOption {
-    const total = values.reduce((a, b) => a + b, 0);
-    const isDark = themeStore.isDark;
-    return {
-      backgroundColor: 'transparent',
-      series: [{
-        type: 'pie',
-        radius: ['58%', '80%'],
-        avoidLabelOverlap: false,
-        label: { show: false },
-        emphasis: { scale: false },
-        data: labels.map((l, i) => ({ name: l, value: values[i]!, itemStyle: { color: colors[i % colors.length]! } })),
-      }],
-      tooltip: {
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-        borderColor: isDark ? '#334155' : '#e2e8f0',
-        borderWidth: 1,
-        textStyle: { color: isDark ? '#e2e8f0' : '#1c1c1c', fontSize: 11 },
-        formatter: (p: any) =>
-          `${p.name}: ${themeStore.privacyMode ? '●●●' : fmt(p.value)} (${total > 0 ? (p.value / total * 100).toFixed(1) : 0}%)`,
-      },
-    };
+  function toAllocItems(map: Record<string, number>, colors: string[]) {
+    const total = Object.values(map).reduce((a, b) => a + b, 0) || 1;
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, val], i) => ({ name, pct: val / total * 100, color: colors[i % colors.length]! }));
   }
 
-  // Allocation donut
-  const allocationLabels = $derived(
-    [...portfolioStore.currentTickers].sort((a, b) =>
-      ((latest?.[b] as number) ?? 0) - ((latest?.[a] as number) ?? 0),
-    ),
-  );
-  const allocationValues = $derived(allocationLabels.map((t) => (latest?.[t] as number | undefined) ?? 0));
-  const allocationColors = $derived(allocationLabels.map((t) => getColor(t)));
-  const allocationOption = $derived(donutOption(allocationLabels, allocationValues, allocationColors));
-
-  // Sector donut
-  const sectorData = $derived(() => {
-    if (!latest) return { labels: [], values: [], colors: [] };
+  const sectorItems = $derived(() => {
+    if (!latest) return [];
     const map: Record<string, number> = {};
     for (const t of portfolioStore.currentTickers) {
-      const sector = (portfolioStore.tickerMeta[t]?.['sector'] as string | undefined) ?? 'Overig';
-      map[sector] = (map[sector] ?? 0) + ((latest[t] as number | undefined) ?? 0);
+      const s = (portfolioStore.tickerMeta[t]?.['sector'] as string | undefined) ?? 'Overig';
+      map[s] = (map[s] ?? 0) + ((latest[t] as number | undefined) ?? 0);
     }
-    const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
-    return {
-      labels: sorted.map(([s]) => s),
-      values: sorted.map(([, v]) => v),
-      colors: sorted.map((_, i) => SECTOR_COLORS[i % SECTOR_COLORS.length]!),
-    };
+    return toAllocItems(map, SECTOR_COLORS);
   });
-  const sectorOption = $derived(donutOption(sectorData().labels, sectorData().values, sectorData().colors));
 
-  // Geography donut
-  const geoData = $derived(() => {
-    if (!latest) return { labels: [], values: [], colors: [] };
+  const geoItems = $derived(() => {
+    if (!latest) return [];
     const map: Record<string, number> = {};
     for (const t of portfolioStore.currentTickers) {
-      const geo = (portfolioStore.tickerMeta[t]?.['geo'] as string | undefined) ?? 'Overig';
-      map[geo] = (map[geo] ?? 0) + ((latest[t] as number | undefined) ?? 0);
+      const g = (portfolioStore.tickerMeta[t]?.['geo'] as string | undefined) ?? 'Overig';
+      map[g] = (map[g] ?? 0) + ((latest[t] as number | undefined) ?? 0);
     }
-    const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
-    return {
-      labels: sorted.map(([g]) => g),
-      values: sorted.map(([, v]) => v),
-      colors: sorted.map((_, i) => PALETTE[i % PALETTE.length]!),
-    };
+    return toAllocItems(map, GEO_COLORS);
   });
-  const geoOption = $derived(donutOption(geoData().labels, geoData().values, geoData().colors));
 
-  // Currency donut
-  const currencyData = $derived(() => {
-    const exp = portfolioStore.currencyExposure;
-    if (Object.keys(exp).length === 0) {
+  const currencyItems = $derived(() => {
+    const exp = portfolioStore.currencyExposure ?? {};
+    if (!Object.keys(exp).length) {
       const usd = portfolioStore.usdExposurePct ?? 0;
-      return { labels: ['USD', 'EUR'], values: [usd, 100 - usd], colors: [PALETTE[0]!, PALETTE[1]!] };
+      return [
+        { name: 'USD', pct: usd,       color: CCY_COLORS[0]! },
+        { name: 'EUR', pct: 100 - usd, color: CCY_COLORS[1]! },
+      ];
     }
-    const sorted = Object.entries(exp).sort((a, b) => b[1] - a[1]);
-    return {
-      labels: sorted.map(([c]) => c),
-      values: sorted.map(([, v]) => v),
-      colors: sorted.map((_, i) => PALETTE[i % PALETTE.length]!),
-    };
-  });
-  const currencyOption = $derived(donutOption(currencyData().labels, currencyData().values, currencyData().colors));
-
-  // ── Bar chart ────────────────────────────────────────────────────────────────
-
-  const barOption = $derived((): EChartsOption => {
-    if (!latest) return {};
-    const tickers = [...portfolioStore.currentTickers].sort((a, b) =>
-      ((latest[b] as number | undefined) ?? 0) - ((latest[a] as number | undefined) ?? 0),
-    );
-    const isDark = themeStore.isDark;
-    const textColor = isDark ? '#94a3b8' : '#64748b';
-    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-    return {
-      backgroundColor: 'transparent',
-      grid: { top: 8, right: 16, bottom: 8, left: 16, containLabel: true },
-      xAxis: {
-        type: 'value',
-        splitLine: { lineStyle: { color: gridColor } },
-        axisLabel: {
-          color: textColor, fontSize: 10,
-          formatter: (v: number) => themeStore.privacyMode ? '●●' : `€${Math.round(v / 1000)}k`,
-        },
-      },
-      yAxis: {
-        type: 'category',
-        data: tickers,
-        axisLabel: { color: textColor, fontSize: 11 },
-        splitLine: { show: false },
-      },
-      tooltip: {
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-        borderColor: isDark ? '#334155' : '#e2e8f0',
-        borderWidth: 1,
-        textStyle: { color: isDark ? '#e2e8f0' : '#1c1c1c', fontSize: 11 },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        formatter: (params: any) =>
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (params as any[]).map((p: any) => `${p.marker}${p.seriesName}: ${themeStore.privacyMode ? '●●●' : fmt(p.value)}`).join('<br>'),
-      },
-      series: [
-        {
-          name: 'Geïnvesteerd',
-          type: 'bar',
-          data: tickers.map((t) => (latest[`${t}_cost`] as number | undefined) ?? 0),
-          itemStyle: { color: isDark ? 'rgba(71,85,105,0.6)' : 'rgba(148,163,184,0.5)', borderRadius: [0, 3, 3, 0] },
-        },
-        {
-          name: 'Huidig',
-          type: 'bar',
-          data: tickers.map((t) => (latest[t] as number | undefined) ?? 0),
-          itemStyle: {
-            color: (p: { dataIndex: number }) => getColor(tickers[p.dataIndex]!) + 'CC',
-            borderRadius: [0, 3, 3, 0],
-          },
-        },
-      ],
-    };
+    return toAllocItems(exp, CCY_COLORS);
   });
 
-  // ── Annual P&L stacked bar chart ────────────────────────────────────────────
+  // ── Contribution to return ───────────────────────────────────────────────────
 
-  const annualOption = $derived((): EChartsOption => {
-    if (!portfolioStore.annualPl.length) return {};
-    const rows = [...portfolioStore.annualPl].sort((a, b) => a.year.localeCompare(b.year));
-    const isDark    = themeStore.isDark;
-    const textColor = isDark ? '#94a3b8' : '#64748b';
-    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-    return {
-      backgroundColor: 'transparent',
-      grid: { top: 24, right: 16, bottom: 32, left: 64 },
-      legend: {
-        data: ['Gerealiseerd', 'Dividenden'],
-        textStyle: { color: textColor, fontSize: 11 },
-        itemWidth: 10, itemHeight: 10, top: 0,
-      },
-      xAxis: {
-        type: 'category',
-        data: rows.map((a) => a.year),
-        axisLabel: { color: textColor, fontSize: 10 },
-        axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
-      },
-      yAxis: {
-        type: 'value',
-        splitLine: { lineStyle: { color: gridColor } },
-        axisLabel: {
-          color: textColor, fontSize: 10,
-          formatter: (v: number) => themeStore.privacyMode ? '●●' : (Math.abs(v) >= 1000 ? `€${+(v / 1000).toFixed(0)}k` : `€${Math.round(v)}`),
-        },
-      },
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-        borderColor: isDark ? '#334155' : '#e2e8f0',
-        borderWidth: 1,
-        textStyle: { fontSize: 11, color: isDark ? '#e2e8f0' : '#1c1c1c' },
-        formatter: (params: any) => {
-          const arr = params as any[];
-          const year = arr[0]?.name ?? '';
-          const lines = arr
-            .filter((p) => p.value !== 0 && p.value != null)
-            .map((p) => `${p.marker}${p.seriesName}: ${themeStore.privacyMode ? '●●●' : fmt(p.value)}`);
-          const total = arr.reduce((s, p) => s + (p.value ?? 0), 0);
-          lines.push(`<b>Totaal: ${themeStore.privacyMode ? '●●●' : fmt(total)}</b>`);
-          return `${year}<br>${lines.join('<br>')}`;
-        },
-      },
-      series: [
-        {
-          name: 'Gerealiseerd',
-          type: 'bar',
-          stack: 'pl',
-          data: rows.map((a) => ({
-            value: a.realizedPl,
-            itemStyle: { color: a.realizedPl >= 0 ? '#4ade80' : '#f87171' },
-          })),
-        },
-        {
-          name: 'Dividenden',
-          type: 'bar',
-          stack: 'pl',
-          data: rows.map((a) => a.dividends),
-          itemStyle: { color: '#818cf8' },
-        },
-      ],
-    };
+  const contributionItems = $derived(() => {
+    const positions = portfolioStore.positions;
+    if (!positions.length) return [];
+    const maxAbs = Math.max(...positions.map((p) => Math.abs(p.pl)), 1);
+    return [...positions]
+      .sort((a, b) => b.pl - a.pl)
+      .map((p) => ({
+        ticker: p.ticker,
+        pl: p.pl,
+        plPct: p.plPct,
+        barPct: Math.abs(p.pl) / maxAbs * 78,
+      }));
   });
 
-  // ── Benchmark chart ──────────────────────────────────────────────────────────
-
-  const benchmarkOption = $derived((): EChartsOption => {
-    const filtered = filterByPeriod(portfolioStore.chartData, analysePeriod);
-    if (filtered.length < 2) return {};
-
-    const vwceMap  = Object.fromEntries(portfolioStore.benchmarkData.map((b) => [b.date, b.value]));
-    const sp500Map = Object.fromEntries(portfolioStore.sp500Data.map((b) => [b.date, b.value]));
-    const ab = portfolioStore.activeBenchmark;
-
-    const first = filtered[0]!;
-    const startDate   = first.date;
-    const startCost   = (first.invested as number | undefined) ?? 1;
-    const startTotal  = (first.value as number | undefined) ?? 0;
-    const baseReturn  = startCost > 0 ? startTotal / startCost : 1;
-
-    const vwceBase  = vwceMap[startDate] ?? null;
-    const sp500Base = sp500Map[startDate] ?? null;
-
-    const portfolioPoints: [string, number][] = [[startDate, 0]];
-    const vwcePoints: [string, number | null][] = [[startDate, 0]];
-    const sp500Points: [string, number | null][] = [[startDate, 0]];
-
-    for (let i = 1; i < filtered.length; i++) {
-      const row  = filtered[i]!;
-      const cost = (row.invested as number | undefined) ?? 0;
-      const absReturn = cost > 0 ? (row.value as number) / cost : baseReturn;
-      portfolioPoints.push([row.date, +((absReturn / baseReturn - 1) * 100).toFixed(2)]);
-
-      const vwce = vwceMap[row.date];
-      vwcePoints.push([row.date, vwce != null && vwceBase ? +((vwce / vwceBase - 1) * 100).toFixed(2) : null]);
-
-      const sp  = sp500Map[row.date];
-      sp500Points.push([row.date, sp != null && sp500Base ? +((sp / sp500Base - 1) * 100).toFixed(2) : null]);
-    }
-
-    const isDark    = themeStore.isDark;
-    const textColor = isDark ? '#94a3b8' : '#64748b';
-    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-
-    const series: EChartsOption['series'] = [
-      {
-        name: 'Portefeuille',
-        type: 'line',
-        data: portfolioPoints.map(([, v]) => v),
-        smooth: false, symbol: 'none', connectNulls: true,
-        lineStyle: { color: '#818cf8', width: 2 },
-      },
-    ];
-
-    if (ab === 'vwce' || ab === 'both') {
-      series.push({
-        name: 'VWCE',
-        type: 'line',
-        data: vwcePoints.map(([, v]) => v),
-        smooth: false, symbol: 'none', connectNulls: true,
-        lineStyle: { color: '#34d399', width: 1.5, type: 'dashed' },
-      });
-    }
-    if (ab === 'sp500' || ab === 'both') {
-      series.push({
-        name: 'S&P 500',
-        type: 'line',
-        data: sp500Points.map(([, v]) => v),
-        smooth: false, symbol: 'none', connectNulls: true,
-        lineStyle: { color: '#fbbf24', width: 1.5, type: 'dashed' },
-      });
-    }
-
-    return {
-      backgroundColor: 'transparent',
-      grid: { top: 16, right: 16, bottom: 32, left: 60 },
-      xAxis: {
-        type: 'category',
-        data: portfolioPoints.map(([d]) => d),
-        axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
-        axisLabel: { color: textColor, fontSize: 10, interval: 'auto' },
-      },
-      yAxis: {
-        type: 'value',
-        splitLine: { lineStyle: { color: gridColor } },
-        axisLabel: { color: textColor, fontSize: 10, formatter: (v: number) => `${+v.toFixed(1)}%` },
-      },
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-        borderColor: isDark ? '#334155' : '#e2e8f0',
-        borderWidth: 1,
-        textStyle: { color: isDark ? '#e2e8f0' : '#1c1c1c', fontSize: 11 },
-      },
-      series,
-    };
-  });
-
+  function fmtContrib(pl: number): string {
+    const abs = Math.abs(Math.round(pl));
+    return `${pl >= 0 ? '+' : '-'}€ ${abs.toLocaleString('nl-BE')}`;
+  }
 </script>
 
 <div class="page-root">
-  <!-- Benchmark period pills -->
-  <div class="section-header">
-    <h2 class="section-title">Analyse</h2>
-    <div class="period-pills">
-      {#each PERIODS as p}
-        <button class="pill" class:on={analysePeriod === p.key} onclick={() => (analysePeriod = p.key)}>
-          {p.label}
-        </button>
+
+  <!-- ── Page header ──────────────────────────────────────────────────────────── -->
+  <div style="margin-bottom:20px">
+    <div class="h-eyebrow" style="margin-bottom:4px">Analyse</div>
+    <div class="h-xl">Prestaties &amp; risico</div>
+  </div>
+
+  {#if portfolioStore.loaded && portfolioStore.positions.length > 0}
+
+    <!-- ── KPI strip ──────────────────────────────────────────────────────────── -->
+    <div class="kpi-grid">
+      <div class="card kpi-card">
+        <div class="h-eyebrow">TWR{startYear() ? ` SINDS ${startYear()}` : ''}</div>
+        <div class="kpi-val mono {(twr() ?? 0) >= 0 ? 'c-pos' : 'c-neg'}">
+          <PrivacyValue value={twr() != null ? `${(twr()! >= 0 ? '+' : '')}${twr()!.toFixed(1)}%` : '—'} />
+        </div>
+        <div class="h-sm">Tijd-gewogen</div>
+      </div>
+
+      <div class="card kpi-card">
+        <div class="h-eyebrow">IRR (GELD-GEWOGEN)</div>
+        <div class="kpi-val mono {(portfolioStore.irrPct ?? 0) >= 0 ? 'c-pos' : 'c-neg'}">
+          <PrivacyValue value={portfolioStore.irrPct != null ? fmtPct(portfolioStore.irrPct) : '—'} />
+        </div>
+        <div class="h-sm">Jaarlijks</div>
+      </div>
+
+      {#if rm}
+        <div class="card kpi-card">
+          <div class="h-eyebrow">SHARPE</div>
+          <div class="kpi-val mono">{rm.sharpe != null ? fmtNum(rm.sharpe) : '—'}</div>
+          <div class="h-sm">Rendement / risico</div>
+        </div>
+
+        <div class="card kpi-card">
+          <div class="h-eyebrow">MAX DRAWDOWN</div>
+          <div class="kpi-val mono c-neg">
+            <PrivacyValue value={rm.maxDrawdown != null ? fmtPct(rm.maxDrawdown) : '—'} />
+          </div>
+          <div class="h-sm">Worst stretch</div>
+        </div>
+      {/if}
+    </div>
+
+    <!-- ── Rolling returns + Risk profile ─────────────────────────────────────── -->
+    <div class="analysis-split">
+
+      <!-- Rolling returns chart -->
+      <div class="card">
+        <div class="split-card-head">
+          <div class="h-md">Rolling returns</div>
+          <div class="h-sm" style="margin-top:1px">Portefeuille per periode</div>
+        </div>
+        {#if orderedRolling().length > 0}
+          <Chart option={rollingChartOption()} height="220px" />
+        {:else}
+          <div class="empty-msg">Geen rolling returns beschikbaar</div>
+        {/if}
+      </div>
+
+      <!-- Risk profile -->
+      <div class="card risk-card">
+        <div class="split-card-head">
+          <div class="h-md">Risico-profiel</div>
+        </div>
+        {#if riskBars().length > 0}
+          <div class="risk-bars">
+            {#each riskBars() as bar}
+              <div class="risk-row">
+                <div class="risk-label">{bar.label}</div>
+                <div class="risk-track">
+                  <div class="risk-fill" style="width:{bar.barPct}%;background:{bar.color}"></div>
+                </div>
+                <div class="risk-val mono" style="color:{bar.color}">{bar.display}</div>
+              </div>
+            {/each}
+          </div>
+          {#if rm}
+            <div class="risk-extra">
+              <div class="risk-extra-row">
+                <span class="h-sm">Sortino</span>
+                <span class="mono" style="font-size:12px;font-weight:600">{rm.sortino != null ? fmtNum(rm.sortino) : '—'}</span>
+              </div>
+              <div class="risk-extra-row">
+                <span class="h-sm">Calmar</span>
+                <span class="mono" style="font-size:12px;font-weight:600">{rm.calmar != null ? fmtNum(rm.calmar) : '—'}</span>
+              </div>
+              <div class="risk-extra-row">
+                <span class="h-sm">Gerealiseerd</span>
+                <span class="mono {portfolioStore.realizedPl >= 0 ? 'c-pos' : 'c-neg'}" style="font-size:12px;font-weight:600">
+                  <PrivacyValue value={`${portfolioStore.realizedPl >= 0 ? '+' : ''}${fmt(portfolioStore.realizedPl)}`} />
+                </span>
+              </div>
+            </div>
+          {/if}
+          {#if riskNarrative()}
+            <div class="risk-narrative">{riskNarrative()}</div>
+          {/if}
+        {:else}
+          <div class="empty-msg">Onvoldoende data</div>
+        {/if}
+      </div>
+
+    </div>
+
+    <!-- ── Allocation panels ──────────────────────────────────────────────────── -->
+    <div class="alloc-grid">
+      {#each [
+        { title: 'Sector', items: sectorItems() },
+        { title: 'Regio',  items: geoItems() },
+        { title: 'Munt',   items: currencyItems() },
+      ] as panel}
+        <div class="card alloc-card">
+          <div class="h-md" style="margin-bottom:10px">{panel.title}</div>
+          <!-- Stacked bar -->
+          <div class="alloc-stack">
+            {#each panel.items as item}
+              <div class="alloc-seg" style="width:{item.pct}%;background:{item.color}"></div>
+            {/each}
+          </div>
+          <!-- List -->
+          <div class="alloc-list">
+            {#each panel.items as item}
+              <div class="alloc-row">
+                <span class="dot" style="background:{item.color}"></span>
+                <span class="alloc-name">{item.name}</span>
+                <span class="alloc-pct mono">{item.pct.toFixed(1)}%</span>
+              </div>
+            {/each}
+          </div>
+        </div>
       {/each}
     </div>
-  </div>
 
-  <!-- Donut grid -->
-  <div class="donut-grid">
-    <!-- Allocation -->
-    <div class="card donut-card">
-      <div class="card-title">Allocatie</div>
-      <div class="donut-wrap">
-        <Chart option={allocationOption} height="160px" />
-      </div>
-      <div class="donut-legend">
-        {#each allocationLabels as t, i}
-          {@const total = allocationValues.reduce((a, b) => a + b, 0)}
-          <div class="donut-legend-item">
-            <span class="donut-dot" style="background:{allocationColors[i]}"></span>
-            <span class="donut-ticker">{t}</span>
-            <span class="donut-pct">{total > 0 ? ((allocationValues[i]! / total) * 100).toFixed(1) : 0}%</span>
+    <!-- ── Bijdrage aan rendement ──────────────────────────────────────────────── -->
+    {#if contributionItems().length > 0}
+      <div class="card contrib-card">
+        <div style="padding:14px 18px 12px;border-bottom:1px solid var(--border)">
+          <div class="h-md">Bijdrage aan rendement</div>
+          <div class="h-sm" style="margin-top:2px">Welke posities dreven de performance</div>
+        </div>
+        {#each contributionItems() as item}
+          <div class="contrib-row">
+            <span class="dot" style="background:{getColor(item.ticker)}"></span>
+            <span class="contrib-ticker">{item.ticker}</span>
+            <div class="contrib-track">
+              <div class="contrib-fill {item.pl >= 0 ? 'pos' : 'neg'}" style="width:{item.barPct}%"></div>
+              <span class="contrib-amount mono {item.pl >= 0 ? 'c-pos' : 'c-neg'}">
+                <PrivacyValue value={fmtContrib(item.pl)} />
+              </span>
+            </div>
+            <span class="contrib-pct mono {item.plPct >= 0 ? 'c-pos' : 'c-neg'}">{fmtPct(item.plPct)}</span>
           </div>
         {/each}
       </div>
-    </div>
+    {/if}
 
-    <!-- Sector -->
-    <div class="card donut-card">
-      <div class="card-title">Sector</div>
-      <div class="donut-wrap">
-        <Chart option={sectorOption} height="160px" />
-      </div>
-      <div class="donut-legend">
-        {#each sectorData().labels as s, i}
-          {@const total = sectorData().values.reduce((a, b) => a + b, 0)}
-          <div class="donut-legend-item">
-            <span class="donut-dot" style="background:{sectorData().colors[i]}"></span>
-            <span class="donut-ticker">{s}</span>
-            <span class="donut-pct">{total > 0 ? ((sectorData().values[i]! / total) * 100).toFixed(1) : 0}%</span>
-          </div>
-        {/each}
-      </div>
-    </div>
-
-    <!-- Geography -->
-    <div class="card donut-card">
-      <div class="card-title">Geografie</div>
-      <div class="donut-wrap">
-        <Chart option={geoOption} height="160px" />
-      </div>
-      <div class="donut-legend">
-        {#each geoData().labels as g, i}
-          {@const total = geoData().values.reduce((a, b) => a + b, 0)}
-          <div class="donut-legend-item">
-            <span class="donut-dot" style="background:{geoData().colors[i]}"></span>
-            <span class="donut-ticker">{g}</span>
-            <span class="donut-pct">{total > 0 ? ((geoData().values[i]! / total) * 100).toFixed(1) : 0}%</span>
-          </div>
-        {/each}
-      </div>
-    </div>
-
-    <!-- Currency -->
-    <div class="card donut-card">
-      <div class="card-title">Valuta</div>
-      <div class="donut-wrap">
-        <Chart option={currencyOption} height="160px" />
-      </div>
-      <div class="donut-legend">
-        {#each currencyData().labels as c, i}
-          <div class="donut-legend-item">
-            <span class="donut-dot" style="background:{currencyData().colors[i]}"></span>
-            <span class="donut-ticker">{c}</span>
-            <span class="donut-pct">{currencyData().values[i]!.toFixed(1)}%</span>
-          </div>
-        {/each}
-      </div>
-    </div>
-  </div>
-
-  <!-- Bar chart: cost vs value -->
-  {#if latest}
-    <div class="card chart-card" style="margin-top:16px">
-      <div class="card-title" style="padding:12px 16px">Geïnvesteerd vs. huidig</div>
-      <Chart option={barOption()} height="280px" />
-    </div>
+  {:else if portfolioStore.loaded}
+    <div class="empty-msg" style="padding:32px 0">Voeg transacties toe om de analyse te zien.</div>
   {/if}
 
-  <!-- Benchmark chart -->
-  <div class="card chart-card" style="margin-top:16px">
-    <div class="chart-header">
-      <span class="card-title">Benchmark</span>
-      <div class="seg">
-        <button class="seg-btn" class:on={portfolioStore.activeBenchmark === 'vwce'} onclick={() => (portfolioStore.activeBenchmark = 'vwce')}>VWCE</button>
-        <button class="seg-btn" class:on={portfolioStore.activeBenchmark === 'sp500'} onclick={() => (portfolioStore.activeBenchmark = 'sp500')}>S&P 500</button>
-        <button class="seg-btn" class:on={portfolioStore.activeBenchmark === 'both'} onclick={() => (portfolioStore.activeBenchmark = 'both')}>Beide</button>
-      </div>
-    </div>
-    <Chart option={benchmarkOption()} height="260px" />
-    <div class="legend" style="padding:10px 16px;border-top:1px solid var(--border)">
-      <div class="legend-item"><span class="legend-line" style="background:#818cf8"></span>Portefeuille</div>
-      {#if portfolioStore.activeBenchmark === 'vwce' || portfolioStore.activeBenchmark === 'both'}
-        <div class="legend-item"><span class="legend-line dashed" style="border-color:#34d399"></span>VWCE</div>
-      {/if}
-      {#if portfolioStore.activeBenchmark === 'sp500' || portfolioStore.activeBenchmark === 'both'}
-        <div class="legend-item"><span class="legend-line dashed" style="border-color:#fbbf24"></span>S&P 500</div>
-      {/if}
-    </div>
-  </div>
-
-  <!-- Risk metrics -->
-  {#if portfolioStore.riskMetrics}
-    {@const rm = portfolioStore.riskMetrics}
-    <div class="card" style="margin-top:16px;padding:16px">
-      <div class="card-title" style="margin-bottom:12px">Risico</div>
-      <div class="metrics-grid">
-        <div class="metric-item">
-          <div class="metric-label">Sharpe</div>
-          <div class="metric-value">{rm.sharpe != null ? fmtNum(rm.sharpe) : '—'}</div>
-        </div>
-        <div class="metric-item">
-          <div class="metric-label">Sortino</div>
-          <div class="metric-value">{rm.sortino != null ? fmtNum(rm.sortino) : '—'}</div>
-        </div>
-        <div class="metric-item">
-          <div class="metric-label">Max Drawdown</div>
-          <div class="metric-value {(rm.maxDrawdown ?? 0) < 0 ? 'c-neg' : ''}">{rm.maxDrawdown != null ? fmtPct(rm.maxDrawdown) : '—'}</div>
-        </div>
-        <div class="metric-item">
-          <div class="metric-label">Volatiliteit</div>
-          <div class="metric-value">{rm.volatility != null ? fmtPct(rm.volatility) : '—'}</div>
-        </div>
-        <div class="metric-item">
-          <div class="metric-label">Beta</div>
-          <div class="metric-value">{rm.beta != null ? fmtNum(rm.beta) : '—'}</div>
-        </div>
-        <div class="metric-item">
-          <div class="metric-label">Calmar</div>
-          <div class="metric-value">{rm.calmar != null ? fmtNum(rm.calmar) : '—'}</div>
-        </div>
-        <div class="metric-item">
-          <div class="metric-label">IRR</div>
-          <div class="metric-value {(portfolioStore.irrPct ?? 0) >= 0 ? 'c-pos' : 'c-neg'}">{portfolioStore.irrPct != null ? fmtPct(portfolioStore.irrPct) : '—'}</div>
-        </div>
-        <div class="metric-item">
-          <div class="metric-label">Gerealiseerd</div>
-          <div class="metric-value {portfolioStore.realizedPl >= 0 ? 'c-pos' : 'c-neg'}">
-            <PrivacyValue value={`${portfolioStore.realizedPl >= 0 ? '+' : ''}${fmt(portfolioStore.realizedPl)}`} />
-          </div>
-        </div>
-      </div>
-    </div>
-  {/if}
-
-  <!-- Rolling returns -->
-  {#if portfolioStore.rollingReturns.length > 0}
-    <div class="card" style="margin-top:16px;overflow-x:auto">
-      <div class="card-title" style="padding:12px 16px">Rolling returns</div>
-      <table class="pos-table">
-        <thead>
-          <tr>
-            <th>Periode</th>
-            <th class="right">Portefeuille</th>
-            <th class="right">VWCE</th>
-            <th class="right">S&P 500</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each portfolioStore.rollingReturns as r}
-            <tr>
-              <td>{r.period}</td>
-              <td class="right mono {(r.portfolio ?? 0) >= 0 ? 'c-pos' : 'c-neg'}">{r.portfolio != null ? fmtPct(r.portfolio) : '—'}</td>
-              <td class="right mono">{r.benchmark != null ? fmtPct(r.benchmark) : '—'}</td>
-              <td class="right mono">{r.sp500 != null ? fmtPct(r.sp500) : '—'}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  {/if}
-
-  <!-- Annual P&L -->
-  {#if portfolioStore.annualPl.length > 0}
-    <div class="card chart-card" style="margin-top:16px">
-      <div class="card-title" style="padding:12px 16px">Jaarlijks resultaat</div>
-      <Chart option={annualOption()} height="220px" />
-    </div>
-  {/if}
 </div>
 
 <style>
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-  .section-title { font-size: 15px; font-weight: 600; margin: 0; }
-
-  .donut-grid {
+  /* ── KPI strip ──────────────────────── */
+  .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
   }
-  .donut-card { padding: 12px 16px; }
-  .donut-wrap { height: 160px; }
-  .donut-legend { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto; }
-  .donut-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-  .donut-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .donut-ticker { flex: 1; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .donut-pct { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fg); }
+  .kpi-card { padding: 16px 18px; }
+  .kpi-val {
+    font-size: 26px; font-weight: 700;
+    letter-spacing: -0.03em; line-height: 1;
+    margin: 6px 0 4px;
+  }
 
-  .chart-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 12px 16px;
+  @media (max-width: 860px) { .kpi-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 480px) { .kpi-grid { grid-template-columns: 1fr 1fr; } .kpi-val { font-size: 20px; } }
+
+  /* ── Rolling + Risk split ───────────── */
+  .analysis-split {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .split-card-head { padding: 14px 16px 10px; }
+  .risk-card { display: flex; flex-direction: column; }
+
+  /* Risk bars */
+  .risk-bars { padding: 4px 16px 8px; }
+  .risk-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 56px;
+    align-items: center; gap: 10px;
+    padding: 7px 0;
+  }
+  .risk-label { font-size: 11px; color: var(--fg-muted); white-space: nowrap; }
+  .risk-track {
+    height: 6px; border-radius: 3px;
+    background: var(--surface-2); overflow: hidden;
+  }
+  .risk-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+  .risk-val { font-size: 12px; font-weight: 700; text-align: right; }
+
+  /* Extra small stats */
+  .risk-extra {
+    margin: 2px 16px 0;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 0; flex-direction: column;
+  }
+  .risk-extra-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0;
+  }
+
+  .risk-narrative {
+    margin: 0 16px 14px;
+    padding: 10px 12px;
+    background: var(--surface-2); border-radius: 8px;
+    font-size: 12px; color: var(--fg-muted); line-height: 1.5;
+  }
+
+  @media (max-width: 700px) {
+    .analysis-split { grid-template-columns: 1fr; }
+    .risk-row { grid-template-columns: 100px 1fr 52px; }
+  }
+
+  /* ── Allocation panels ──────────────── */
+  .alloc-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .alloc-card { padding: 14px 16px 12px; }
+  .alloc-stack {
+    height: 7px; border-radius: 999px;
+    display: flex; overflow: hidden; gap: 2px;
+    margin-bottom: 12px;
+  }
+  .alloc-seg { height: 100%; min-width: 2px; }
+  .alloc-list { display: flex; flex-direction: column; gap: 6px; }
+  .alloc-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .alloc-name { flex: 1; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .alloc-pct  { font-size: 11px; font-weight: 600; color: var(--fg); min-width: 40px; text-align: right; }
+
+  @media (max-width: 640px) { .alloc-grid { grid-template-columns: 1fr; } }
+
+  /* ── Contribution ───────────────────── */
+  .contrib-card { overflow: hidden; }
+  .contrib-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 18px;
     border-bottom: 1px solid var(--border);
   }
-
-  .metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 12px;
+  .contrib-row:last-child { border-bottom: none; }
+  .contrib-ticker { font-size: 12px; font-weight: 700; width: 52px; flex-shrink: 0; }
+  .contrib-track {
+    flex: 1; position: relative; height: 26px;
+    background: var(--surface-2); border-radius: 5px; overflow: hidden;
+    display: flex; align-items: center;
   }
-  .metric-item { display: flex; flex-direction: column; gap: 2px; }
-  .metric-label { font-size: 11px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .metric-value { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; }
-
-  .legend { display: flex; flex-wrap: wrap; gap: 10px 16px; }
-  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-muted); }
-  .legend-line { width: 16px; height: 2px; border-radius: 1px; flex-shrink: 0; }
-  .legend-line.dashed { background: none !important; border-top: 2px dashed; height: 0; margin-top: 1px; }
-
-  .pos-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .pos-table th {
-    padding: 8px 12px; font-size: 11px; font-weight: 600; color: var(--fg-muted);
-    text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border);
+  .contrib-fill {
+    position: absolute; left: 0; top: 0; height: 100%; border-radius: 5px;
+    transition: width 0.3s;
   }
-  .pos-table th.right, .pos-table td.right { text-align: right; }
-  .pos-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  .pos-table tbody tr:last-child td { border-bottom: none; }
+  .contrib-fill.pos { background: var(--c-pos-bg-strong); }
+  .contrib-fill.neg { background: var(--c-neg-bg-strong); }
+  .contrib-amount {
+    position: relative; z-index: 1;
+    padding: 0 8px; font-size: 11px; font-weight: 700;
+    white-space: nowrap;
+  }
+  .contrib-pct { font-size: 11px; font-weight: 700; min-width: 54px; text-align: right; flex-shrink: 0; }
+
+  @media (max-width: 640px) {
+    .contrib-ticker { width: 40px; }
+    .contrib-pct { min-width: 44px; }
+    .risk-row { grid-template-columns: 90px 1fr 48px; }
+  }
+
+  /* ── Misc ───────────────────────────── */
+  .empty-msg { padding: 24px; text-align: center; font-size: 13px; color: var(--fg-muted); }
   .mono { font-family: 'JetBrains Mono', monospace; }
 </style>

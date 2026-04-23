@@ -87,10 +87,10 @@ app.get('/health', (req, res) => {
     .json({ status, cache_dir: cDir, cache_writable: cacheWritable });
 });
 
-// Serve built frontend
+// Serve built frontend (dist/index.html already has relative ./_app/ paths from build step)
 const distDir = path.join(__dirname, '..', 'dist');
 app.use(express.static(distDir));
-app.get('*', (req, res) => res.sendFile(path.join(distDir, 'index.html')));
+app.get('*', (_req, res) => res.sendFile(path.join(distDir, 'index.html')));
 
 // Copy Lovelace card to /config/www/ so it's accessible via /local/ (works with Nabu Casa)
 try {

@@ -1,7 +1,7 @@
-name: "Portfolio Tracker"
-description: "Self-hosted stock portfolio tracker with Yahoo Finance data"
-version: "0.6.11b2"
-slug: "portfolio_tracker"
+name: 'Portfolio Tracker'
+description: 'Self-hosted stock portfolio tracker with Yahoo Finance data'
+version: '0.7.0-redesign.9'
+slug: 'portfolio_tracker'
 init: false
 arch:
   - aarch64
@@ -13,12 +13,12 @@ services:
   - mqtt:want
 ingress: true
 ingress_port: 3069
-panel_icon: "mdi:chart-line"
-panel_title: "Portfolio"
+panel_icon: 'mdi:chart-line'
+panel_title: 'Portfolio'
 ports:
   3069/tcp: 3069
 ports_description:
-  3069/tcp: "Portfolio Tracker Web UI"
+  3069/tcp: 'Portfolio Tracker Web UI'
 map:
   - data:rw
   - config:rw

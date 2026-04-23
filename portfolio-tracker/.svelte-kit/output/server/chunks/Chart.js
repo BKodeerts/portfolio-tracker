@@ -1,4 +1,4 @@
-import { ac as ssr_context, b as attr_class, ad as clsx, i as attr_style, d as stringify } from "./renderer.js";
+import { ac as ssr_context, c as attr_class, ad as clsx, i as attr_style, h as stringify } from "./renderer.js";
 import "clsx";
 function onDestroy(fn) {
   /** @type {SSRContext} */

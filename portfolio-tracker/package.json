@@ -1,12 +1,12 @@
 {
   "name": "portfolio-tracker",
-  "version": "0.6.11b2",
+  "version": "0.7.0-redesign.2",
   "description": "Self-hosted portfolio tracker with Yahoo Finance data",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
     "dev:server": "node server/index.js",
-    "build": "vite build",
+    "build": "vite build && node -e \"const fs=require('fs'),p='dist/index.html';fs.writeFileSync(p,fs.readFileSync(p,'utf8').replaceAll('/_app/','./_app/'))\"",
     "preview": "vite preview",
     "start": "node server/index.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",

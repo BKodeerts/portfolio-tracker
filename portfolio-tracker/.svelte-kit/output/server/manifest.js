@@ -10,7 +10,7 @@ return {
 	assets: new Set(["portfolio-card.js"]),
 	mimeTypes: {".js":"text/javascript"},
 	_: {
-		client: {start:"_app/immutable/entry/start.DGYxft3P.js",app:"_app/immutable/entry/app.CPMivWyO.js",imports:["_app/immutable/entry/start.DGYxft3P.js","_app/immutable/chunks/DzSi-rgU.js","_app/immutable/chunks/Bpfdnexl.js","_app/immutable/chunks/BXpyhBrx.js","_app/immutable/chunks/CSGOvlfF.js","_app/immutable/entry/app.CPMivWyO.js","_app/immutable/chunks/CEWIRRa7.js","_app/immutable/chunks/Bpfdnexl.js","_app/immutable/chunks/CXH28_OG.js","_app/immutable/chunks/CSGOvlfF.js","_app/immutable/chunks/B0ETMeTh.js","_app/immutable/chunks/BSPHWbet.js","_app/immutable/chunks/BXpyhBrx.js"],stylesheets:[],fonts:[],uses_env_dynamic_public:false},
+		client: {start:"_app/immutable/entry/start.Ch11ZHVn.js",app:"_app/immutable/entry/app.BaCyN30A.js",imports:["_app/immutable/entry/start.Ch11ZHVn.js","_app/immutable/chunks/jRI4WU9T.js","_app/immutable/chunks/DYfs8h9k.js","_app/immutable/chunks/CYe3V2wK.js","_app/immutable/chunks/DqPTTihx.js","_app/immutable/entry/app.BaCyN30A.js","_app/immutable/chunks/YeONUzBx.js","_app/immutable/chunks/DYfs8h9k.js","_app/immutable/chunks/B1ep9eYV.js","_app/immutable/chunks/DqPTTihx.js","_app/immutable/chunks/kyn8nHbR.js","_app/immutable/chunks/Du1jO82t.js","_app/immutable/chunks/p7ECaPJi.js","_app/immutable/chunks/CYe3V2wK.js"],stylesheets:[],fonts:[],uses_env_dynamic_public:false},
 		nodes: [
 			__memo(() => import('./nodes/0.js')),
 			__memo(() => import('./nodes/1.js')),

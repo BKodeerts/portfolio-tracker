@@ -1,4 +1,4 @@
-import { c as escape_html, b as attr_class, a as attr, e as ensure_array_like, f as derived } from "../../../chunks/renderer.js";
+import { e as escape_html, c as attr_class, a as attr, b as ensure_array_like, d as derived } from "../../../chunks/renderer.js";
 import { p as portfolioStore } from "../../../chunks/portfolio.svelte.js";
 function _page($$renderer, $$props) {
   $$renderer.component(($$renderer2) => {

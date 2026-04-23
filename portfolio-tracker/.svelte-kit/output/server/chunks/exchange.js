@@ -1,69 +1,3 @@
-import "clsx";
-import { a as apiFetch, p as portfolioStore } from "./portfolio.svelte.js";
-async function fetchIntraday(symbols, force = false) {
-  const qs = force ? "&force=1" : "";
-  const body = await apiFetch(
-    `/api/intraday?symbols=${symbols.join(",")}${qs}`
-  );
-  return body.data;
-}
-function createIntradayStore() {
-  let data = {};
-  let loaded = false;
-  let liveEurUsd = null;
-  let _timer = null;
-  async function load(force = false) {
-    const tickers = portfolioStore.currentTickers;
-    if (tickers.length === 0) return;
-    const yahooSymbols = tickers.map((t) => portfolioStore.tickerMeta[t]?.["yahoo"] ?? t).filter(Boolean);
-    const watchlistSymbols = portfolioStore.watchlistData.map((w) => w.yahoo).filter(Boolean);
-    const symbols = [
-      .../* @__PURE__ */ new Set([...yahooSymbols, ...watchlistSymbols, "EURUSD=X"])
-    ];
-    try {
-      const result = await fetchIntraday(symbols, force);
-      data = { ...data, ...result };
-      const fxData = result["EURUSD=X"];
-      if (fxData?.points?.length) {
-        const last = fxData.points[fxData.points.length - 1];
-        if (last) liveEurUsd = last.close;
-      }
-      loaded = true;
-    } catch (e) {
-      console.error("[intraday] load failed:", e);
-    }
-  }
-  function startAutoRefresh(intervalMs = 5 * 60 * 1e3) {
-    if (_timer) return;
-    _timer = setInterval(
-      () => {
-        load(true);
-      },
-      intervalMs
-    );
-  }
-  function stopAutoRefresh() {
-    if (_timer) {
-      clearInterval(_timer);
-      _timer = null;
-    }
-  }
-  return {
-    get data() {
-      return data;
-    },
-    get loaded() {
-      return loaded;
-    },
-    get liveEurUsd() {
-      return liveEurUsd;
-    },
-    load,
-    startAutoRefresh,
-    stopAutoRefresh
-  };
-}
-const intradayStore = createIntradayStore();
 const EU_EXCHANGE_RE = /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i;
 const EXCHANGE_DEFS = {
   "": { label: "US", tz: "America/New_York", open: [9, 30], close: [16, 0] },
@@ -144,9 +78,8 @@ function sparklineSVG(points, prevClose, tradingMins, muted = false) {
 }
 export {
   EU_EXCHANGE_RE as E,
-  isExchangeOpen as a,
   getTradingMins as g,
-  intradayStore as i,
+  isExchangeOpen as i,
   normalizeMarketState as n,
   sparklineSVG as s
 };

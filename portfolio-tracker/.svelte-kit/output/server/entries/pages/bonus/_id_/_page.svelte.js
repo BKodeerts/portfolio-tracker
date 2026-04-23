@@ -1,4 +1,4 @@
-import { c as escape_html, b as attr_class, d as stringify, a as attr, f as derived, s as store_get, u as unsubscribe_stores } from "../../../../chunks/renderer.js";
+import { c as attr_class, h as stringify, e as escape_html, a as attr, d as derived, s as store_get, u as unsubscribe_stores } from "../../../../chunks/renderer.js";
 import { p as page } from "../../../../chunks/stores.js";
 import { p as portfolioStore } from "../../../../chunks/portfolio.svelte.js";
 import { t as themeStore } from "../../../../chunks/theme.svelte.js";
@@ -139,14 +139,7 @@ function _page($$renderer, $$props) {
         ]
       };
     });
-    $$renderer2.push(`<header class="detail-header svelte-1lko5y8"><a href="/bonus" class="back-btn svelte-1lko5y8">← Bonus</a> `);
-    if (item()) {
-      $$renderer2.push("<!--[0-->");
-      $$renderer2.push(`<span class="detail-title svelte-1lko5y8">${escape_html(item().label)}</span> <span${attr_class("type-badge svelte-1lko5y8", void 0, { "call": item().type === "call_option" })}>${escape_html(item().type === "call_option" ? "Call optie" : "Warrant")}</span>`);
-    } else {
-      $$renderer2.push("<!--[-1-->");
-    }
-    $$renderer2.push(`<!--]--></header> <div class="page-root">`);
+    $$renderer2.push(`<div class="page-root">`);
     if (!item()) {
       $$renderer2.push("<!--[0-->");
       $$renderer2.push(`<div class="c-muted" style="padding:24px;text-align:center">Bonus niet gevonden</div>`);

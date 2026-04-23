@@ -1,111 +1,146 @@
-/* Design tokens — CSS custom properties for light and dark themes.
-   Applied via [data-theme="dark"] on <html>, replacing the old body.theme-dark cascade. */
+/* Design tokens — light & dark. Applied via data-theme="dark" on <html>. */
 
-:root {
-  --bg-gradient: linear-gradient(145deg, #eef0f3 0%, #f3f5f8 50%, #eef1f4 100%);
-  --bg-topbar: rgba(238, 240, 243, 0.9);
-  --bg-card: rgba(255, 255, 255, 0.7);
-  --bg-chart: rgba(255, 255, 255, 0.6);
-  --bg-modal: rgba(255, 255, 255, 0.97);
-  --bg-input: rgba(0, 0, 0, 0.03);
+:root,
+:root[data-theme="light"] {
+  /* ── Page background ── */
+  --bg:       #fafaf8;
+  --bg-2:     #f3f3ef;
 
-  --surface-0: rgba(0, 0, 0, 0.03);
-  --surface-1: rgba(0, 0, 0, 0.05);
-  --surface-2: rgba(0, 0, 0, 0.07);
-  --surface-hover: rgba(0, 0, 0, 0.02);
+  /* ── Card surfaces ── */
+  --surface:        #ffffff;
+  --surface-2:      #f6f6f2;
+  --surface-3:      #eceae3;
+  --surface-hover:  rgba(0, 0, 0, 0.03);
 
-  --fg: #1c1c1c;
-  --fg-muted: #888;
-  --fg-dim: #aaa;
-  --fg-subtle: #bbb;
+  /* ── Borders ── */
+  --border:        rgba(16, 18, 22, 0.08);
+  --border-2:      rgba(16, 18, 22, 0.12);
+  --border-strong: rgba(16, 18, 22, 0.22);
 
-  --border-0: rgba(0, 0, 0, 0.04);
-  --border-1: rgba(0, 0, 0, 0.06);
-  --border-2: rgba(0, 0, 0, 0.08);
-  --border-3: rgba(0, 0, 0, 0.1);
-  --border-strong: rgba(0, 0, 0, 0.2);
-  --border-stronger: rgba(0, 0, 0, 0.28);
+  /* ── Text ── */
+  --fg:       #101216;
+  --fg-2:     #2a2d33;
+  --fg-muted: #6a6f78;
+  --fg-subtle:#9aa0aa;
 
-  --c-pos: #16a34a;
-  --c-neg: #dc2626;
-  --c-pos-muted: rgba(22, 163, 74, 0.45);
-  --c-neg-muted: rgba(220, 38, 38, 0.45);
-  --c-neutral: #888;
-  --c-brand: #555;
+  /* ── Accent ── */
+  --accent:      oklch(62% 0.14 255);
+  --accent-soft: oklch(62% 0.14 255 / 0.08);
 
-  /* ECharts palette */
-  --chart-grid: rgba(0, 0, 0, 0.05);
-  --chart-axis: #999;
-  --chart-cost-line: #ccc;
-  --chart-cost-fill: rgba(0, 0, 0, 0.03);
-  --chart-benchmark: #bbb;
-  --chart-tooltip-bg: rgba(255, 255, 255, 0.97);
-  --chart-tooltip-border: rgba(0, 0, 0, 0.08);
-  --chart-tooltip-body: #1c1c1c;
-  --chart-donut-border: rgba(243, 245, 248, 0.9);
+  /* ── Semantic colors ── */
+  --c-pos:           #047857;
+  --c-pos-bg:        rgba(16, 185, 129, 0.12);
+  --c-pos-bg-strong: rgba(16, 185, 129, 0.20);
+  --c-neg:           #b91c1c;
+  --c-neg-bg:        rgba(239, 68, 68, 0.12);
+  --c-neg-bg-strong: rgba(239, 68, 68, 0.20);
+  --c-neutral: #6a6f78;
+  --c-brand:   oklch(62% 0.14 255);
 
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.12);
-  --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.12);
-  --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.08);
+  /* ── Shadows ── */
+  --shadow-card:  0 1px 2px rgba(16,18,22,0.04), 0 1px 3px rgba(16,18,22,0.02);
+  --shadow-hover: 0 4px 12px rgba(16,18,22,0.08), 0 1px 3px rgba(16,18,22,0.04);
+  --shadow-modal: 0 8px 32px rgba(16,18,22,0.12);
 
-  /* Convenience aliases used by new SvelteKit pages */
-  --border: var(--border-1);
-  --card-bg: var(--bg-card);
-  --input-bg: var(--bg-input);
-  --hover-bg: var(--surface-hover);
-  --bg-solid: var(--bg-card);
+  /* ── Backwards-compat aliases ── */
+  --bg-gradient:   var(--bg);
+  --bg-topbar:     color-mix(in srgb, var(--bg) 88%, transparent);
+  --bg-card:       var(--surface);
+  --bg-chart:      var(--surface);
+  --bg-modal:      var(--surface);
+  --bg-input:      var(--surface-2);
+  --surface-0:     var(--surface-hover);
+  --surface-1:     var(--surface-2);
+  --border-0:      rgba(16, 18, 22, 0.05);
+  --border-1:      var(--border);
+  --border-3:      var(--border-strong);
+  --border-stronger: var(--border-strong);
+  --fg-dim:        var(--fg-muted);
+  --hover-bg:      var(--surface-hover);
+  --card-bg:       var(--surface);
+  --input-bg:      var(--surface-2);
+  --bg-solid:      var(--surface);
+
+  /* ECharts */
+  --chart-grid:         rgba(0, 0, 0, 0.05);
+  --chart-axis:         #8b929c;
+  --chart-cost-line:    #c8c8c8;
+  --chart-cost-fill:    rgba(0, 0, 0, 0.03);
+  --chart-benchmark:    #b0b0b0;
+  --chart-tooltip-bg:   var(--surface);
+  --chart-tooltip-border: var(--border-2);
+  --chart-tooltip-body: var(--fg);
+  --chart-donut-border: var(--bg);
 }
 
-[data-theme='dark'] {
-  --bg-gradient: linear-gradient(145deg, #18181b 0%, #1f1f23 50%, #18181b 100%);
-  --bg-topbar: rgba(18, 18, 20, 0.9);
-  --bg-card: rgba(255, 255, 255, 0.07);
-  --bg-chart: rgba(255, 255, 255, 0.06);
-  --bg-modal: rgba(24, 24, 27, 0.99);
-  --bg-input: rgba(255, 255, 255, 0.07);
+[data-theme="dark"] {
+  /* ── Page background ── */
+  --bg:       #0b0c0e;
+  --bg-2:     #111316;
 
-  --surface-0: rgba(255, 255, 255, 0.05);
-  --surface-1: rgba(255, 255, 255, 0.07);
-  --surface-2: rgba(255, 255, 255, 0.09);
-  --surface-hover: rgba(255, 255, 255, 0.04);
+  /* ── Card surfaces ── */
+  --surface:        #15181c;
+  --surface-2:      #1b1f24;
+  --surface-3:      #232830;
+  --surface-hover:  rgba(255, 255, 255, 0.04);
 
-  --fg: #e2e2e2;
-  --fg-muted: #909090;
-  --fg-dim: #808080;
-  --fg-subtle: #606060;
-
-  --border-0: rgba(255, 255, 255, 0.05);
-  --border-1: rgba(255, 255, 255, 0.08);
-  --border-2: rgba(255, 255, 255, 0.1);
-  --border-3: rgba(255, 255, 255, 0.13);
+  /* ── Borders ── */
+  --border:        rgba(255, 255, 255, 0.08);
+  --border-2:      rgba(255, 255, 255, 0.12);
   --border-strong: rgba(255, 255, 255, 0.22);
-  --border-stronger: rgba(255, 255, 255, 0.28);
 
-  --c-pos: #4ade80;
-  --c-neg: #f87171;
-  --c-pos-muted: rgba(74, 222, 128, 0.45);
-  --c-neg-muted: rgba(248, 113, 113, 0.45);
-  --c-neutral: #a0a0a0;
-  --c-brand: #c0c0c0;
+  /* ── Text ── */
+  --fg:       #f2f4f7;
+  --fg-2:     #d4d8de;
+  --fg-muted: #8b929c;
+  --fg-subtle:#5a6069;
 
-  --chart-grid: rgba(255, 255, 255, 0.08);
-  --chart-axis: #909090;
-  --chart-cost-line: #666;
-  --chart-cost-fill: rgba(80, 80, 80, 0.07);
-  --chart-benchmark: #888;
-  --chart-tooltip-bg: rgba(28, 28, 28, 0.97);
-  --chart-tooltip-border: rgba(255, 255, 255, 0.1);
-  --chart-tooltip-body: #d8d8d8;
-  --chart-donut-border: rgba(24, 24, 27, 0.9);
+  /* ── Accent ── */
+  --accent:      oklch(72% 0.14 255);
+  --accent-soft: oklch(72% 0.14 255 / 0.14);
 
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.45);
-  --shadow-modal: 0 8px 40px rgba(0, 0, 0, 0.6);
-  --shadow-hover: 0 4px 14px rgba(0, 0, 0, 0.35);
+  /* ── Semantic colors ── */
+  --c-pos:           #34d399;
+  --c-pos-bg:        rgba(52, 211, 153, 0.14);
+  --c-pos-bg-strong: rgba(52, 211, 153, 0.24);
+  --c-neg:           #f87171;
+  --c-neg-bg:        rgba(248, 113, 113, 0.14);
+  --c-neg-bg-strong: rgba(248, 113, 113, 0.24);
+  --c-neutral: #8b929c;
+  --c-brand:   oklch(72% 0.14 255);
 
-  /* Convenience aliases used by new SvelteKit pages */
-  --border: var(--border-1);
-  --card-bg: var(--bg-card);
-  --input-bg: var(--bg-input);
-  --hover-bg: var(--surface-hover);
-  --bg-solid: #1a1a1e;
+  /* ── Shadows ── */
+  --shadow-card:  0 1px 2px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.02);
+  --shadow-hover: 0 8px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+  --shadow-modal: 0 8px 40px rgba(0,0,0,0.6);
+
+  /* ── Backwards-compat aliases ── */
+  --bg-gradient:   var(--bg);
+  --bg-topbar:     color-mix(in srgb, var(--bg) 88%, transparent);
+  --bg-card:       var(--surface);
+  --bg-chart:      var(--surface);
+  --bg-modal:      var(--surface);
+  --bg-input:      var(--surface-2);
+  --surface-0:     var(--surface-hover);
+  --surface-1:     var(--surface-2);
+  --border-0:      rgba(255, 255, 255, 0.05);
+  --border-1:      var(--border);
+  --border-3:      var(--border-strong);
+  --border-stronger: var(--border-strong);
+  --fg-dim:        var(--fg-muted);
+  --hover-bg:      var(--surface-hover);
+  --card-bg:       var(--surface);
+  --input-bg:      var(--surface-2);
+  --bg-solid:      var(--surface);
+
+  /* ECharts */
+  --chart-grid:         rgba(255, 255, 255, 0.06);
+  --chart-axis:         #8b929c;
+  --chart-cost-line:    #3a3f46;
+  --chart-cost-fill:    rgba(80, 80, 80, 0.07);
+  --chart-benchmark:    #555b66;
+  --chart-tooltip-bg:   var(--surface);
+  --chart-tooltip-border: var(--border-2);
+  --chart-tooltip-body: var(--fg);
+  --chart-donut-border: var(--bg);
 }

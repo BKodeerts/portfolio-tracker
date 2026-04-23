@@ -1,4 +1,4 @@
-import { f as derived } from "./renderer.js";
+import { d as derived } from "./renderer.js";
 function createThemeStore() {
   const stored = typeof localStorage !== "undefined" ? localStorage.getItem("theme") : null;
   let theme = stored === "dark" || stored === "system" ? stored : "light";

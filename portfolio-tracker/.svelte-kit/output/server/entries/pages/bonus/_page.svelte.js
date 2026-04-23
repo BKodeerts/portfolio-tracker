@@ -1,4 +1,4 @@
-import { e as ensure_array_like, a as attr, d as stringify, c as escape_html, b as attr_class } from "../../../chunks/renderer.js";
+import { b as ensure_array_like, a as attr, h as stringify, e as escape_html, c as attr_class } from "../../../chunks/renderer.js";
 import { p as portfolioStore } from "../../../chunks/portfolio.svelte.js";
 import { f as fmt, a as fmtPct } from "../../../chunks/fmt.js";
 import { P as PrivacyValue } from "../../../chunks/PrivacyValue.js";

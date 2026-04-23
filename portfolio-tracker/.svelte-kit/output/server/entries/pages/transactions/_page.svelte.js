@@ -1,4 +1,4 @@
-import { a as attr, c as escape_html, e as ensure_array_like, b as attr_class, ad as clsx, f as derived } from "../../../chunks/renderer.js";
+import { a as attr, e as escape_html, b as ensure_array_like, c as attr_class, ad as clsx, d as derived } from "../../../chunks/renderer.js";
 import { f as fmt } from "../../../chunks/fmt.js";
 function _page($$renderer, $$props) {
   $$renderer.component(($$renderer2) => {
@@ -30,7 +30,7 @@ function _page($$renderer, $$props) {
     const each_array_1 = ensure_array_like(filtered());
     for (let i = 0, $$length = each_array_1.length; i < $$length; i++) {
       let tx = each_array_1[i];
-      $$renderer2.push(`<tr class="svelte-1q0dtg6"><td class="mono svelte-1q0dtg6">${escape_html(tx.date)}</td><td${attr_class(clsx(typeClass(tx)), "svelte-1q0dtg6")}>${escape_html(typeLabel(tx))}</td><td class="svelte-1q0dtg6"><span class="ticker-name">${escape_html(tx.ticker)}</span> `);
+      $$renderer2.push(`<tr class="svelte-1q0dtg6"><td class="mono svelte-1q0dtg6">${escape_html(tx.date)}</td><td${attr_class(clsx(typeClass(tx)), "svelte-1q0dtg6")}>${escape_html(typeLabel(tx))}</td><td class="svelte-1q0dtg6"><span class="ticker-name svelte-1q0dtg6">${escape_html(tx.ticker)}</span> `);
       if (tx.yahoo !== tx.ticker) {
         $$renderer2.push("<!--[0-->");
         $$renderer2.push(`<span class="ticker-sub desktop-only svelte-1q0dtg6">${escape_html(tx.yahoo)}</span>`);

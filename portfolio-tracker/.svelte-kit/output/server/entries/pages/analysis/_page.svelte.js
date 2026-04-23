@@ -1,454 +1,339 @@
-import { e as ensure_array_like, b as attr_class, c as escape_html, i as attr_style, d as stringify, f as derived } from "../../../chunks/renderer.js";
+import { e as escape_html, c as attr_class, h as stringify, b as ensure_array_like, i as attr_style, d as derived } from "../../../chunks/renderer.js";
 import { p as portfolioStore } from "../../../chunks/portfolio.svelte.js";
 import { t as themeStore } from "../../../chunks/theme.svelte.js";
-import { a as fmtPct, f as fmt, b as fmtNum } from "../../../chunks/fmt.js";
+import { a as fmtPct, b as fmtNum, f as fmt } from "../../../chunks/fmt.js";
 import { g as getColor } from "../../../chunks/color.js";
 import { C as Chart } from "../../../chunks/Chart.js";
 import { P as PrivacyValue } from "../../../chunks/PrivacyValue.js";
-function periodCutoff(period) {
-  return null;
-}
-function filterByPeriod(data, period) {
-  const cutoff = periodCutoff();
-  if (!cutoff) return data;
-  return data.filter((d) => d.date >= cutoff);
-}
 function _page($$renderer, $$props) {
   $$renderer.component(($$renderer2) => {
-    let analysePeriod = "total";
     const SECTOR_COLORS = [
-      "#818cf8",
-      "#34d399",
-      "#fbbf24",
-      "#f87171",
-      "#60a5fa",
-      "#a78bfa",
-      "#fb923c",
-      "#4ade80",
-      "#38bdf8",
-      "#f472b6"
+      "var(--accent)",
+      "#8b5cf6",
+      "#14b8a6",
+      "#f59e0b",
+      "#ec4899",
+      "#10b981",
+      "#f97316",
+      "#06b6d4",
+      "#e11d48",
+      "#84cc16"
     ];
-    const PALETTE = [
-      "#fbbf24",
-      "#818cf8",
-      "#34d399",
-      "#f87171",
-      "#60a5fa",
-      "#a78bfa",
-      "#fb923c",
-      "#4ade80",
-      "#f472b6",
-      "#22d3ee"
+    const GEO_COLORS = [
+      "var(--accent)",
+      "#8b5cf6",
+      "#14b8a6",
+      "#f59e0b",
+      "#ec4899",
+      "#10b981",
+      "#f97316"
     ];
-    const PERIODS = [
-      { key: "1m", label: "1M" },
-      { key: "3m", label: "3M" },
-      { key: "6m", label: "6M" },
-      { key: "ytd", label: "YTD" },
-      { key: "1y", label: "1Y" },
-      { key: "2y", label: "2Y" },
-      { key: "3y", label: "3Y" },
-      { key: "total", label: "Max" }
+    const CCY_COLORS = [
+      "var(--accent)",
+      "#8b5cf6",
+      "#14b8a6",
+      "#f59e0b",
+      "#ec4899",
+      "#10b981",
+      "#f97316"
     ];
-    const latest = derived(() => portfolioStore.chartData[portfolioStore.chartData.length - 1]);
-    function donutOption(labels, values, colors) {
-      const total = values.reduce((a, b) => a + b, 0);
+    function chartColors() {
       const isDark = themeStore.isDark;
       return {
-        backgroundColor: "transparent",
-        series: [
-          {
-            type: "pie",
-            radius: ["58%", "80%"],
-            avoidLabelOverlap: false,
-            label: { show: false },
-            emphasis: { scale: false },
-            data: labels.map((l, i) => ({
-              name: l,
-              value: values[i],
-              itemStyle: { color: colors[i % colors.length] }
-            }))
-          }
-        ],
-        tooltip: {
-          backgroundColor: isDark ? "#1e293b" : "#ffffff",
-          borderColor: isDark ? "#334155" : "#e2e8f0",
-          borderWidth: 1,
-          textStyle: { color: isDark ? "#e2e8f0" : "#1c1c1c", fontSize: 11 },
-          formatter: (p) => `${p.name}: ${themeStore.privacyMode ? "●●●" : fmt(p.value)} (${total > 0 ? (p.value / total * 100).toFixed(1) : 0}%)`
-        }
+        text: isDark ? "#8b929c" : "#6a6f78",
+        grid: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+        tooltipBg: isDark ? "#15181c" : "#ffffff",
+        tooltipBord: isDark ? "rgba(255,255,255,0.12)" : "rgba(16,18,22,0.12)",
+        tooltipText: isDark ? "#f2f4f7" : "#101216",
+        posBar: isDark ? "#34d399" : "#047857",
+        negBar: isDark ? "#f87171" : "#b91c1c"
       };
     }
-    const allocationLabels = derived(() => [...portfolioStore.currentTickers].sort((a, b) => (latest()?.[b] ?? 0) - (latest()?.[a] ?? 0)));
-    const allocationValues = derived(() => allocationLabels().map((t) => latest()?.[t] ?? 0));
-    const allocationColors = derived(() => allocationLabels().map((t) => getColor(t)));
-    const allocationOption = derived(() => donutOption(allocationLabels(), allocationValues(), allocationColors()));
-    const sectorData = derived(() => () => {
-      if (!latest()) return { labels: [], values: [], colors: [] };
-      const map = {};
-      for (const t of portfolioStore.currentTickers) {
-        const sector = portfolioStore.tickerMeta[t]?.["sector"] ?? "Overig";
-        map[sector] = (map[sector] ?? 0) + (latest()[t] ?? 0);
-      }
-      const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
-      return {
-        labels: sorted.map(([s]) => s),
-        values: sorted.map(([, v]) => v),
-        colors: sorted.map((_, i) => SECTOR_COLORS[i % SECTOR_COLORS.length])
-      };
+    const startYear = derived(() => () => {
+      const d = portfolioStore.chartData[0];
+      return d ? new Date(d.date).getFullYear() : null;
     });
-    const sectorOption = derived(() => donutOption(sectorData()().labels, sectorData()().values, sectorData()().colors));
-    const geoData = derived(() => () => {
-      if (!latest()) return { labels: [], values: [], colors: [] };
-      const map = {};
-      for (const t of portfolioStore.currentTickers) {
-        const geo = portfolioStore.tickerMeta[t]?.["geo"] ?? "Overig";
-        map[geo] = (map[geo] ?? 0) + (latest()[t] ?? 0);
-      }
-      const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
-      return {
-        labels: sorted.map(([g]) => g),
-        values: sorted.map(([, v]) => v),
-        colors: sorted.map((_, i) => PALETTE[i % PALETTE.length])
-      };
+    const totalValue = derived(() => portfolioStore.positions.reduce((s, p) => s + p.value, 0));
+    const twr = derived(() => () => {
+      const cost = portfolioStore.totalInvested;
+      if (cost <= 0) return null;
+      return (totalValue() - cost) / cost * 100;
     });
-    const geoOption = derived(() => donutOption(geoData()().labels, geoData()().values, geoData()().colors));
-    const currencyData = derived(() => () => {
-      const exp = portfolioStore.currencyExposure;
-      if (Object.keys(exp).length === 0) {
-        const usd = portfolioStore.usdExposurePct ?? 0;
-        return {
-          labels: ["USD", "EUR"],
-          values: [usd, 100 - usd],
-          colors: [PALETTE[0], PALETTE[1]]
-        };
-      }
-      const sorted = Object.entries(exp).sort((a, b) => b[1] - a[1]);
-      return {
-        labels: sorted.map(([c]) => c),
-        values: sorted.map(([, v]) => v),
-        colors: sorted.map((_, i) => PALETTE[i % PALETTE.length])
-      };
+    const rm = derived(() => portfolioStore.riskMetrics);
+    const PERIOD_ORDER = [
+      ["1w", "1W"],
+      ["1m", "1M"],
+      ["3m", "3M"],
+      ["ytd", "YTD"],
+      ["1y", "1Y"],
+      ["inception", "Max"]
+    ];
+    const orderedRolling = derived(() => () => {
+      const rr = portfolioStore.rollingReturns;
+      if (!rr) return [];
+      return PERIOD_ORDER.map(([key, label]) => {
+        const r = rr[key];
+        return r && r.portfolio != null ? { period: label, portfolio: r.portfolio, vwce: r.vwce } : null;
+      }).filter((r) => r != null);
     });
-    const currencyOption = derived(() => donutOption(currencyData()().labels, currencyData()().values, currencyData()().colors));
-    const barOption = derived(() => () => {
-      if (!latest()) return {};
-      const tickers = [...portfolioStore.currentTickers].sort((a, b) => (latest()[b] ?? 0) - (latest()[a] ?? 0));
-      const isDark = themeStore.isDark;
-      const textColor = isDark ? "#94a3b8" : "#64748b";
-      const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+    const rollingChartOption = derived(() => () => {
+      const rows = orderedRolling()();
+      if (!rows.length) return {};
+      const { text, grid, posBar, negBar } = chartColors();
+      const values = rows.map((r) => +(r.portfolio ?? 0));
       return {
         backgroundColor: "transparent",
-        grid: { top: 8, right: 16, bottom: 8, left: 16, containLabel: true },
-        xAxis: {
-          type: "value",
-          splitLine: { lineStyle: { color: gridColor } },
-          axisLabel: {
-            color: textColor,
-            fontSize: 10,
-            formatter: (v) => themeStore.privacyMode ? "●●" : `€${Math.round(v / 1e3)}k`
-          }
-        },
-        yAxis: {
-          type: "category",
-          data: tickers,
-          axisLabel: { color: textColor, fontSize: 11 },
-          splitLine: { show: false }
-        },
-        tooltip: {
-          backgroundColor: isDark ? "#1e293b" : "#ffffff",
-          borderColor: isDark ? "#334155" : "#e2e8f0",
-          borderWidth: 1,
-          textStyle: { color: isDark ? "#e2e8f0" : "#1c1c1c", fontSize: 11 },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter: (params) => params.map((p) => `${p.marker}${p.seriesName}: ${themeStore.privacyMode ? "●●●" : fmt(p.value)}`).join("<br>")
-        },
-        series: [
-          {
-            name: "Geïnvesteerd",
-            type: "bar",
-            data: tickers.map((t) => latest()[`${t}_cost`] ?? 0),
-            itemStyle: {
-              color: isDark ? "rgba(71,85,105,0.6)" : "rgba(148,163,184,0.5)",
-              borderRadius: [0, 3, 3, 0]
-            }
-          },
-          {
-            name: "Huidig",
-            type: "bar",
-            data: tickers.map((t) => latest()[t] ?? 0),
-            itemStyle: {
-              color: (p) => getColor(tickers[p.dataIndex]) + "CC",
-              borderRadius: [0, 3, 3, 0]
-            }
-          }
-        ]
-      };
-    });
-    const annualOption = derived(() => () => {
-      if (!portfolioStore.annualPl.length) return {};
-      const rows = [...portfolioStore.annualPl].sort((a, b) => a.year.localeCompare(b.year));
-      const isDark = themeStore.isDark;
-      const textColor = isDark ? "#94a3b8" : "#64748b";
-      const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
-      return {
-        backgroundColor: "transparent",
-        grid: { top: 24, right: 16, bottom: 32, left: 64 },
-        legend: {
-          data: ["Gerealiseerd", "Dividenden"],
-          textStyle: { color: textColor, fontSize: 11 },
-          itemWidth: 10,
-          itemHeight: 10,
-          top: 0
+        grid: {
+          top: 36,
+          right: 12,
+          bottom: 24,
+          left: 44,
+          containLabel: false
         },
         xAxis: {
           type: "category",
-          data: rows.map((a) => a.year),
-          axisLabel: { color: textColor, fontSize: 10 },
-          axisLine: { show: false },
-          axisTick: { show: false },
-          splitLine: { show: false }
-        },
-        yAxis: {
-          type: "value",
-          splitLine: { lineStyle: { color: gridColor } },
-          axisLabel: {
-            color: textColor,
-            fontSize: 10,
-            formatter: (v) => themeStore.privacyMode ? "●●" : Math.abs(v) >= 1e3 ? `€${+(v / 1e3).toFixed(0)}k` : `€${Math.round(v)}`
-          }
-        },
-        tooltip: {
-          trigger: "axis",
-          axisPointer: { type: "shadow" },
-          backgroundColor: isDark ? "#1e293b" : "#ffffff",
-          borderColor: isDark ? "#334155" : "#e2e8f0",
-          borderWidth: 1,
-          textStyle: { fontSize: 11, color: isDark ? "#e2e8f0" : "#1c1c1c" },
-          formatter: (params) => {
-            const arr = params;
-            const year = arr[0]?.name ?? "";
-            const lines = arr.filter((p) => p.value !== 0 && p.value != null).map((p) => `${p.marker}${p.seriesName}: ${themeStore.privacyMode ? "●●●" : fmt(p.value)}`);
-            const total = arr.reduce((s, p) => s + (p.value ?? 0), 0);
-            lines.push(`<b>Totaal: ${themeStore.privacyMode ? "●●●" : fmt(total)}</b>`);
-            return `${year}<br>${lines.join("<br>")}`;
-          }
-        },
-        series: [
-          {
-            name: "Gerealiseerd",
-            type: "bar",
-            stack: "pl",
-            data: rows.map((a) => ({
-              value: a.realizedPl,
-              itemStyle: { color: a.realizedPl >= 0 ? "#4ade80" : "#f87171" }
-            }))
-          },
-          {
-            name: "Dividenden",
-            type: "bar",
-            stack: "pl",
-            data: rows.map((a) => a.dividends),
-            itemStyle: { color: "#818cf8" }
-          }
-        ]
-      };
-    });
-    const benchmarkOption = derived(() => () => {
-      const filtered = filterByPeriod(portfolioStore.chartData);
-      if (filtered.length < 2) return {};
-      const vwceMap = Object.fromEntries(portfolioStore.benchmarkData.map((b) => [b.date, b.value]));
-      const sp500Map = Object.fromEntries(portfolioStore.sp500Data.map((b) => [b.date, b.value]));
-      const ab = portfolioStore.activeBenchmark;
-      const first = filtered[0];
-      const startDate = first.date;
-      const startCost = first.invested ?? 1;
-      const startTotal = first.value ?? 0;
-      const baseReturn = startCost > 0 ? startTotal / startCost : 1;
-      const vwceBase = vwceMap[startDate] ?? null;
-      const sp500Base = sp500Map[startDate] ?? null;
-      const portfolioPoints = [[startDate, 0]];
-      const vwcePoints = [[startDate, 0]];
-      const sp500Points = [[startDate, 0]];
-      for (let i = 1; i < filtered.length; i++) {
-        const row = filtered[i];
-        const cost = row.invested ?? 0;
-        const absReturn = cost > 0 ? row.value / cost : baseReturn;
-        portfolioPoints.push([row.date, +((absReturn / baseReturn - 1) * 100).toFixed(2)]);
-        const vwce = vwceMap[row.date];
-        vwcePoints.push([
-          row.date,
-          vwce != null && vwceBase ? +((vwce / vwceBase - 1) * 100).toFixed(2) : null
-        ]);
-        const sp = sp500Map[row.date];
-        sp500Points.push([
-          row.date,
-          sp != null && sp500Base ? +((sp / sp500Base - 1) * 100).toFixed(2) : null
-        ]);
-      }
-      const isDark = themeStore.isDark;
-      const textColor = isDark ? "#94a3b8" : "#64748b";
-      const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
-      const series = [
-        {
-          name: "Portefeuille",
-          type: "line",
-          data: portfolioPoints.map(([, v]) => v),
-          smooth: false,
-          symbol: "none",
-          connectNulls: true,
-          lineStyle: { color: "#818cf8", width: 2 }
-        }
-      ];
-      if (ab === "vwce" || ab === "both") {
-        series.push({
-          name: "VWCE",
-          type: "line",
-          data: vwcePoints.map(([, v]) => v),
-          smooth: false,
-          symbol: "none",
-          connectNulls: true,
-          lineStyle: { color: "#34d399", width: 1.5, type: "dashed" }
-        });
-      }
-      if (ab === "sp500" || ab === "both") {
-        series.push({
-          name: "S&P 500",
-          type: "line",
-          data: sp500Points.map(([, v]) => v),
-          smooth: false,
-          symbol: "none",
-          connectNulls: true,
-          lineStyle: { color: "#fbbf24", width: 1.5, type: "dashed" }
-        });
-      }
-      return {
-        backgroundColor: "transparent",
-        grid: { top: 16, right: 16, bottom: 32, left: 60 },
-        xAxis: {
-          type: "category",
-          data: portfolioPoints.map(([d]) => d),
+          data: rows.map((r) => r.period),
           axisLine: { show: false },
           axisTick: { show: false },
           splitLine: { show: false },
-          axisLabel: { color: textColor, fontSize: 10, interval: "auto" }
+          axisLabel: { color: text, fontSize: 10 }
         },
         yAxis: {
           type: "value",
-          splitLine: { lineStyle: { color: gridColor } },
+          splitLine: { lineStyle: { color: grid } },
           axisLabel: {
-            color: textColor,
+            color: text,
             fontSize: 10,
-            formatter: (v) => `${+v.toFixed(1)}%`
+            formatter: (v) => `${v.toFixed(0)}%`
           }
         },
-        tooltip: {
-          trigger: "axis",
-          backgroundColor: isDark ? "#1e293b" : "#ffffff",
-          borderColor: isDark ? "#334155" : "#e2e8f0",
-          borderWidth: 1,
-          textStyle: { color: isDark ? "#e2e8f0" : "#1c1c1c", fontSize: 11 }
-        },
-        series
+        tooltip: { show: false },
+        series: [
+          {
+            type: "bar",
+            barMaxWidth: 36,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            data: values.map((v) => ({
+              value: v,
+              itemStyle: {
+                color: v >= 0 ? posBar : negBar,
+                borderRadius: v >= 0 ? [3, 3, 0, 0] : [0, 0, 3, 3]
+              },
+              label: {
+                show: true,
+                position: v >= 0 ? "top" : "bottom",
+                color: v >= 0 ? posBar : negBar,
+                fontSize: 9,
+                fontWeight: 600,
+                formatter: () => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`
+              }
+            }))
+          }
+        ]
       };
     });
-    $$renderer2.push(`<div class="page-root"><div class="section-header svelte-8pceb3"><h2 class="section-title svelte-8pceb3">Analyse</h2> <div class="period-pills"><!--[-->`);
-    const each_array = ensure_array_like(PERIODS);
-    for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
-      let p = each_array[$$index];
-      $$renderer2.push(`<button${attr_class("pill", void 0, { "on": analysePeriod === p.key })}>${escape_html(p.label)}</button>`);
-    }
-    $$renderer2.push(`<!--]--></div></div> <div class="donut-grid svelte-8pceb3"><div class="card donut-card svelte-8pceb3"><div class="card-title">Allocatie</div> <div class="donut-wrap svelte-8pceb3">`);
-    Chart($$renderer2, { option: allocationOption(), height: "160px" });
-    $$renderer2.push(`<!----></div> <div class="donut-legend svelte-8pceb3"><!--[-->`);
-    const each_array_1 = ensure_array_like(allocationLabels());
-    for (let i = 0, $$length = each_array_1.length; i < $$length; i++) {
-      let t = each_array_1[i];
-      const total = allocationValues().reduce((a, b) => a + b, 0);
-      $$renderer2.push(`<div class="donut-legend-item svelte-8pceb3"><span class="donut-dot svelte-8pceb3"${attr_style(`background:${stringify(allocationColors()[i])}`)}></span> <span class="donut-ticker svelte-8pceb3">${escape_html(t)}</span> <span class="donut-pct svelte-8pceb3">${escape_html(total > 0 ? (allocationValues()[i] / total * 100).toFixed(1) : 0)}%</span></div>`);
-    }
-    $$renderer2.push(`<!--]--></div></div> <div class="card donut-card svelte-8pceb3"><div class="card-title">Sector</div> <div class="donut-wrap svelte-8pceb3">`);
-    Chart($$renderer2, { option: sectorOption(), height: "160px" });
-    $$renderer2.push(`<!----></div> <div class="donut-legend svelte-8pceb3"><!--[-->`);
-    const each_array_2 = ensure_array_like(sectorData()().labels);
-    for (let i = 0, $$length = each_array_2.length; i < $$length; i++) {
-      let s = each_array_2[i];
-      const total = sectorData()().values.reduce((a, b) => a + b, 0);
-      $$renderer2.push(`<div class="donut-legend-item svelte-8pceb3"><span class="donut-dot svelte-8pceb3"${attr_style(`background:${stringify(sectorData()().colors[i])}`)}></span> <span class="donut-ticker svelte-8pceb3">${escape_html(s)}</span> <span class="donut-pct svelte-8pceb3">${escape_html(total > 0 ? (sectorData()().values[i] / total * 100).toFixed(1) : 0)}%</span></div>`);
-    }
-    $$renderer2.push(`<!--]--></div></div> <div class="card donut-card svelte-8pceb3"><div class="card-title">Geografie</div> <div class="donut-wrap svelte-8pceb3">`);
-    Chart($$renderer2, { option: geoOption(), height: "160px" });
-    $$renderer2.push(`<!----></div> <div class="donut-legend svelte-8pceb3"><!--[-->`);
-    const each_array_3 = ensure_array_like(geoData()().labels);
-    for (let i = 0, $$length = each_array_3.length; i < $$length; i++) {
-      let g = each_array_3[i];
-      const total = geoData()().values.reduce((a, b) => a + b, 0);
-      $$renderer2.push(`<div class="donut-legend-item svelte-8pceb3"><span class="donut-dot svelte-8pceb3"${attr_style(`background:${stringify(geoData()().colors[i])}`)}></span> <span class="donut-ticker svelte-8pceb3">${escape_html(g)}</span> <span class="donut-pct svelte-8pceb3">${escape_html(total > 0 ? (geoData()().values[i] / total * 100).toFixed(1) : 0)}%</span></div>`);
-    }
-    $$renderer2.push(`<!--]--></div></div> <div class="card donut-card svelte-8pceb3"><div class="card-title">Valuta</div> <div class="donut-wrap svelte-8pceb3">`);
-    Chart($$renderer2, { option: currencyOption(), height: "160px" });
-    $$renderer2.push(`<!----></div> <div class="donut-legend svelte-8pceb3"><!--[-->`);
-    const each_array_4 = ensure_array_like(currencyData()().labels);
-    for (let i = 0, $$length = each_array_4.length; i < $$length; i++) {
-      let c = each_array_4[i];
-      $$renderer2.push(`<div class="donut-legend-item svelte-8pceb3"><span class="donut-dot svelte-8pceb3"${attr_style(`background:${stringify(currencyData()().colors[i])}`)}></span> <span class="donut-ticker svelte-8pceb3">${escape_html(c)}</span> <span class="donut-pct svelte-8pceb3">${escape_html(currencyData()().values[i].toFixed(1))}%</span></div>`);
-    }
-    $$renderer2.push(`<!--]--></div></div></div> `);
-    if (latest()) {
-      $$renderer2.push("<!--[0-->");
-      $$renderer2.push(`<div class="card chart-card" style="margin-top:16px"><div class="card-title" style="padding:12px 16px">Geïnvesteerd vs. huidig</div> `);
-      Chart($$renderer2, { option: barOption()(), height: "280px" });
-      $$renderer2.push(`<!----></div>`);
-    } else {
-      $$renderer2.push("<!--[-1-->");
-    }
-    $$renderer2.push(`<!--]--> <div class="card chart-card" style="margin-top:16px"><div class="chart-header svelte-8pceb3"><span class="card-title">Benchmark</span> <div class="seg"><button${attr_class("seg-btn", void 0, { "on": portfolioStore.activeBenchmark === "vwce" })}>VWCE</button> <button${attr_class("seg-btn", void 0, { "on": portfolioStore.activeBenchmark === "sp500" })}>S&amp;P 500</button> <button${attr_class("seg-btn", void 0, { "on": portfolioStore.activeBenchmark === "both" })}>Beide</button></div></div> `);
-    Chart($$renderer2, { option: benchmarkOption()(), height: "260px" });
-    $$renderer2.push(`<!----> <div class="legend svelte-8pceb3" style="padding:10px 16px;border-top:1px solid var(--border)"><div class="legend-item svelte-8pceb3"><span class="legend-line svelte-8pceb3" style="background:#818cf8"></span>Portefeuille</div> `);
-    if (portfolioStore.activeBenchmark === "vwce" || portfolioStore.activeBenchmark === "both") {
-      $$renderer2.push("<!--[0-->");
-      $$renderer2.push(`<div class="legend-item svelte-8pceb3"><span class="legend-line dashed svelte-8pceb3" style="border-color:#34d399"></span>VWCE</div>`);
-    } else {
-      $$renderer2.push("<!--[-1-->");
-    }
-    $$renderer2.push(`<!--]--> `);
-    if (portfolioStore.activeBenchmark === "sp500" || portfolioStore.activeBenchmark === "both") {
-      $$renderer2.push("<!--[0-->");
-      $$renderer2.push(`<div class="legend-item svelte-8pceb3"><span class="legend-line dashed svelte-8pceb3" style="border-color:#fbbf24"></span>S&amp;P 500</div>`);
-    } else {
-      $$renderer2.push("<!--[-1-->");
-    }
-    $$renderer2.push(`<!--]--></div></div> `);
-    if (portfolioStore.riskMetrics) {
-      $$renderer2.push("<!--[0-->");
-      const rm = portfolioStore.riskMetrics;
-      $$renderer2.push(`<div class="card" style="margin-top:16px;padding:16px"><div class="card-title" style="margin-bottom:12px">Risico</div> <div class="metrics-grid svelte-8pceb3"><div class="metric-item svelte-8pceb3"><div class="metric-label svelte-8pceb3">Sharpe</div> <div class="metric-value svelte-8pceb3">${escape_html(rm.sharpe != null ? fmtNum(rm.sharpe) : "—")}</div></div> <div class="metric-item svelte-8pceb3"><div class="metric-label svelte-8pceb3">Sortino</div> <div class="metric-value svelte-8pceb3">${escape_html(rm.sortino != null ? fmtNum(rm.sortino) : "—")}</div></div> <div class="metric-item svelte-8pceb3"><div class="metric-label svelte-8pceb3">Max Drawdown</div> <div${attr_class(`metric-value ${stringify((rm.maxDrawdown ?? 0) < 0 ? "c-neg" : "")}`, "svelte-8pceb3")}>${escape_html(rm.maxDrawdown != null ? fmtPct(rm.maxDrawdown) : "—")}</div></div> <div class="metric-item svelte-8pceb3"><div class="metric-label svelte-8pceb3">Volatiliteit</div> <div class="metric-value svelte-8pceb3">${escape_html(rm.volatility != null ? fmtPct(rm.volatility) : "—")}</div></div> <div class="metric-item svelte-8pceb3"><div class="metric-label svelte-8pceb3">Beta</div> <div class="metric-value svelte-8pceb3">${escape_html(rm.beta != null ? fmtNum(rm.beta) : "—")}</div></div> <div class="metric-item svelte-8pceb3"><div class="metric-label svelte-8pceb3">Calmar</div> <div class="metric-value svelte-8pceb3">${escape_html(rm.calmar != null ? fmtNum(rm.calmar) : "—")}</div></div> <div class="metric-item svelte-8pceb3"><div class="metric-label svelte-8pceb3">IRR</div> <div${attr_class(`metric-value ${stringify((portfolioStore.irrPct ?? 0) >= 0 ? "c-pos" : "c-neg")}`, "svelte-8pceb3")}>${escape_html(portfolioStore.irrPct != null ? fmtPct(portfolioStore.irrPct) : "—")}</div></div> <div class="metric-item svelte-8pceb3"><div class="metric-label svelte-8pceb3">Gerealiseerd</div> <div${attr_class(`metric-value ${stringify(portfolioStore.realizedPl >= 0 ? "c-pos" : "c-neg")}`, "svelte-8pceb3")}>`);
-      PrivacyValue($$renderer2, {
-        value: `${portfolioStore.realizedPl >= 0 ? "+" : ""}${fmt(portfolioStore.realizedPl)}`
+    const riskBars = derived(() => () => {
+      if (!rm()) return [];
+      const isDark = themeStore.isDark;
+      const pos = isDark ? "#34d399" : "#047857";
+      const neg = isDark ? "#f87171" : "#b91c1c";
+      const neu = isDark ? "#8b929c" : "#6a6f78";
+      const acc = isDark ? "#818cf8" : "#6366f1";
+      const bars = [];
+      if (rm().volatility != null) bars.push({
+        label: "Volatiliteit (1J)",
+        display: fmtPct(rm().volatility),
+        barPct: Math.min(100, Math.abs(rm().volatility) / 130 * 100),
+        color: neg
       });
-      $$renderer2.push(`<!----></div></div></div></div>`);
-    } else {
-      $$renderer2.push("<!--[-1-->");
+      if (rm().beta != null) bars.push({
+        label: "Beta",
+        display: fmtNum(rm().beta),
+        barPct: Math.min(100, Math.abs(rm().beta) / 2 * 100),
+        color: acc
+      });
+      if (rm().sharpe != null) bars.push({
+        label: "Sharpe",
+        display: fmtNum(rm().sharpe),
+        barPct: Math.min(100, Math.max(0, rm().sharpe) / 3 * 100),
+        color: rm().sharpe >= 1 ? pos : neu
+      });
+      if (portfolioStore.irrPct != null) bars.push({
+        label: "Annual return",
+        display: fmtPct(portfolioStore.irrPct),
+        barPct: Math.min(100, Math.abs(portfolioStore.irrPct) / 100 * 100),
+        color: portfolioStore.irrPct >= 0 ? pos : neg
+      });
+      return bars;
+    });
+    const riskNarrative = derived(() => () => {
+      if (!rm()) return "";
+      const parts = [];
+      if (rm().sharpe != null) parts.push(rm().sharpe > 1 ? "Hoog rendement" : rm().sharpe < 0.5 ? "Laag rendement" : "Gemiddeld rendement");
+      if (rm().volatility != null) parts.push(rm().volatility > 30 ? "hoge volatiliteit" : rm().volatility < 10 ? "lage volatiliteit" : "gemiddelde volatiliteit");
+      const top3 = [...portfolioStore.positions].sort((a, b) => b.value - a.value).slice(0, 3);
+      const top3val = top3.reduce((s, p) => s + p.value, 0);
+      const conc = totalValue() > 0 ? Math.round(top3val / totalValue() * 100) : 0;
+      if (conc > 50 && top3.length >= 3) parts.push(`Concentratierisico: ${conc}% van portefeuille in ${top3.length} namen`);
+      if (!parts.length) return "";
+      return parts.join(", ") + ".";
+    });
+    const latest = derived(() => portfolioStore.chartData[portfolioStore.chartData.length - 1]);
+    function toAllocItems(map, colors) {
+      const total = Object.values(map).reduce((a, b) => a + b, 0) || 1;
+      return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([name, val], i) => ({
+        name,
+        pct: val / total * 100,
+        color: colors[i % colors.length]
+      }));
     }
-    $$renderer2.push(`<!--]--> `);
-    if (portfolioStore.rollingReturns.length > 0) {
-      $$renderer2.push("<!--[0-->");
-      $$renderer2.push(`<div class="card" style="margin-top:16px;overflow-x:auto"><div class="card-title" style="padding:12px 16px">Rolling returns</div> <table class="pos-table svelte-8pceb3"><thead><tr><th class="svelte-8pceb3">Periode</th><th class="right svelte-8pceb3">Portefeuille</th><th class="right svelte-8pceb3">VWCE</th><th class="right svelte-8pceb3">S&amp;P 500</th></tr></thead><tbody class="svelte-8pceb3"><!--[-->`);
-      const each_array_5 = ensure_array_like(portfolioStore.rollingReturns);
-      for (let $$index_5 = 0, $$length = each_array_5.length; $$index_5 < $$length; $$index_5++) {
-        let r = each_array_5[$$index_5];
-        $$renderer2.push(`<tr class="svelte-8pceb3"><td class="svelte-8pceb3">${escape_html(r.period)}</td><td${attr_class(`right mono ${stringify((r.portfolio ?? 0) >= 0 ? "c-pos" : "c-neg")}`, "svelte-8pceb3")}>${escape_html(r.portfolio != null ? fmtPct(r.portfolio) : "—")}</td><td class="right mono svelte-8pceb3">${escape_html(r.benchmark != null ? fmtPct(r.benchmark) : "—")}</td><td class="right mono svelte-8pceb3">${escape_html(r.sp500 != null ? fmtPct(r.sp500) : "—")}</td></tr>`);
+    const sectorItems = derived(() => () => {
+      if (!latest()) return [];
+      const map = {};
+      for (const t of portfolioStore.currentTickers) {
+        const s = portfolioStore.tickerMeta[t]?.["sector"] ?? "Overig";
+        map[s] = (map[s] ?? 0) + (latest()[t] ?? 0);
       }
-      $$renderer2.push(`<!--]--></tbody></table></div>`);
-    } else {
-      $$renderer2.push("<!--[-1-->");
+      return toAllocItems(map, SECTOR_COLORS);
+    });
+    const geoItems = derived(() => () => {
+      if (!latest()) return [];
+      const map = {};
+      for (const t of portfolioStore.currentTickers) {
+        const g = portfolioStore.tickerMeta[t]?.["geo"] ?? "Overig";
+        map[g] = (map[g] ?? 0) + (latest()[t] ?? 0);
+      }
+      return toAllocItems(map, GEO_COLORS);
+    });
+    const currencyItems = derived(() => () => {
+      const exp = portfolioStore.currencyExposure ?? {};
+      if (!Object.keys(exp).length) {
+        const usd = portfolioStore.usdExposurePct ?? 0;
+        return [
+          { name: "USD", pct: usd, color: CCY_COLORS[0] },
+          { name: "EUR", pct: 100 - usd, color: CCY_COLORS[1] }
+        ];
+      }
+      return toAllocItems(exp, CCY_COLORS);
+    });
+    const contributionItems = derived(() => () => {
+      const positions = portfolioStore.positions;
+      if (!positions.length) return [];
+      const maxAbs = Math.max(...positions.map((p) => Math.abs(p.pl)), 1);
+      return [...positions].sort((a, b) => b.pl - a.pl).map((p) => ({
+        ticker: p.ticker,
+        pl: p.pl,
+        plPct: p.plPct,
+        barPct: Math.abs(p.pl) / maxAbs * 78
+      }));
+    });
+    function fmtContrib(pl) {
+      const abs = Math.abs(Math.round(pl));
+      return `${pl >= 0 ? "+" : "-"}€ ${abs.toLocaleString("nl-BE")}`;
     }
-    $$renderer2.push(`<!--]--> `);
-    if (portfolioStore.annualPl.length > 0) {
+    $$renderer2.push(`<div class="page-root"><div style="margin-bottom:20px"><div class="h-eyebrow" style="margin-bottom:4px">Analyse</div> <div class="h-xl">Prestaties &amp; risico</div></div> `);
+    if (portfolioStore.loaded && portfolioStore.positions.length > 0) {
       $$renderer2.push("<!--[0-->");
-      $$renderer2.push(`<div class="card chart-card" style="margin-top:16px"><div class="card-title" style="padding:12px 16px">Jaarlijks resultaat</div> `);
-      Chart($$renderer2, { option: annualOption()(), height: "220px" });
-      $$renderer2.push(`<!----></div>`);
+      $$renderer2.push(`<div class="kpi-grid svelte-8pceb3"><div class="card kpi-card svelte-8pceb3"><div class="h-eyebrow">TWR${escape_html(startYear()() ? ` SINDS ${startYear()()}` : "")}</div> <div${attr_class(`kpi-val mono ${stringify((twr()() ?? 0) >= 0 ? "c-pos" : "c-neg")}`, "svelte-8pceb3")}>`);
+      PrivacyValue($$renderer2, {
+        value: twr()() != null ? `${twr()() >= 0 ? "+" : ""}${twr()().toFixed(1)}%` : "—"
+      });
+      $$renderer2.push(`<!----></div> <div class="h-sm">Tijd-gewogen</div></div> <div class="card kpi-card svelte-8pceb3"><div class="h-eyebrow">IRR (GELD-GEWOGEN)</div> <div${attr_class(`kpi-val mono ${stringify((portfolioStore.irrPct ?? 0) >= 0 ? "c-pos" : "c-neg")}`, "svelte-8pceb3")}>`);
+      PrivacyValue($$renderer2, {
+        value: portfolioStore.irrPct != null ? fmtPct(portfolioStore.irrPct) : "—"
+      });
+      $$renderer2.push(`<!----></div> <div class="h-sm">Jaarlijks</div></div> `);
+      if (rm()) {
+        $$renderer2.push("<!--[0-->");
+        $$renderer2.push(`<div class="card kpi-card svelte-8pceb3"><div class="h-eyebrow">SHARPE</div> <div class="kpi-val mono svelte-8pceb3">${escape_html(rm().sharpe != null ? fmtNum(rm().sharpe) : "—")}</div> <div class="h-sm">Rendement / risico</div></div> <div class="card kpi-card svelte-8pceb3"><div class="h-eyebrow">MAX DRAWDOWN</div> <div class="kpi-val mono c-neg svelte-8pceb3">`);
+        PrivacyValue($$renderer2, {
+          value: rm().maxDrawdown != null ? fmtPct(rm().maxDrawdown) : "—"
+        });
+        $$renderer2.push(`<!----></div> <div class="h-sm">Worst stretch</div></div>`);
+      } else {
+        $$renderer2.push("<!--[-1-->");
+      }
+      $$renderer2.push(`<!--]--></div> <div class="analysis-split svelte-8pceb3"><div class="card"><div class="split-card-head svelte-8pceb3"><div class="h-md">Rolling returns</div> <div class="h-sm" style="margin-top:1px">Portefeuille per periode</div></div> `);
+      if (orderedRolling()().length > 0) {
+        $$renderer2.push("<!--[0-->");
+        Chart($$renderer2, { option: rollingChartOption()(), height: "220px" });
+      } else {
+        $$renderer2.push("<!--[-1-->");
+        $$renderer2.push(`<div class="empty-msg svelte-8pceb3">Geen rolling returns beschikbaar</div>`);
+      }
+      $$renderer2.push(`<!--]--></div> <div class="card risk-card svelte-8pceb3"><div class="split-card-head svelte-8pceb3"><div class="h-md">Risico-profiel</div></div> `);
+      if (riskBars()().length > 0) {
+        $$renderer2.push("<!--[0-->");
+        $$renderer2.push(`<div class="risk-bars svelte-8pceb3"><!--[-->`);
+        const each_array = ensure_array_like(riskBars()());
+        for (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {
+          let bar = each_array[$$index];
+          $$renderer2.push(`<div class="risk-row svelte-8pceb3"><div class="risk-label svelte-8pceb3">${escape_html(bar.label)}</div> <div class="risk-track svelte-8pceb3"><div class="risk-fill svelte-8pceb3"${attr_style(`width:${stringify(bar.barPct)}%;background:${stringify(bar.color)}`)}></div></div> <div class="risk-val mono svelte-8pceb3"${attr_style(`color:${stringify(bar.color)}`)}>${escape_html(bar.display)}</div></div>`);
+        }
+        $$renderer2.push(`<!--]--></div> `);
+        if (rm()) {
+          $$renderer2.push("<!--[0-->");
+          $$renderer2.push(`<div class="risk-extra svelte-8pceb3"><div class="risk-extra-row svelte-8pceb3"><span class="h-sm">Sortino</span> <span class="mono svelte-8pceb3" style="font-size:12px;font-weight:600">${escape_html(rm().sortino != null ? fmtNum(rm().sortino) : "—")}</span></div> <div class="risk-extra-row svelte-8pceb3"><span class="h-sm">Calmar</span> <span class="mono svelte-8pceb3" style="font-size:12px;font-weight:600">${escape_html(rm().calmar != null ? fmtNum(rm().calmar) : "—")}</span></div> <div class="risk-extra-row svelte-8pceb3"><span class="h-sm">Gerealiseerd</span> <span${attr_class(`mono ${stringify(portfolioStore.realizedPl >= 0 ? "c-pos" : "c-neg")}`, "svelte-8pceb3")} style="font-size:12px;font-weight:600">`);
+          PrivacyValue($$renderer2, {
+            value: `${portfolioStore.realizedPl >= 0 ? "+" : ""}${fmt(portfolioStore.realizedPl)}`
+          });
+          $$renderer2.push(`<!----></span></div></div>`);
+        } else {
+          $$renderer2.push("<!--[-1-->");
+        }
+        $$renderer2.push(`<!--]--> `);
+        if (riskNarrative()()) {
+          $$renderer2.push("<!--[0-->");
+          $$renderer2.push(`<div class="risk-narrative svelte-8pceb3">${escape_html(riskNarrative()())}</div>`);
+        } else {
+          $$renderer2.push("<!--[-1-->");
+        }
+        $$renderer2.push(`<!--]-->`);
+      } else {
+        $$renderer2.push("<!--[-1-->");
+        $$renderer2.push(`<div class="empty-msg svelte-8pceb3">Onvoldoende data</div>`);
+      }
+      $$renderer2.push(`<!--]--></div></div> <div class="alloc-grid svelte-8pceb3"><!--[-->`);
+      const each_array_1 = ensure_array_like([
+        { title: "Sector", items: sectorItems()() },
+        { title: "Regio", items: geoItems()() },
+        { title: "Munt", items: currencyItems()() }
+      ]);
+      for (let $$index_3 = 0, $$length = each_array_1.length; $$index_3 < $$length; $$index_3++) {
+        let panel = each_array_1[$$index_3];
+        $$renderer2.push(`<div class="card alloc-card svelte-8pceb3"><div class="h-md" style="margin-bottom:10px">${escape_html(panel.title)}</div> <div class="alloc-stack svelte-8pceb3"><!--[-->`);
+        const each_array_2 = ensure_array_like(panel.items);
+        for (let $$index_1 = 0, $$length2 = each_array_2.length; $$index_1 < $$length2; $$index_1++) {
+          let item = each_array_2[$$index_1];
+          $$renderer2.push(`<div class="alloc-seg svelte-8pceb3"${attr_style(`width:${stringify(item.pct)}%;background:${stringify(item.color)}`)}></div>`);
+        }
+        $$renderer2.push(`<!--]--></div> <div class="alloc-list svelte-8pceb3"><!--[-->`);
+        const each_array_3 = ensure_array_like(panel.items);
+        for (let $$index_2 = 0, $$length2 = each_array_3.length; $$index_2 < $$length2; $$index_2++) {
+          let item = each_array_3[$$index_2];
+          $$renderer2.push(`<div class="alloc-row svelte-8pceb3"><span class="dot"${attr_style(`background:${stringify(item.color)}`)}></span> <span class="alloc-name svelte-8pceb3">${escape_html(item.name)}</span> <span class="alloc-pct mono svelte-8pceb3">${escape_html(item.pct.toFixed(1))}%</span></div>`);
+        }
+        $$renderer2.push(`<!--]--></div></div>`);
+      }
+      $$renderer2.push(`<!--]--></div> `);
+      if (contributionItems()().length > 0) {
+        $$renderer2.push("<!--[0-->");
+        $$renderer2.push(`<div class="card contrib-card svelte-8pceb3"><div style="padding:14px 18px 12px;border-bottom:1px solid var(--border)"><div class="h-md">Bijdrage aan rendement</div> <div class="h-sm" style="margin-top:2px">Welke posities dreven de performance</div></div> <!--[-->`);
+        const each_array_4 = ensure_array_like(contributionItems()());
+        for (let $$index_4 = 0, $$length = each_array_4.length; $$index_4 < $$length; $$index_4++) {
+          let item = each_array_4[$$index_4];
+          $$renderer2.push(`<div class="contrib-row svelte-8pceb3"><span class="dot"${attr_style(`background:${stringify(getColor(item.ticker))}`)}></span> <span class="contrib-ticker svelte-8pceb3">${escape_html(item.ticker)}</span> <div class="contrib-track svelte-8pceb3"><div${attr_class(`contrib-fill ${stringify(item.pl >= 0 ? "pos" : "neg")}`, "svelte-8pceb3")}${attr_style(`width:${stringify(item.barPct)}%`)}></div> <span${attr_class(`contrib-amount mono ${stringify(item.pl >= 0 ? "c-pos" : "c-neg")}`, "svelte-8pceb3")}>`);
+          PrivacyValue($$renderer2, { value: fmtContrib(item.pl) });
+          $$renderer2.push(`<!----></span></div> <span${attr_class(`contrib-pct mono ${stringify(item.plPct >= 0 ? "c-pos" : "c-neg")}`, "svelte-8pceb3")}>${escape_html(fmtPct(item.plPct))}</span></div>`);
+        }
+        $$renderer2.push(`<!--]--></div>`);
+      } else {
+        $$renderer2.push("<!--[-1-->");
+      }
+      $$renderer2.push(`<!--]-->`);
+    } else if (portfolioStore.loaded) {
+      $$renderer2.push("<!--[1-->");
+      $$renderer2.push(`<div class="empty-msg svelte-8pceb3" style="padding:32px 0">Voeg transacties toe om de analyse te zien.</div>`);
     } else {
       $$renderer2.push("<!--[-1-->");
     }

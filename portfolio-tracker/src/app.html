@@ -6,12 +6,39 @@
     <title>Portefeuille Tracker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
     <div style="display: contents">%sveltekit.body%</div>
+    <script>
+      // Home Assistant ingress mounts this app under a dynamic path like
+      // /api/hassio_ingress/<token>/ that isn't known at build time. SvelteKit
+      // bakes `base: ""` into index.html, so its runtime fetches absolute paths
+      // like /_app/version.json which escape the ingress scope and 404.
+      //
+      // The <link rel="modulepreload"> tags in <head> have their href resolved
+      // by the browser against document.baseURI, so we can read the live app
+      // root from any of them. We patch the __sveltekit_* global before the
+      // dynamic imports in the preceding inline script resolve — at that point
+      // SvelteKit's client modules haven't yet read `base`.
+      (function () {
+        var links = document.querySelectorAll('link[rel="modulepreload"]');
+        for (var link of links) {
+          var m = link.href.match(/^(.*)\/_app\//);
+          if (!m) continue;
+          var base = new URL(m[1]).pathname.replace(/\/$/, '');
+          for (var k in globalThis) {
+            if (k.indexOf('__sveltekit_') === 0 && globalThis[k]) {
+              globalThis[k].base = base;
+              globalThis[k].assets = base;
+            }
+          }
+          return;
+        }
+      })();
+    </script>
   </body>
 </html>

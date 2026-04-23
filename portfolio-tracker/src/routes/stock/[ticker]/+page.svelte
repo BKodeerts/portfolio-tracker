@@ -4,7 +4,7 @@
   import { intradayStore } from '$lib/stores/intraday.svelte';
   import { themeStore } from '$lib/stores/theme.svelte';
   import { fetchCandles } from '$lib/api/candles';
-  import { fmt, fmtPct } from '$lib/utils/fmt';
+  import { fmt } from '$lib/utils/fmt';
   import { getColor } from '$lib/utils/color';
   import { isExchangeOpen, normalizeMarketState, EU_EXCHANGE_RE, sessionBounds } from '$lib/utils/exchange';
   import { periodCutoff } from '$lib/utils/period';
@@ -15,9 +15,8 @@
   import type { EChartsOption } from 'echarts';
 
   const PERIODS: { key: Period; label: string }[] = [
-    { key: '1d', label: '1D' }, { key: '1m', label: '1M' }, { key: '3m', label: '3M' },
-    { key: '6m', label: '6M' }, { key: 'ytd', label: 'YTD' }, { key: '1y', label: '1Y' },
-    { key: '2y', label: '2Y' }, { key: '3y', label: '3Y' }, { key: 'total', label: 'Max' },
+    { key: '1m', label: '1M' }, { key: '3m', label: '3M' }, { key: '6m', label: '6M' },
+    { key: 'ytd', label: 'YTD' }, { key: '1y', label: '1J' }, { key: 'total', label: 'Max' },
   ];
 
   const ticker  = $derived($page.params['ticker'] ?? '');
@@ -33,8 +32,6 @@
   const pl     = $derived(val - cost);
   const plPct  = $derived(cost > 0 ? (pl / cost) * 100 : 0);
   const shares = $derived((latest?.[`${ticker}_shares`] as number | undefined) ?? pos?.shares ?? 0);
-  const realPl = $derived((portfolioStore.realizedPlPerTicker[ticker]) ?? 0);
-  const divInc = $derived((portfolioStore.dividendsPerTicker[ticker]) ?? 0);
 
   // Currency symbol
   const nativeCcy = $derived((meta['currency'] as string | undefined) ?? 'EUR');
@@ -75,8 +72,13 @@
       : null,
   );
 
+  // Derive native-currency avg cost using current implicit FX rate (value/shares/currentPrice)
+  const priceEur      = $derived(shares > 0 && currentPrice != null && currentPrice > 0 ? val / shares : null);
+  const impliedFx     = $derived(priceEur && priceEur > 0 && currentPrice != null ? currentPrice / priceEur : null);
+  const avgCostNative = $derived(pos?.avgCost != null && impliedFx != null ? pos.avgCost * impliedFx : null);
+
   // Period + candles
-  let period   = $state<Period>('1d');
+  let period   = $state<Period>('3m');
   let candles  = $state<Candle[]>([]);
   let loading  = $state(false);
 
@@ -290,224 +292,244 @@
 </script>
 
 <div class="page-root">
-  <div class="sd-page-header">
+  <!-- Mobile top bar -->
+  <div class="mobile-topbar">
+    <a href="/" class="mobile-circle-btn" aria-label="Terug">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <div class="mobile-topbar-title">
+      <span class="mobile-avatar" style="background:{color}">{ticker.slice(0, 2)}</span>
+      <span class="mobile-topbar-ticker">{ticker}</span>
+    </div>
+    <button class="mobile-circle-btn" aria-label="Meer opties">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+    </button>
+  </div>
+
+  <!-- Desktop header (hidden on mobile) -->
+  <div class="sd-desktop-header">
     <div class="sd-identity">
       <span class="color-dot" style="background:{color}"></span>
       <span class="sd-ticker">{ticker}</span>
-      {#if meta['label']}
-        <span class="sd-name">{meta['label'] as string}</span>
-      {/if}
+      {#if meta['label']}<span class="sd-name">{meta['label'] as string}</span>{/if}
     </div>
     <div class="sd-price-row">
       {#if currentPrice != null}
-        <span class="sd-price">
-          <PrivacyValue value="{ccySym}{currentPrice.toFixed(2)}" />
-        </span>
+        <span class="sd-price"><PrivacyValue value="{ccySym}{currentPrice.toFixed(2)}" /></span>
       {/if}
       {#if extChangePct != null && regularChangePct != null}
         <span class="sd-change-group">
           <span class="sd-change-lbl">Markt</span>
-          <span class="sd-change {regularChangePct >= 0 ? 'c-pos' : 'c-neg'}">
-            {regularChangePct >= 0 ? '+' : ''}{regularChangePct.toFixed(2)}%
-          </span>
+          <span class="sd-change {regularChangePct >= 0 ? 'c-pos' : 'c-neg'}">{regularChangePct >= 0 ? '+' : ''}{regularChangePct.toFixed(2)}%</span>
           <span class="sd-change-sep">·</span>
           <span class="sd-change-lbl">{marketState === 'PRE' ? 'Pre' : 'Post'}</span>
-          <span class="sd-change {extChangePct >= 0 ? 'c-pos' : 'c-neg'}">
-            {extChangePct >= 0 ? '+' : ''}{extChangePct.toFixed(2)}%
-          </span>
+          <span class="sd-change {extChangePct >= 0 ? 'c-pos' : 'c-neg'}">{extChangePct >= 0 ? '+' : ''}{extChangePct.toFixed(2)}%</span>
         </span>
       {:else if dayChangePct != null}
-        <span class="sd-change {dayChangePct >= 0 ? 'c-pos' : 'c-neg'}">
-          {dayChangePct >= 0 ? '+' : ''}{dayChangePct.toFixed(2)}%
-        </span>
+        <span class="sd-change {dayChangePct >= 0 ? 'c-pos' : 'c-neg'}">{dayChangePct >= 0 ? '+' : ''}{dayChangePct.toFixed(2)}%</span>
       {/if}
       <span class="badge {msBadgeClass(marketState)}">{msBadgeLabel(marketState)}</span>
     </div>
   </div>
-  <!-- Stats row -->
-  <div class="stats-grid card">
-    <div class="stat">
-      <div class="stat-label">Waarde</div>
-      <div class="stat-val"><PrivacyValue value={fmt(val)} /></div>
+
+  <!-- Mobile hero: name · big value · P&L pill -->
+  <div class="sd-hero">
+    {#if meta['label']}
+      <div class="h-eyebrow" style="margin-bottom:6px">{(meta['label'] as string).toUpperCase()}</div>
+    {/if}
+    <div class="sd-hero-value"><PrivacyValue value={fmt(val)} /></div>
+    <div class="sd-hero-pl">
+      {#if pl !== 0}
+        <span class="sd-pl-pill {pl >= 0 ? 'pos' : 'neg'}">
+          {pl >= 0 ? '▲' : '▼'} {Math.abs(plPct).toFixed(2)}%
+        </span>
+        <span class="sd-pl-total {pl >= 0 ? 'c-pos' : 'c-neg'}">
+          {pl >= 0 ? '+' : ''}<PrivacyValue value={fmt(pl)} /> totaal
+        </span>
+      {/if}
     </div>
-    <div class="stat">
-      <div class="stat-label">P&amp;L</div>
-      <div class="stat-val {pl >= 0 ? 'c-pos' : 'c-neg'}">
-        <PrivacyValue value="{pl >= 0 ? '+' : ''}{fmt(pl)}" />
-      </div>
-      <div class="stat-sub {pl >= 0 ? 'c-pos' : 'c-neg'}">{fmtPct(plPct)}</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Ingelegd</div>
-      <div class="stat-val"><PrivacyValue value={fmt(cost)} /></div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Aandelen</div>
-      <div class="stat-val mono"><PrivacyValue value={String(shares)} /></div>
-    </div>
-    {#if pos?.avgCost}
-      <div class="stat">
-        <div class="stat-label">Gem. kostprijs</div>
-        <div class="stat-val mono">{ccySym}{pos.avgCost.toFixed(2)}</div>
-      </div>
-    {/if}
-    {#if realPl !== 0}
-      <div class="stat">
-        <div class="stat-label">Gerealiseerd</div>
-        <div class="stat-val {realPl >= 0 ? 'c-pos' : 'c-neg'}">
-          <PrivacyValue value="{realPl >= 0 ? '+' : ''}{fmt(realPl)}" />
-        </div>
-      </div>
-    {/if}
-    {#if divInc > 0}
-      <div class="stat">
-        <div class="stat-label">Dividenden</div>
-        <div class="stat-val c-pos"><PrivacyValue value="+{fmt(divInc)}" /></div>
-      </div>
-    {/if}
-    {#if (meta['high52'] as number | undefined) != null}
-      <div class="stat">
-        <div class="stat-label">52W Hoog</div>
-        <div class="stat-val mono">{ccySym}{(meta['high52'] as number).toFixed(2)}</div>
-      </div>
-    {/if}
-    {#if (meta['low52'] as number | undefined) != null}
-      <div class="stat">
-        <div class="stat-label">52W Laag</div>
-        <div class="stat-val mono">{ccySym}{(meta['low52'] as number).toFixed(2)}</div>
-      </div>
-    {/if}
-    {#if (meta['pe'] as number | undefined) != null}
-      <div class="stat">
-        <div class="stat-label">P/E</div>
-        <div class="stat-val mono">{(meta['pe'] as number).toFixed(1)}</div>
-      </div>
-    {/if}
   </div>
 
   <!-- Chart -->
-  <div class="card chart-card" style="margin-top:12px">
-    <div class="chart-header">
-      <div class="period-pills">
-        {#each PERIODS as p}
-          <button class="pill" class:on={period === p.key} onclick={() => (period = p.key)}>
-            {p.label}
-          </button>
-        {/each}
-      </div>
-    </div>
+  <div class="sd-chart-wrap">
     {#if loading}
       <div class="chart-placeholder">Laden…</div>
-    {:else if period === '1d' && allPts.length > 0 && prevClose != null}
-      <Chart option={chartOption()} height="280px" />
-    {:else if period !== '1d' && candles.length > 1}
-      <Chart option={chartOption()} height="280px" />
+    {:else if candles.length > 1}
+      <Chart option={chartOption()} height="240px" />
     {:else}
       <div class="chart-placeholder">Geen data voor deze periode</div>
     {/if}
   </div>
 
-  <!-- Transactions -->
+  <!-- Period selector -->
+  <div class="sd-periods card">
+    {#each PERIODS as p}
+      <button class="sd-period-btn" class:on={period === p.key} onclick={() => (period = p.key)}>
+        {p.label}
+      </button>
+    {/each}
+  </div>
+
+  <!-- 2×2 stat cards -->
+  <div class="sd-stats">
+    <div class="sd-stat card">
+      <div class="sd-stat-label">Aantal</div>
+      <div class="sd-stat-val mono"><PrivacyValue value={String(shares)} /></div>
+      {#if currentPrice != null}
+        <div class="sd-stat-sub">{nativeCcy} {currentPrice.toFixed(2)}</div>
+      {/if}
+    </div>
+    <div class="sd-stat card">
+      <div class="sd-stat-label">Gem. kost</div>
+      {#if avgCostNative != null}
+        <div class="sd-stat-val mono">{nativeCcy} {avgCostNative.toFixed(2)}</div>
+      {:else if pos?.avgCost}
+        <div class="sd-stat-val mono">€ {pos.avgCost.toFixed(2)}</div>
+      {/if}
+      <div class="sd-stat-sub"><PrivacyValue value={fmt(cost)} /></div>
+    </div>
+    <div class="sd-stat card">
+      <div class="sd-stat-label">Vandaag</div>
+      {#if pos?.dayPl != null}
+        <div class="sd-stat-val {pos.dayPl >= 0 ? 'c-pos' : 'c-neg'}">
+          <PrivacyValue value="€ {pos.dayPl >= 0 ? '+' : ''}{pos.dayPl.toFixed(0)}" />
+        </div>
+        <div class="sd-stat-sub {pos.dayPl >= 0 ? 'c-pos' : 'c-neg'}">{(pos.dayPlPct ?? 0) >= 0 ? '+' : ''}{(pos.dayPlPct ?? 0).toFixed(2)}%</div>
+      {:else if dayChangePct != null}
+        <div class="sd-stat-val {dayChangePct >= 0 ? 'c-pos' : 'c-neg'}">{dayChangePct >= 0 ? '+' : ''}{dayChangePct.toFixed(2)}%</div>
+      {:else}
+        <div class="sd-stat-val c-muted">—</div>
+      {/if}
+    </div>
+    <div class="sd-stat card">
+      <div class="sd-stat-label">P&amp;L %</div>
+      <div class="sd-stat-val {pl >= 0 ? 'c-pos' : 'c-neg'}">{pl >= 0 ? '+' : ''}{plPct.toFixed(1)}%</div>
+      <div class="sd-stat-sub {pl >= 0 ? 'c-pos' : 'c-neg'}"><PrivacyValue value="{pl >= 0 ? '+' : ''}{fmt(pl)}" /></div>
+    </div>
+  </div>
+
+  <!-- Transactions list -->
   {#if txs.length > 0}
-    <div class="card" style="margin-top:12px;overflow-x:auto">
-      <div class="card-title" style="padding:10px 14px;border-bottom:1px solid var(--border)">Transacties</div>
-      <table class="tx-table">
-        <thead>
-          <tr>
-            <th>Datum</th>
-            <th>Type</th>
-            <th class="right">Aandelen</th>
-            <th class="right">Kosten €</th>
-            <th class="right desktop-only">Prijs</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each txs as tx}
-            {@const isDividend = tx.shares === 0}
-            {@const isSale     = !isDividend && tx.shares < 0}
-            {@const price      = !isDividend && tx.shares !== 0 ? Math.abs(tx.costEur / tx.shares) : null}
-            <tr>
-              <td class="mono">{tx.date}</td>
-              <td class="{isDividend ? 'c-div' : isSale ? 'c-neg' : 'c-pos'}">
-                {isDividend ? 'Dividend' : isSale ? 'Verkoop' : 'Koop'}
-              </td>
-              <td class="right mono">
-                {isDividend ? '—' : Math.abs(tx.shares).toLocaleString('nl-BE', { maximumFractionDigits: 4 })}
-              </td>
-              <td class="right mono"><PrivacyValue value={fmt(Math.abs(tx.costEur))} /></td>
-              <td class="right mono desktop-only">
-                {price != null ? `${ccySym}${price.toFixed(2)}` : '—'}
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+    <div class="card sd-tx-card">
+      <div class="sd-tx-title">Laatste transacties</div>
+      {#each txs as tx}
+        {@const isDividend = tx.shares === 0}
+        {@const isSale = !isDividend && tx.shares < 0}
+        <div class="sd-tx-row">
+          <div class="sd-tx-left">
+            <div class="sd-tx-type">
+              {isDividend ? 'Dividend' : isSale ? 'Verkoop' : 'Koop'}{#if !isDividend} · {Math.abs(tx.shares).toLocaleString('nl-BE', { maximumFractionDigits: 4 })} aandelen{/if}
+            </div>
+            <div class="sd-tx-date">{tx.date}</div>
+          </div>
+          <div class="sd-tx-amount mono"><PrivacyValue value={fmt(tx.costEur)} /></div>
+        </div>
+      {/each}
     </div>
   {/if}
 </div>
 
 <style>
-  .sd-page-header {
-    display: flex; align-items: center; gap: 12px;
-    padding: 16px 0 12px; flex-wrap: wrap;
+  /* ── Mobile topbar ── */
+  .mobile-topbar {
+    display: none; align-items: center; justify-content: space-between; padding: 10px 0 6px;
+  }
+  .mobile-topbar-title { display: flex; align-items: center; gap: 8px; }
+  .mobile-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff; letter-spacing: 0.02em; flex-shrink: 0; opacity: 0.85;
+  }
+  .mobile-topbar-ticker { font-size: 16px; font-weight: 700; }
+  .mobile-circle-btn {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--surface-2); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--fg); text-decoration: none; flex-shrink: 0;
+  }
+  .mobile-circle-btn:hover { background: var(--surface-3, var(--surface-2)); }
+
+  @media (max-width: 640px) { .mobile-topbar { display: flex; } }
+
+  /* ── Desktop header ── */
+  .sd-desktop-header {
+    display: flex; align-items: center; gap: 12px; padding: 16px 0 12px; flex-wrap: wrap;
   }
   .sd-identity { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
   .color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
   .sd-ticker { font-size: 18px; font-weight: 700; }
   .sd-name { font-size: 12px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
   .sd-price-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .sd-price { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; }
   .sd-change { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
   .sd-change-group { display: inline-flex; align-items: baseline; gap: 4px; font-family: 'JetBrains Mono', monospace; }
   .sd-change-lbl { font-size: 10px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
   .sd-change-sep { color: var(--fg-muted); opacity: 0.5; margin: 0 2px; }
-
-  .badge {
-    font-size: 9px; font-weight: 600; letter-spacing: 0.05em;
-    padding: 2px 5px; border-radius: 3px; text-transform: uppercase; white-space: nowrap;
-  }
+  .badge { font-size: 9px; font-weight: 600; letter-spacing: 0.05em; padding: 2px 5px; border-radius: 3px; text-transform: uppercase; white-space: nowrap; }
   .badge-open   { background: rgba(74,222,128,0.15); color: #4ade80; }
   .badge-ext    { background: rgba(251,191,36,0.15);  color: #fbbf24; }
   .badge-closed { background: rgba(100,116,139,0.15); color: #64748b; }
+  @media (max-width: 640px) { .sd-desktop-header { display: none; } }
 
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    overflow: hidden;
+  /* ── Hero ── */
+  .sd-hero { padding: 4px 0 12px; }
+  .sd-hero-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 36px; font-weight: 700; letter-spacing: -0.02em;
+    line-height: 1.1; margin-bottom: 8px;
   }
-  .stat {
-    padding: 12px 14px;
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+  .sd-hero-pl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .sd-pl-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 6px;
+    font-size: 12px; font-weight: 600;
   }
-  .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-muted); margin-bottom: 3px; }
-  .stat-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; }
-  .stat-sub { font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-top: 1px; }
+  .sd-pl-pill.pos { background: rgba(4,120,87,0.12); color: var(--c-pos, #047857); }
+  .sd-pl-pill.neg { background: rgba(185,28,28,0.1);  color: var(--c-neg, #b91c1c); }
+  .sd-pl-total { font-size: 13px; font-weight: 500; }
+  @media (min-width: 641px) { .sd-hero { display: none; } }
 
-  .chart-header {
-    padding: 10px 14px; border-bottom: 1px solid var(--border);
-  }
+  /* ── Chart ── */
+  .sd-chart-wrap { margin: 0 -16px; }
+  @media (min-width: 641px) { .sd-chart-wrap { margin: 12px 0 0; } }
   .chart-placeholder {
     display: flex; align-items: center; justify-content: center;
-    height: 120px; color: var(--fg-muted); font-size: 13px;
+    height: 160px; color: var(--fg-muted); font-size: 13px;
   }
 
-  .tx-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .tx-table th {
-    padding: 7px 12px; font-size: 11px; font-weight: 600; color: var(--fg-muted);
-    text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border);
-    text-align: left;
+  /* ── Period selector ── */
+  .sd-periods {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 12px 0; padding: 4px;
   }
-  .tx-table th.right, .tx-table td.right { text-align: right; }
-  .tx-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
-  .tx-table tbody tr:last-child td { border-bottom: none; }
-  .tx-table tbody tr:hover { background: var(--hover-bg, rgba(0,0,0,0.03)); }
+  .sd-period-btn {
+    flex: 1; padding: 7px 4px; font-size: 12px; font-weight: 500;
+    background: none; border: none; cursor: pointer;
+    color: var(--fg-muted); border-radius: 8px; text-align: center;
+    transition: color 0.1s, background 0.1s;
+  }
+  .sd-period-btn:hover { color: var(--fg); }
+  .sd-period-btn.on { background: var(--surface-3, var(--surface-2)); color: var(--fg); font-weight: 700; }
 
-  .c-div { color: #f59e0b; }
+  /* ── 2×2 stat cards ── */
+  .sd-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .sd-stat { padding: 14px 16px; }
+  .sd-stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--fg-muted); margin-bottom: 6px; }
+  .sd-stat-val { font-size: 20px; font-weight: 700; line-height: 1.1; margin-bottom: 3px; }
+  .sd-stat-sub { font-size: 12px; color: var(--fg-muted); }
+
+  /* ── Transactions list ── */
+  .sd-tx-card { overflow: hidden; }
+  .sd-tx-title { font-size: 15px; font-weight: 700; padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
+  .sd-tx-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 16px; border-bottom: 1px solid var(--border);
+  }
+  .sd-tx-row:last-child { border-bottom: none; }
+  .sd-tx-left { display: flex; flex-direction: column; gap: 2px; }
+  .sd-tx-type { font-size: 13px; font-weight: 600; }
+  .sd-tx-date { font-size: 11px; color: var(--fg-muted); }
+  .sd-tx-amount { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; }
+
   .mono { font-family: 'JetBrains Mono', monospace; }
-
-  @media (max-width: 640px) {
-    .desktop-only { display: none !important; }
-  }
 </style>

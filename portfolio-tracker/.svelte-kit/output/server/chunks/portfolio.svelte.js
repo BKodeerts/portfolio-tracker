@@ -1,6 +1,6 @@
-import { f as derived } from "./renderer.js";
+import { d as derived } from "./renderer.js";
 async function apiFetch(path, init) {
-  const res = await fetch(path, init);
+  const res = await fetch(path.replace(/^\//, ""), init);
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`API ${path} → ${res.status}: ${text}`);
@@ -33,7 +33,7 @@ function createPortfolioStore() {
   let currentTickers = [];
   let latestFxRate = null;
   let riskMetrics = null;
-  let rollingReturns = [];
+  let rollingReturns = {};
   let realizedPl = 0;
   let realizedPlPerTicker = {};
   let totalInvested = 0;

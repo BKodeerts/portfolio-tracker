@@ -1,4 +1,4 @@
-import type { PortfolioResponse, Position, ChartPoint, BenchmarkPoint, RiskMetrics, RollingReturn, AnnualPl, WatchlistEntry, TickerMeta } from '$lib/types/portfolio';
+import type { PortfolioResponse, Position, ChartPoint, BenchmarkPoint, RiskMetrics, RollingReturns, AnnualPl, WatchlistEntry, TickerMeta } from '$lib/types/portfolio';
 import type { Transaction } from '$lib/types/transaction';
 import type { BonusItem } from '$lib/types/bonus';
 import { fetchPortfolio, fetchTransactions } from '$lib/api/portfolio';
@@ -18,7 +18,7 @@ function createPortfolioStore() {
   let currentTickers   = $state<string[]>([]);
   let latestFxRate     = $state<number | null>(null);
   let riskMetrics      = $state<RiskMetrics | null>(null);
-  let rollingReturns   = $state<RollingReturn[]>([]);
+  let rollingReturns   = $state<RollingReturns>({});
   let realizedPl       = $state(0);
   let realizedPlPerTicker = $state<Record<string, number>>({});
   let totalInvested    = $state(0);

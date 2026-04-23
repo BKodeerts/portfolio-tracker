@@ -36,12 +36,13 @@ export interface RiskMetrics {
   calmar: number | null;
 }
 
-export interface RollingReturn {
-  period: string;
+export interface RollingReturnEntry {
   portfolio: number | null;
-  benchmark: number | null;
+  vwce: number | null;
   sp500: number | null;
 }
+
+export type RollingReturns = Record<string, RollingReturnEntry | null>;
 
 export interface AnnualPl {
   year: string;
@@ -74,7 +75,7 @@ export interface PortfolioResponse {
   latestFxRate: number | null;
   positions: Position[];
   riskMetrics: RiskMetrics | null;
-  rollingReturns: RollingReturn[];
+  rollingReturns: RollingReturns;
   realizedPl: number;
   realizedPlPerTicker: Record<string, number>;
   totalInvested: number;

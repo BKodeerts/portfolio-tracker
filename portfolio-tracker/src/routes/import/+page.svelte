@@ -355,7 +355,7 @@
     transition: border-color 0.15s, background 0.15s;
   }
   .drop-zone:hover, .drop-zone.drag-over {
-    border-color: #818cf8;
+    border-color: var(--accent);
     background: rgba(99,102,241,0.05);
   }
 
@@ -380,15 +380,15 @@
   .map-table tbody tr:last-child td { border-bottom: none; }
 
   .map-input {
-    background: var(--input-bg, transparent);
+    background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 6px;
     padding: 3px 6px;
     color: var(--fg);
     font-size: 12px;
     font-family: inherit;
   }
-  .map-input:focus { outline: none; border-color: #818cf8; }
+  .map-input:focus { outline: none; border-color: var(--border-strong); }
 
   .error-box {
     margin-top: 12px;

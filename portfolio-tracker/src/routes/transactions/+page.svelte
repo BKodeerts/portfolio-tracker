@@ -258,11 +258,13 @@
     max-width: 300px;
     padding: 6px 10px;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--input-bg, var(--card-bg));
+    border-radius: 8px;
+    background: var(--surface-2);
     color: var(--fg);
     font-size: 13px;
   }
+  .search-input:focus { outline: none; border-color: var(--border-strong); }
+  .ticker-name { font-weight: 600; }
   .save-msg { font-size: 12px; color: var(--c-pos, #16a34a); }
 
   .add-form { padding: 14px 16px; margin-bottom: 12px; }
@@ -284,7 +286,7 @@
   .tx-table th.right, .tx-table td.right { text-align: right; }
   .tx-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   .tx-table tbody tr:last-child td { border-bottom: none; }
-  .tx-table tbody tr:hover { background: var(--hover-bg, rgba(0,0,0,0.03)); }
+  .tx-table tbody tr:hover { background: var(--surface-hover, rgba(0,0,0,0.03)); }
 
   .ticker-sub { font-size: 11px; color: var(--fg-muted); margin-left: 4px; }
   .ticker-label { font-size: 11px; color: var(--fg-muted); margin-top: 1px; }

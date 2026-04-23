@@ -256,7 +256,7 @@
     margin-bottom: 16px;
     flex-wrap: wrap;
   }
-  .page-title { font-size: 15px; font-weight: 600; margin: 0; flex: 1; }
+  .page-title { font-size: 15px; font-weight: 600; margin: 0; flex: 1; color: var(--fg); }
   .save-msg { font-size: 12px; color: var(--c-pos, #16a34a); }
 
   .empty-state { padding: 32px; text-align: center; }
@@ -317,7 +317,7 @@
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     z-index: 101;
-    background: var(--card-bg);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
     width: min(400px, calc(100vw - 32px));
@@ -338,15 +338,15 @@
   .form-group { display: flex; flex-direction: column; gap: 4px; }
   .form-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-muted); }
   .form-input {
-    background: var(--input-bg, var(--card-bg));
+    background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 7px;
     padding: 7px 10px;
     color: var(--fg);
     font-size: 13px;
     width: 100%;
     box-sizing: border-box;
   }
-  .form-input:focus { outline: none; border-color: #818cf8; }
+  .form-input:focus { outline: none; border-color: var(--border-strong); }
   .form-row { display: flex; gap: 10px; }
 </style>

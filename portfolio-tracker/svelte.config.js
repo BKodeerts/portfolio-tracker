@@ -12,8 +12,6 @@ const config = {
       precompress: false,
       strict: true,
     }),
-    // Relative asset URLs — required for Home Assistant ingress (arbitrary base path)
-    // and for Express static serving in production.
     paths: { relative: true },
     alias: {
       $lib: 'src/lib',
