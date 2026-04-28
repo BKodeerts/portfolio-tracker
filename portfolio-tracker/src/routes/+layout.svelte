@@ -1,8 +1,8 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
-  import { base } from '$app/paths';
+  import { page } from '$app/state';
+  import { resolve } from '$app/paths';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
   import { themeStore } from '$lib/stores/theme.svelte';
@@ -11,9 +11,11 @@
   interface Props { children: import('svelte').Snippet }
   const { children }: Props = $props();
 
-  function pathname(): string {
-    const p = $page.url.pathname;
-    return base && p.startsWith(base) ? p.slice(base.length) || '/' : p;
+  function isAt(route: '/' | '/analysis' | '/transactions' | '/import' | '/bonus' | '/settings'): boolean {
+    const current = page.url.pathname;
+    const target = resolve(route);
+    if (route === '/') return current === target;
+    return current === target || current.startsWith(target + '/');
   }
 
   // Re-fetch intraday whenever the set of current tickers changes (e.g. after import)
@@ -35,7 +37,11 @@
     return () => intradayStore.stopAutoRefresh();
   });
 
-  const isSettingsPage = $derived(pathname() === '/settings');
+  const isSettingsPage = $derived(isAt('/settings'));
+  const isPortfolio    = $derived(isAt('/'));
+  const isAnalysis     = $derived(isAt('/analysis'));
+  const isTransactions = $derived(isAt('/transactions'));
+  const isMore         = $derived(isAt('/import') || isAt('/bonus') || isAt('/settings'));
 </script>
 
 <header class="top-bar">
@@ -90,7 +96,7 @@
       </button>
 
       <a
-        href="{base}/settings"
+        href={resolve('/settings')}
         class="icon-toggle"
         class:on={isSettingsPage}
         title="Instellingen"
@@ -108,20 +114,20 @@
 
 <!-- Mobile bottom tab bar — must be outside <header> to escape backdrop-filter stacking context -->
 <nav class="mobile-tab-bar" aria-label="Navigatie">
-  <a href="{base}/"             class="mtab" class:active={pathname() === '/'}>
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={pathname() === '/' ? 2.3 : 1.7} stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>
+  <a href={resolve('/')}             class="mtab" class:active={isPortfolio}>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={isPortfolio ? 2.3 : 1.7} stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>
     <span>Portefeuille</span>
   </a>
-  <a href="{base}/analysis"     class="mtab" class:active={pathname().startsWith('/analysis')}>
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={pathname().startsWith('/analysis') ? 2.3 : 1.7} stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 4 5-8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <a href={resolve('/analysis')}     class="mtab" class:active={isAnalysis}>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={isAnalysis ? 2.3 : 1.7} stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 4 5-8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <span>Analyse</span>
   </a>
-  <a href="{base}/transactions" class="mtab" class:active={pathname().startsWith('/transactions')}>
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={pathname().startsWith('/transactions') ? 2.3 : 1.7} stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+  <a href={resolve('/transactions')} class="mtab" class:active={isTransactions}>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={isTransactions ? 2.3 : 1.7} stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
     <span>Transacties</span>
   </a>
-  <a href="{base}/import"       class="mtab" class:active={pathname().startsWith('/import') || pathname().startsWith('/bonus') || pathname().startsWith('/settings')}>
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={(pathname().startsWith('/import') || pathname().startsWith('/bonus') || pathname().startsWith('/settings')) ? 2.3 : 1.7} stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+  <a href={resolve('/import')}       class="mtab" class:active={isMore}>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={isMore ? 2.3 : 1.7} stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
     <span>Meer</span>
   </a>
 </nav>

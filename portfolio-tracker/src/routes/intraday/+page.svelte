@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
   import { themeStore } from '$lib/stores/theme.svelte';
@@ -87,7 +88,7 @@
     <!-- Sparkline grid -->
     <div class="spark-grid">
       {#each cards() as card}
-        <a class="spark-card card" href="/stock/{card.ticker}">
+        <a class="spark-card card" href={resolve('/stock/[ticker]', { ticker: card.ticker })}>
           <div class="spark-header">
             <div class="spark-ticker">{card.ticker}</div>
             <span class="badge {stateClass(card.marketState)}">{stateLabel(card.marketState)}</span>

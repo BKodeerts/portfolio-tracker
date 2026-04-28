@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { resolve } from '$app/paths';
   import { themeStore } from '$lib/stores/theme.svelte';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
@@ -319,7 +320,7 @@
 
             <div class="section-label">IMPORT &amp; EXPORT</div>
             <div class="data-grid">
-              <a class="data-tile" href="/import">
+              <a class="data-tile" href={resolve('/import')}>
                 <div class="data-tile-title">↑ Importeer CSV</div>
                 <div class="data-tile-sub">DeGiro, Bolero, T212</div>
               </a>

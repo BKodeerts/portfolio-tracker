@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { themeStore } from '$lib/stores/theme.svelte';
   import { fetchBonusHistory } from '$lib/api/bonus';
@@ -9,7 +9,7 @@
   import type { BonusHistoryPoint } from '$lib/types/bonus';
   import type { EChartsOption } from 'echarts';
 
-  const id = $derived($page.params['id'] ?? '');
+  const id = $derived(page.params['id'] ?? '');
   const item = $derived(portfolioStore.bonusItems.find((b) => b.id === id) ?? null);
 
   let history     = $state<BonusHistoryPoint[]>([]);

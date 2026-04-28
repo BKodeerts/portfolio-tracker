@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
+  import { goto } from '$app/navigation';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
   import { themeStore } from '$lib/stores/theme.svelte';
@@ -85,8 +87,16 @@
   const movers = $derived(() => {
     const cs = cards().filter((c) => c.changePct != null);
     const sorted = [...cs].sort((a, b) => (b.changePct ?? 0) - (a.changePct ?? 0));
-    return { top: sorted[0] ?? null, bot: sorted[sorted.length - 1] ?? null };
+    const first = sorted[0] ?? null;
+    const last  = sorted[sorted.length - 1] ?? null;
+    // Only surface a "top" winner if it's actually positive,
+    // and a "bot" loser if it's actually negative.
+    return {
+      top: first && (first.changePct ?? 0) > 0 ? first : null,
+      bot: last  && (last.changePct  ?? 0) < 0 ? last  : null,
+    };
   });
+
 
   // ── Day P&L per ticker for table ────────────────────────────────────────────
   const dayPlMap = $derived(() => {
@@ -94,44 +104,10 @@
     for (const c of cards()) m[c.ticker] = c.changeEur;
     return m;
   });
-
-  // ── Intraday change % per ticker — only "fresh" when session date is today ──
-  const intradayChangePctMap = $derived(() => {
-    const today = new Date().toISOString().slice(0, 10); // UTC, matches intra.date
-    const m: Record<string, { pct: number | null; fresh: boolean }> = {};
-    for (const c of cards()) {
-      const intra = intradayStore.data[c.yahoo];
-      const fresh = intra?.date != null && intra.date >= today;
-      m[c.ticker] = { pct: c.changePct, fresh };
-    }
+  const dayPctMap = $derived(() => {
+    const m: Record<string, number | null> = {};
+    for (const c of cards()) m[c.ticker] = c.changePct;
     return m;
-  });
-
-  // True when at least one portfolio ticker has intraday data from today (UTC)
-  const isIntradayFresh = $derived(() => {
-    if (!intradayStore.loaded) return false;
-    const today = new Date().toISOString().slice(0, 10);
-    return portfolioStore.currentTickers.some((ticker) => {
-      const yahoo = (portfolioStore.tickerMeta[ticker]?.['yahoo'] as string) ?? ticker;
-      return (intradayStore.data[yahoo]?.date ?? '') >= today;
-    });
-  });
-
-  // Dutch label for the intraday session date: "Vandaag", "Gisteren", or weekday name
-  const intradayDateLabel = $derived(() => {
-    if (!intradayStore.loaded) return 'Vandaag';
-    const today = new Date().toISOString().slice(0, 10);
-    let latestDate = '';
-    for (const ticker of portfolioStore.currentTickers) {
-      const yahoo = (portfolioStore.tickerMeta[ticker]?.['yahoo'] as string) ?? ticker;
-      const d = intradayStore.data[yahoo]?.date ?? '';
-      if (d > latestDate) latestDate = d;
-    }
-    if (!latestDate || latestDate >= today) return 'Vandaag';
-    const prevDay = new Date(today);
-    prevDay.setUTCDate(prevDay.getUTCDate() - 1);
-    if (latestDate === prevDay.toISOString().slice(0, 10)) return 'Gisteren';
-    return new Date(latestDate + 'T12:00:00Z').toLocaleDateString('nl-BE', { weekday: 'long' });
   });
 
   // ── Per-position 3-month sparkline from weekly chart data ──────────────────
@@ -142,9 +118,45 @@
       .filter((v) => v > 0);
   }
 
-  function miniSparkSvg(ticker: string): string {
+  // ── Intraday card sparkline: x-axis spans full session,
+  //    line stops at "now" so live tickers visually fill only the elapsed portion.
+  function intradaySparkSvg(ticker: string): string {
+    const yahoo = (portfolioStore.tickerMeta[ticker]?.['yahoo'] as string) ?? ticker;
+    const intra = intradayStore.data[yahoo];
+    const pts = intra?.points ?? [];
+    const prev = intra?.previousClose ?? null;
+    if (pts.length < 2 || !prev) return '';
+
+    const tradingMins = getTradingMins(yahoo);
+    const W = 200, H = 26;
+    const firstTs = pts[0]!.ts;
+    const totalSecs = tradingMins ? tradingMins * 60 : pts[pts.length - 1]!.ts - firstTs;
+
+    const pcts = pts.map((p) => ((p.close - prev) / prev) * 100);
+    const min = Math.min(0, ...pcts);
+    const max = Math.max(0, ...pcts);
+    const range = max - min || 0.1;
+    const xs = pts.map((p) => Math.min(W, Math.max(0, ((p.ts - firstTs) / totalSecs) * W)));
+    const ys = pcts.map((v) => H - 2 - ((v - min) / range) * (H - 4));
+
+    const last = pcts[pcts.length - 1] ?? 0;
+    const up = last >= 0;
+    const stroke = up ? 'var(--c-pos)' : 'var(--c-neg)';
+    const fill   = up ? 'var(--c-pos-bg)' : 'var(--c-neg-bg)';
+    const lineD = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${ys[i]!.toFixed(1)}`).join(' ');
+    const lastX = xs[xs.length - 1]!;
+    const fillD = `${lineD} L${lastX.toFixed(1)} ${H} L${xs[0]!.toFixed(1)} ${H} Z`;
+
+    return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block">
+      <path d="${fillD}" fill="${fill}" />
+      <path d="${lineD}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+    </svg>`;
+  }
+
+  function miniSparkSvg(ticker: string, opts?: { fullWidth?: boolean }): string {
     const values = posSparkValues(ticker);
     if (values.length < 2) return '';
+    const fullWidth = opts?.fullWidth ?? false;
     const w = 72; const h = 22;
     const min = Math.min(...values);
     const max = Math.max(...values);
@@ -156,7 +168,10 @@
     const color = up ? 'var(--c-pos)' : 'var(--c-neg)';
     const fill  = up ? 'var(--c-pos-bg)' : 'var(--c-neg-bg)';
     const fillD = `${d} L${w} ${h} L0 ${h} Z`;
-    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block"><path d="${fillD}" fill="${fill}" /><path d="${d}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>`;
+    const sizeAttrs = fullWidth
+      ? `width="100%" height="${h}"`
+      : `width="${w}" height="${h}"`;
+    return `<svg ${sizeAttrs} viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block"><path d="${fillD}" fill="${fill}" /><path d="${d}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" /></svg>`;
   }
 
   // ── Chart data ──────────────────────────────────────────────────────────────
@@ -408,12 +423,57 @@
     for (const { region, open, close } of sessions) {
       const openIdx  = sortedTs.findIndex((ts) => ts >= open);
       const closeIdx = sortedTs.findIndex((ts) => ts >= close);
-      if (openIdx  >= 0) sessionMarks.push({ name: `${region} Open`,  xAxis: openIdx,  lineStyle: { color: 'var(--c-pos)', type: 'dashed', width: 1, opacity: 0.5 }, label: { formatter: `${region} open`,  fontSize: 9, color: 'var(--c-pos)',  position: 'insideStartTop' } });
-      if (closeIdx >= 0) sessionMarks.push({ name: `${region} Sluit`, xAxis: closeIdx, lineStyle: { color: 'var(--c-neg)', type: 'dashed', width: 1, opacity: 0.5 }, label: { formatter: `${region} sluit`, fontSize: 9, color: 'var(--c-neg)', position: 'insideEndBottom' } });
+      // Compact, low-contrast session markers — easier to read on mobile.
+      const markStyle = { color: 'var(--fg-muted)', type: 'dashed' as const, width: 1, opacity: 0.35 };
+      if (openIdx >= 0) {
+        sessionMarks.push({
+          name: `${region} Open`, xAxis: openIdx,
+          lineStyle: markStyle,
+          label: { formatter: `${region}↑`, fontSize: 9, color: 'var(--fg-muted)', position: 'insideStartTop' },
+        });
+      }
+      if (closeIdx >= 0) {
+        sessionMarks.push({
+          name: `${region} Sluit`, xAxis: closeIdx,
+          lineStyle: markStyle,
+          label: { formatter: `${region}↓`, fontSize: 9, color: 'var(--fg-muted)', position: 'insideEndBottom' },
+        });
+      }
     }
 
-    const hourInterval = ((index: number) => { const ts = sortedTs[index]; return ts !== undefined && new Date(ts * 1000).getMinutes() === 0; }) as unknown as number;
-    const commonAxes = { xAxis: { type: 'category' as const, data: labels, axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { color: text, fontSize: 10, interval: hourInterval } }, grid: { top: 16, right: 16, bottom: 32, left: 60, containLabel: false } };
+    // On narrow viewports, only label every 2 hours so labels don't overlap.
+    const isNarrow = typeof window !== 'undefined' && window.innerWidth < 540;
+    const labelInterval = ((index: number) => {
+      const ts = sortedTs[index];
+      if (ts === undefined) return false;
+      const d = new Date(ts * 1000);
+      if (d.getMinutes() !== 0) return false;
+      return isNarrow ? d.getHours() % 2 === 0 : true;
+    }) as unknown as number;
+
+    const commonAxes = {
+      xAxis: {
+        type: 'category' as const,
+        data: labels,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { show: false },
+        axisLabel: {
+          color: text,
+          fontSize: isNarrow ? 9 : 10,
+          interval: labelInterval,
+          hideOverlap: true,
+          margin: 10,
+        },
+      },
+      grid: {
+        top: 16,
+        right: isNarrow ? 12 : 16,
+        bottom: 28,
+        left: 8,
+        containLabel: true,    // ← let echarts measure y-axis label width
+      },
+    };
 
     const fxFor     = (t: string) => EU_EXCHANGE_RE.test((portfolioStore.tickerMeta[t]?.['yahoo'] as string) ?? t) ? 1 : fxRate;
     const sharesFor = (t: string) => portfolioStore.positions.find((p) => p.ticker === t)?.shares ?? 0;
@@ -534,9 +594,11 @@
 
 <div class="page-root">
 
-  <!-- ── Hero C: 3-card split ─────────────────────────────────────────────── -->
+  <!-- ── Hero C: 3-card split (desktop) + compact card (mobile) ──────────── -->
   {#if portfolioStore.loaded}
-    <div class="hero-c">
+
+    <!-- DESKTOP / TABLET: 3-card split -->
+    <div class="hero-c desktop-hero">
 
       <!-- Card 1: Total value -->
       <div class="card hero-total">
@@ -556,7 +618,7 @@
 
       <!-- Card 2: Today -->
       <div class="card hero-today">
-        <div class="h-eyebrow" style="margin-bottom:8px">{intradayStore.loaded ? intradayDateLabel() : 'Vandaag'}</div>
+        <div class="h-eyebrow" style="margin-bottom:8px">Vandaag</div>
         {#if intradayStore.loaded}
           <div class="mono" style="font-size:22px;font-weight:600;line-height:1;color:{totalDayPl >= 0 ? 'var(--c-pos)' : 'var(--c-neg)'}">
             <PrivacyValue value={signed(totalDayPl)} />
@@ -584,8 +646,8 @@
             </div>
           </div>
         {/if}
-        {#if movers().bot && movers().bot!.ticker !== movers().top!?.ticker}
-          <div class="hero-movers-sep"></div>
+        {#if movers().bot && movers().bot!.ticker !== movers().top?.ticker}
+         {#if movers().top}<div class="hero-movers-sep"></div>{/if}
           <div class="mover-row">
             <div class="mover-avatar" style="background:{getColor(movers().bot!.ticker)}22;color:{getColor(movers().bot!.ticker)}">{movers().bot!.ticker.slice(0,2)}</div>
             <div style="flex:1;min-width:0">
@@ -598,12 +660,66 @@
             </div>
           </div>
         {/if}
-        {#if !movers().top}
-          <div class="h-sm c-muted" style="padding:4px 0">Intraday data laden…</div>
-        {/if}
+        {#if !movers().top && !movers().bot}
+         <div class="h-sm c-muted" style="padding:4px 0">
+           {intradayStore.loaded ? 'Geen koersbeweging vandaag' : 'Intraday data laden…'}
+         </div>
+       {/if}
+      </div>
+    </div>
+
+    <!-- MOBILE: single compact card -->
+    <div class="card mobile-hero">
+      <!-- Top row: TOTAAL big, VANDAAG to the right -->
+      <div class="mh-top">
+        <div class="mh-total">
+          <div class="h-eyebrow">Totale waarde</div>
+          <div class="mh-total-val mono"><PrivacyValue value={fmt(totalValue)} /></div>
+          <div class="mh-total-sub">
+            <span class="pill-badge sm" class:pos={totalPlPct >= 0} class:neg={totalPlPct < 0}>
+              {totalPlPct >= 0 ? '▲' : '▼'} {Math.abs(totalPlPct).toFixed(1)}%
+            </span>
+            <span class="mono mh-total-pl" style="color:{totalPl >= 0 ? 'var(--c-pos)' : 'var(--c-neg)'}">
+              <PrivacyValue value={signed(totalPl)} />
+            </span>
+          </div>
+        </div>
+        <div class="mh-today">
+          <div class="h-eyebrow">Vandaag</div>
+          {#if intradayStore.loaded}
+            <div class="mono mh-today-val" style="color:{totalDayPl >= 0 ? 'var(--c-pos)' : 'var(--c-neg)'}">
+              <PrivacyValue value={signed(totalDayPl)} />
+            </div>
+            <div class="mono mh-today-pct" style="color:{totalDayPl >= 0 ? 'var(--c-pos)' : 'var(--c-neg)'}">
+              {fmtPct(totalDayPlPct)}
+            </div>
+          {:else}
+            <div class="h-sm c-muted">Laden…</div>
+          {/if}
+        </div>
       </div>
 
+      <!-- Movers row (chips) -->
+      {#if movers().top || movers().bot}
+         <div class="mh-movers">
+          {#if movers().top}
+            <div class="mh-mover">
+              <span class="mover-avatar" style="background:{getColor(movers().top!.ticker)}22;color:{getColor(movers().top!.ticker)}">{movers().top!.ticker.slice(0,2)}</span>
+              <span class="mh-mover-tk">{movers().top!.ticker}</span>
+              <span class="mono c-pos mh-mover-pct">{fmtPct(movers().top!.changePct ?? 0)}</span>
+            </div>
+          {/if}
+          {#if movers().bot && movers().bot!.ticker !== movers().top?.ticker}
+            <div class="mh-mover">
+              <span class="mover-avatar" style="background:{getColor(movers().bot!.ticker)}22;color:{getColor(movers().bot!.ticker)}">{movers().bot!.ticker.slice(0,2)}</span>
+              <span class="mh-mover-tk">{movers().bot!.ticker}</span>
+              <span class="mono c-neg mh-mover-pct">{fmtPct(movers().bot!.changePct ?? 0)}</span>
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
+
   {/if}
 
   <!-- ── Chart card ─────────────────────────────────────────────────────────── -->
@@ -615,7 +731,7 @@
           <span class="headline-pct">{fmtPct(periodPlValue.pct)}</span>
         {:else}&nbsp;{/if}
       </div>
-      <div class="headline-caption">{period === '1d' && intradayStore.loaded ? intradayDateLabel() : periodLabel}</div>
+      <div class="headline-caption">{periodLabel}</div>
     </div>
 
     <div class="chart-header">
@@ -635,14 +751,19 @@
           <button class="pill" class:on={period === p.key} onclick={() => (period = p.key)}>{p.label}</button>
         {/each}
       </div>
+      <!-- Mobile: real segmented controls, not native selects -->
       <div class="chart-controls-mobile">
-        <select class="mobile-select" bind:value={view}>
-          {#each VIEWS as v}<option value={v.key}>{v.label}</option>{/each}
-        </select>
-        <select class="mobile-select" bind:value={period}>
-          {#each PERIODS as p}<option value={p.key}>{p.label}</option>{/each}
-        </select>
+        <div class="seg seg-mobile">
+          <button class="seg-btn" class:on={view === 'total'} onclick={() => (view = 'total')}>Totaal</button>
+          <button class="seg-btn" class:on={view !== 'total'} onclick={() => (view = 'pct')}>Per pos.</button>
+        </div>
+        <div class="period-pills-track period-pills-mobile">
+          {#each PERIODS as p}
+            <button class="pill" class:on={period === p.key} onclick={() => (period = p.key)}>{p.label}</button>
+          {/each}
+        </div>
       </div>
+
     </div>
 
     <div class="chart-wrap">
@@ -658,7 +779,7 @@
     <div class="chart-legend">
       {#if view !== 'total'}
         {#each visibleTickers as t}
-          <a class="legend-item" href="/stock/{t}">
+          <a class="legend-item" href={resolve('/stock/[ticker]', { ticker: t })}>
             <span class="legend-dot" style="background:{getColor(t)}"></span>{t}
           </a>
         {/each}
@@ -705,11 +826,14 @@
                 <th onclick={() => portfolioStore.sortPositions('pl')} class="sortable right desktop-only">
                   P&amp;L {portfolioStore.posSort.col === 'pl' ? (portfolioStore.posSort.dir === 'asc' ? '↑' : '↓') : ''}
                 </th>
-                <th onclick={() => portfolioStore.sortPositions('dayPl')} class="sortable right">
-                  Dag% {portfolioStore.posSort.col === 'dayPl' ? (portfolioStore.posSort.dir === 'asc' ? '↑' : '↓') : ''}
+                <th onclick={() => portfolioStore.sortPositions('plPct')} class="sortable right desktop-only">
+                  % {portfolioStore.posSort.col === 'plPct' ? (portfolioStore.posSort.dir === 'asc' ? '↑' : '↓') : ''}
                 </th>
                 <th onclick={() => portfolioStore.sortPositions('dayPl')} class="sortable right desktop-only">
-                  Vandaag {portfolioStore.posSort.col === 'dayPl' ? (portfolioStore.posSort.dir === 'asc' ? '↑' : '↓') : ''}
+                  Vandaag € {portfolioStore.posSort.col === 'dayPl' ? (portfolioStore.posSort.dir === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th onclick={() => portfolioStore.sortPositions('dayPl')} class="sortable right">
+                  Dag % {portfolioStore.posSort.col === 'dayPl' ? (portfolioStore.posSort.dir === 'asc' ? '↑' : '↓') : ''}
                 </th>
                 <th class="right desktop-only">30D</th>
                 <th onclick={() => portfolioStore.sortPositions('cost')} class="sortable right desktop-only">
@@ -719,7 +843,7 @@
             </thead>
             <tbody>
               {#each portfolioStore.sortedPositions as pos}
-                <tr onclick={() => (window.location.href = `/stock/${pos.ticker}`)}>
+                <tr onclick={() => goto(resolve('/stock/[ticker]', { ticker: pos.ticker }))}>
                   <td class="left">
                     <div style="display:flex;align-items:center;gap:8px">
                       <span class="ticker-dot" style="background:{getColor(pos.ticker)}"></span>
@@ -735,20 +859,21 @@
                   <td class="right mono desktop-only {pos.pl >= 0 ? 'c-pos' : 'c-neg'}">
                     <PrivacyValue value={signed(pos.pl)} />
                   </td>
-                  <td class="right">
-                    {#each [intradayChangePctMap()[pos.ticker]] as dayInfo}
-                      {#if dayInfo?.pct != null}
-                        <span class="pill-badge sm" class:pos={dayInfo.pct >= 0} class:neg={dayInfo.pct < 0}>
-                          {dayInfo.pct >= 0 ? '▲' : '▼'} {Math.abs(dayInfo.pct).toFixed(1)}%
-                        </span>
-                      {:else}
-                        <span class="c-muted">—</span>
-                      {/if}
-                    {/each}
+                  <td class="right desktop-only">
+                    <span class="pill-badge sm" class:pos={pos.plPct >= 0} class:neg={pos.plPct < 0}>
+                      {pos.plPct >= 0 ? '▲' : '▼'} {Math.abs(pos.plPct).toFixed(1)}%
+                    </span>
                   </td>
                   <td class="right mono desktop-only {(dayPlMap()[pos.ticker] ?? 0) >= 0 ? 'c-pos' : 'c-neg'}">
                     {#if dayPlMap()[pos.ticker] != null}
                       <PrivacyValue value={signed(dayPlMap()[pos.ticker] ?? 0)} />
+                    {:else}<span class="c-muted">—</span>{/if}
+                  </td>
+                  <td class="right">
+                    {#if dayPctMap()[pos.ticker] != null}
+                      <span class="pill-badge sm" class:pos={(dayPctMap()[pos.ticker] ?? 0) >= 0} class:neg={(dayPctMap()[pos.ticker] ?? 0) < 0}>
+                        {(dayPctMap()[pos.ticker] ?? 0) >= 0 ? '▲' : '▼'} {Math.abs(dayPctMap()[pos.ticker] ?? 0).toFixed(2)}%
+                      </span>
                     {:else}<span class="c-muted">—</span>{/if}
                   </td>
                   <td class="right desktop-only">
@@ -766,11 +891,11 @@
       {:else}
         <div class="pos-cards-grid">
           {#each portfolioStore.sortedPositions as pos}
-            <a href="/stock/{pos.ticker}" class="pos-card hover-lift" style="border-left:3px solid {getColor(pos.ticker)}">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                <div>
+            <a href={resolve('/stock/[ticker]', { ticker: pos.ticker })} class="pos-card hover-lift" style="border-left:3px solid {getColor(pos.ticker)}">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+                <div style="display:flex;align-items:center;gap:6px;min-width:0">
+                  <span class="ticker-dot" style="background:{getColor(pos.ticker)};flex-shrink:0"></span>
                   <div style="font-size:13px;font-weight:700;letter-spacing:-0.01em">{pos.ticker}</div>
-                  <div class="h-sm" style="font-size:10px">{pos.label}</div>
                 </div>
                 {#if dayPlMap()[pos.ticker] != null}
                   <span class="pill-badge sm" class:pos={(dayPlMap()[pos.ticker] ?? 0) >= 0} class:neg={(dayPlMap()[pos.ticker] ?? 0) < 0}>
@@ -783,7 +908,7 @@
               </div>
               <!-- svelte-ignore html-self-closing-tags -->
               <div style="margin:4px 0">
-                {@html miniSparkSvg(pos.ticker)}
+                {@html intradaySparkSvg(pos.ticker) || miniSparkSvg(pos.ticker, { fullWidth: true })}
               </div>
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:4px;font-size:10px;color:var(--fg-muted)">
                 <span>{pos.shares}×</span>
@@ -826,7 +951,7 @@
       <div class="card" style="overflow:hidden">
         <div style="padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)">
           <div class="h-md">Recente transacties</div>
-          <a href="/transactions" class="h-sm" style="cursor:pointer;text-decoration:underline;color:var(--fg-muted)">Alle bekijken</a>
+          <a href={resolve('/transactions')} class="h-sm" style="cursor:pointer;text-decoration:underline;color:var(--fg-muted)">Alle bekijken</a>
         </div>
         {#each recentTx as tx, i}
           {@const isBuy = (tx.shares ?? 0) > 0}
@@ -874,10 +999,6 @@
   @media (max-width: 860px) {
     .hero-c { grid-template-columns: 1fr 1fr; }
     .hero-movers { grid-column: 1 / -1; }
-  }
-  @media (max-width: 540px) {
-    .hero-c { grid-template-columns: 1fr; }
-    .hero-movers { grid-column: auto; }
   }
 
   /* ── Chart card internals ─────────────────────────────── */
@@ -992,10 +1113,128 @@
   /* ── Desktop-only hiding ──────────────────────────────── */
   @media (max-width: 640px) {
     .desktop-only { display: none !important; }
-    .chart-controls-mobile { display: flex !important; }
+    .chart-controls-mobile { display: flex !important; width: stretch; }
   }
   .chart-controls-mobile { display: none; }
 
   /* ── Footer ───────────────────────────────────────────── */
   .footer { margin-top: 24px; padding: 12px 0; text-align: center; font-size: 11px; color: var(--fg-muted); }
+
+  /* Hide mobile hero on desktop, hide desktop hero on mobile */
+  .mobile-hero { display: none; }
+
+  @media (max-width: 540px) {
+    .desktop-hero { display: none !important; }
+    .mobile-hero { display: block; margin-bottom: 12px; padding: 14px 16px; }
+  }
+
+  /* Compact mobile hero internals */
+  .mh-top {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: start;
+    padding-bottom: 12px;
+  }
+
+  .mh-total .h-eyebrow,
+  .mh-today .h-eyebrow { margin-bottom: 4px; }
+
+  .mh-total-val {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin-bottom: 6px;
+  }
+  .mh-total-sub {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-size: 12px;
+  }
+  .mh-total-pl { font-weight: 600; }
+
+  .mh-today { text-align: right; min-width: 80px; }
+  .mh-today-val {
+    font-size: 17px; font-weight: 600; line-height: 1.1;
+    margin-top: 2px;
+  }
+  .mh-today-pct {
+    font-size: 11px; font-weight: 500; margin-top: 2px; opacity: 0.85;
+  }
+
+  /* Movers as horizontal chips, separated from the top by a hairline */
+  .mh-movers {
+    display: flex; gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .mh-movers::-webkit-scrollbar { display: none; }
+  .mh-mover {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 6px 10px 6px 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    flex-shrink: 0;
+    font-size: 12px;
+  }
+  .mh-mover .mover-avatar {
+    width: 22px; height: 22px; border-radius: 50%;
+    font-size: 9px;
+  }
+  .mh-mover-tk { font-weight: 700; }
+  .mh-mover-pct { font-weight: 600; font-size: 11px; }
+
+  /* ── Mobile chart controls ─────────────────────────────── */
+  .chart-controls-mobile {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+  @media (max-width: 700px) {
+    .chart-controls-mobile { display: flex; }
+    /* Hide the desktop-only chart header rows on mobile */
+    .chart-header > .desktop-only { display: none !important; }
+  }
+
+  .seg-mobile { width: 100%; }
+  .seg-mobile .seg-btn { flex: 1; height: 30px; font-size: 12px; }
+
+  /* iOS-style segmented track for periods — single row, scrollable if needed */
+  .period-pills-track {
+    display: flex;
+    gap: 0;
+    background: var(--surface-2);
+    border-radius: 9px;
+    padding: 3px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;          /* don't bleed past the card */
+  }
+  .period-pills-track .pill {
+    flex: 1 1 0;               /* equal share, allowed to shrink */
+    min-width: 0;              /* let flex shrink past content size */
+    height: 26px;
+    padding: 0 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+    background: transparent;
+    border: 0;
+    border-radius: 7px;
+    color: var(--fg-muted);
+    cursor: pointer;
+    transition: background .12s, color .12s;
+    white-space: nowrap;
+  }
+  .period-pills-track .pill:hover { color: var(--fg); }
+  .period-pills-track .pill.on {
+    background: var(--surface);
+    color: var(--fg);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
 </style>
+
+
+

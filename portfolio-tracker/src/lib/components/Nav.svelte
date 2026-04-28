@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { page } from '$app/stores';
-  import { base } from '$app/paths';
+  import { page } from '$app/state';
+  import { resolve } from '$app/paths';
 
   const tabs = [
     { path: '/',             label: 'Dashboard' },
@@ -8,26 +8,28 @@
     { path: '/transactions', label: 'Transacties' },
     { path: '/import',       label: 'Import' },
     { path: '/bonus',        label: 'Bonus' },
-  ];
+  ] as const;
 
-  function pathname(): string {
-    const p = $page.url.pathname;
-    return base && p.startsWith(base) ? p.slice(base.length) || '/' : p;
+  type TabPath = (typeof tabs)[number]['path'];
+
+  function isActive(path: TabPath): boolean {
+    const current = page.url.pathname;
+    const resolved = resolve(path);
+    if (path === '/') return current === resolved;
+    return current === resolved || current.startsWith(resolved + '/');
   }
 
-  function isActive(path: string): boolean {
-    const p = pathname();
-    if (path === '/') return p === '/';
-    return p.startsWith(path);
-  }
-
-  const isStockDetail = $derived(pathname().startsWith('/stock/'));
+  // Build prefixes via a sentinel param, then strip it — empty params throw at runtime.
+  const stockPrefix   = $derived(resolve('/stock/[ticker]', { ticker: '_' }).slice(0, -1));
+  const bonusHome     = $derived(resolve('/bonus'));
+  const bonusPrefix   = $derived(bonusHome + '/');
+  const isStockDetail = $derived(page.url.pathname.startsWith(stockPrefix));
   const isBonusDetail = $derived(
-    pathname().startsWith('/bonus/') && pathname() !== '/bonus',
+    page.url.pathname.startsWith(bonusPrefix) && page.url.pathname !== bonusHome,
   );
-  const isDetailPage = $derived(isStockDetail || isBonusDetail);
-  const backHref     = $derived(isBonusDetail ? `${base}/bonus` : `${base}/`);
-  const backLabel    = $derived(isBonusDetail ? '← Bonus' : '← Portfolio');
+  const isDetailPage  = $derived(isStockDetail || isBonusDetail);
+  const backHref      = $derived(isBonusDetail ? resolve('/bonus') : resolve('/'));
+  const backLabel     = $derived(isBonusDetail ? '← Bonus' : '← Portfolio');
 </script>
 
 <nav class="app-nav" aria-label="Navigatie">
@@ -35,7 +37,7 @@
     <a href={backHref} class="nav-btn back-btn">{backLabel}</a>
   {/if}
   {#each tabs as tab}
-    <a href="{base}{tab.path === '/' ? '/' : tab.path}" class="nav-btn" class:active={isActive(tab.path)}>
+    <a href={resolve(tab.path)} class="nav-btn" class:active={isActive(tab.path)}>
       {tab.label}
     </a>
   {/each}

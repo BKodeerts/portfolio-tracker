@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { saveBonus, deleteBonus } from '$lib/api/bonus';
   import { fmt, fmtPct } from '$lib/utils/fmt';
@@ -110,7 +111,7 @@
   {:else}
     <div class="bonus-grid">
       {#each portfolioStore.bonusItems as item}
-        <a class="bonus-card card" href="/bonus/{item.id}">
+        <a class="bonus-card card" href={resolve('/bonus/[id]', { id: item.id })}>
           <div class="bonus-card-header">
             <div class="bonus-card-title">{item.label}</div>
             <span class="type-badge" class:call={item.type === 'call_option'}>{typeLabel(item.type)}</span>

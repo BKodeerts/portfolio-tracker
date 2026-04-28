@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
+  import { resolve } from '$app/paths';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
   import { themeStore } from '$lib/stores/theme.svelte';
@@ -19,7 +20,7 @@
     { key: 'ytd', label: 'YTD' }, { key: '1y', label: '1J' }, { key: 'total', label: 'Max' },
   ];
 
-  const ticker  = $derived($page.params['ticker'] ?? '');
+  const ticker  = $derived(page.params['ticker'] ?? '');
   const meta    = $derived(portfolioStore.tickerMeta[ticker] ?? {});
   const yahoo   = $derived((meta['yahoo'] as string | undefined) ?? ticker);
   const color   = $derived(getColor(ticker));
@@ -294,7 +295,7 @@
 <div class="page-root">
   <!-- Mobile top bar -->
   <div class="mobile-topbar">
-    <a href="/" class="mobile-circle-btn" aria-label="Terug">
+    <a href={resolve('/')} class="mobile-circle-btn" aria-label="Terug">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
     </a>
     <div class="mobile-topbar-title">
