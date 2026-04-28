@@ -107,6 +107,16 @@
     return m;
   });
 
+  // True when at least one portfolio ticker has intraday data from today (UTC)
+  const isIntradayFresh = $derived(() => {
+    if (!intradayStore.loaded) return false;
+    const today = new Date().toISOString().slice(0, 10);
+    return portfolioStore.currentTickers.some((ticker) => {
+      const yahoo = (portfolioStore.tickerMeta[ticker]?.['yahoo'] as string) ?? ticker;
+      return (intradayStore.data[yahoo]?.date ?? '') >= today;
+    });
+  });
+
   // ── Per-position 3-month sparkline from weekly chart data ──────────────────
   function posSparkValues(ticker: string, n = 12): number[] {
     return portfolioStore.chartData
@@ -154,7 +164,7 @@
 
   const day1Pl = $derived(() => {
     const tickers = portfolioStore.currentTickers;
-    if (!tickers.length || !intradayStore.loaded) return null;
+    if (!tickers.length || !intradayStore.loaded || !isIntradayFresh()) return null;
     const fxRate = intradayStore.liveEurUsd;
     if (fxRate === null && tickers.some((t) => !EU_EXCHANGE_RE.test((portfolioStore.tickerMeta[t]?.['yahoo'] as string) ?? t))) return null;
     let prevCloseTotal = 0;
@@ -327,7 +337,7 @@
 
   function build1DOption(v: View): echarts.EChartsOption | null {
     const tickers = portfolioStore.currentTickers;
-    if (!tickers.length || !intradayStore.loaded) return null;
+    if (!tickers.length || !intradayStore.loaded || !isIntradayFresh()) return null;
     const fxRateRaw = intradayStore.liveEurUsd;
     if (fxRateRaw === null && tickers.some((t) => !EU_EXCHANGE_RE.test((portfolioStore.tickerMeta[t]?.['yahoo'] as string) ?? t))) return null;
     const fxRate = fxRateRaw ?? 1;
@@ -530,13 +540,16 @@
       <!-- Card 2: Today -->
       <div class="card hero-today">
         <div class="h-eyebrow" style="margin-bottom:8px">Vandaag</div>
-        {#if intradayStore.loaded}
+        {#if intradayStore.loaded && isIntradayFresh()}
           <div class="mono" style="font-size:22px;font-weight:600;line-height:1;color:{totalDayPl >= 0 ? 'var(--c-pos)' : 'var(--c-neg)'}">
             <PrivacyValue value={signed(totalDayPl)} />
           </div>
           <div class="mono h-sm" style="margin-top:6px;color:{totalDayPl >= 0 ? 'var(--c-pos)' : 'var(--c-neg)'}">
             {fmtPct(totalDayPlPct)}
           </div>
+        {:else if intradayStore.loaded}
+          <div class="mono" style="font-size:22px;font-weight:600;line-height:1;color:var(--fg-muted)">—</div>
+          <div class="h-sm c-muted" style="margin-top:6px">Markt gesloten</div>
         {:else}
           <div class="h-sm c-muted">Laden…</div>
         {/if}
@@ -622,7 +635,11 @@
       {#if chartOption}
         <Chart option={chartOption} height="340px" />
       {:else if period === '1d'}
-        <div class="chart-empty" style="height:340px">Intraday data laden…</div>
+        {#if intradayStore.loaded && !isIntradayFresh()}
+          <div class="chart-empty" style="height:340px">Geen intraday data voor vandaag</div>
+        {:else}
+          <div class="chart-empty" style="height:340px">Intraday data laden…</div>
+        {/if}
       {:else if filtered.length <= 1}
         <div class="chart-empty" style="height:340px">Niet genoeg data voor deze periode</div>
       {/if}
