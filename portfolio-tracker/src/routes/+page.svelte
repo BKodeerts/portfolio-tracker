@@ -95,6 +95,18 @@
     return m;
   });
 
+  // ── Intraday change % per ticker — only "fresh" when session date is today ──
+  const intradayChangePctMap = $derived(() => {
+    const today = new Date().toISOString().slice(0, 10); // UTC, matches intra.date
+    const m: Record<string, { pct: number | null; fresh: boolean }> = {};
+    for (const c of cards()) {
+      const intra = intradayStore.data[c.yahoo];
+      const fresh = intra?.date != null && intra.date >= today;
+      m[c.ticker] = { pct: c.changePct, fresh };
+    }
+    return m;
+  });
+
   // ── Per-position 3-month sparkline from weekly chart data ──────────────────
   function posSparkValues(ticker: string, n = 12): number[] {
     return portfolioStore.chartData
@@ -666,8 +678,8 @@
                 <th onclick={() => portfolioStore.sortPositions('pl')} class="sortable right desktop-only">
                   P&amp;L {portfolioStore.posSort.col === 'pl' ? (portfolioStore.posSort.dir === 'asc' ? '↑' : '↓') : ''}
                 </th>
-                <th onclick={() => portfolioStore.sortPositions('plPct')} class="sortable right">
-                  % {portfolioStore.posSort.col === 'plPct' ? (portfolioStore.posSort.dir === 'asc' ? '↑' : '↓') : ''}
+                <th onclick={() => portfolioStore.sortPositions('dayPl')} class="sortable right">
+                  Dag% {portfolioStore.posSort.col === 'dayPl' ? (portfolioStore.posSort.dir === 'asc' ? '↑' : '↓') : ''}
                 </th>
                 <th onclick={() => portfolioStore.sortPositions('dayPl')} class="sortable right desktop-only">
                   Vandaag {portfolioStore.posSort.col === 'dayPl' ? (portfolioStore.posSort.dir === 'asc' ? '↑' : '↓') : ''}
@@ -697,9 +709,14 @@
                     <PrivacyValue value={signed(pos.pl)} />
                   </td>
                   <td class="right">
-                    <span class="pill-badge sm" class:pos={pos.plPct >= 0} class:neg={pos.plPct < 0}>
-                      {pos.plPct >= 0 ? '▲' : '▼'} {Math.abs(pos.plPct).toFixed(1)}%
-                    </span>
+                    {@const dayInfo = intradayChangePctMap()[pos.ticker]}
+                    {#if dayInfo?.fresh && dayInfo.pct != null}
+                      <span class="pill-badge sm" class:pos={dayInfo.pct >= 0} class:neg={dayInfo.pct < 0}>
+                        {dayInfo.pct >= 0 ? '▲' : '▼'} {Math.abs(dayInfo.pct).toFixed(1)}%
+                      </span>
+                    {:else}
+                      <span class="c-muted">—</span>
+                    {/if}
                   </td>
                   <td class="right mono desktop-only {(dayPlMap()[pos.ticker] ?? 0) >= 0 ? 'c-pos' : 'c-neg'}">
                     {#if dayPlMap()[pos.ticker] != null}
