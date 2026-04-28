@@ -736,14 +736,15 @@
                     <PrivacyValue value={signed(pos.pl)} />
                   </td>
                   <td class="right">
-                    {@const dayInfo = intradayChangePctMap()[pos.ticker]}
-                    {#if dayInfo?.pct != null}
-                      <span class="pill-badge sm" class:pos={dayInfo.pct >= 0} class:neg={dayInfo.pct < 0}>
-                        {dayInfo.pct >= 0 ? '▲' : '▼'} {Math.abs(dayInfo.pct).toFixed(1)}%
-                      </span>
-                    {:else}
-                      <span class="c-muted">—</span>
-                    {/if}
+                    {#each [intradayChangePctMap()[pos.ticker]] as dayInfo}
+                      {#if dayInfo?.pct != null}
+                        <span class="pill-badge sm" class:pos={dayInfo.pct >= 0} class:neg={dayInfo.pct < 0}>
+                          {dayInfo.pct >= 0 ? '▲' : '▼'} {Math.abs(dayInfo.pct).toFixed(1)}%
+                        </span>
+                      {:else}
+                        <span class="c-muted">—</span>
+                      {/if}
+                    {/each}
                   </td>
                   <td class="right mono desktop-only {(dayPlMap()[pos.ticker] ?? 0) >= 0 ? 'c-pos' : 'c-neg'}">
                     {#if dayPlMap()[pos.ticker] != null}
