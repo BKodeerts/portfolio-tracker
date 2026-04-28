@@ -117,6 +117,23 @@
     });
   });
 
+  // Dutch label for the intraday session date: "Vandaag", "Gisteren", or weekday name
+  const intradayDateLabel = $derived(() => {
+    if (!intradayStore.loaded) return 'Vandaag';
+    const today = new Date().toISOString().slice(0, 10);
+    let latestDate = '';
+    for (const ticker of portfolioStore.currentTickers) {
+      const yahoo = (portfolioStore.tickerMeta[ticker]?.['yahoo'] as string) ?? ticker;
+      const d = intradayStore.data[yahoo]?.date ?? '';
+      if (d > latestDate) latestDate = d;
+    }
+    if (!latestDate || latestDate >= today) return 'Vandaag';
+    const prevDay = new Date(today);
+    prevDay.setUTCDate(prevDay.getUTCDate() - 1);
+    if (latestDate === prevDay.toISOString().slice(0, 10)) return 'Gisteren';
+    return new Date(latestDate + 'T12:00:00Z').toLocaleDateString('nl-BE', { weekday: 'long' });
+  });
+
   // ── Per-position 3-month sparkline from weekly chart data ──────────────────
   function posSparkValues(ticker: string, n = 12): number[] {
     return portfolioStore.chartData
@@ -164,7 +181,7 @@
 
   const day1Pl = $derived(() => {
     const tickers = portfolioStore.currentTickers;
-    if (!tickers.length || !intradayStore.loaded || !isIntradayFresh()) return null;
+    if (!tickers.length || !intradayStore.loaded) return null;
     const fxRate = intradayStore.liveEurUsd;
     if (fxRate === null && tickers.some((t) => !EU_EXCHANGE_RE.test((portfolioStore.tickerMeta[t]?.['yahoo'] as string) ?? t))) return null;
     let prevCloseTotal = 0;
@@ -337,7 +354,7 @@
 
   function build1DOption(v: View): echarts.EChartsOption | null {
     const tickers = portfolioStore.currentTickers;
-    if (!tickers.length || !intradayStore.loaded || !isIntradayFresh()) return null;
+    if (!tickers.length || !intradayStore.loaded) return null;
     const fxRateRaw = intradayStore.liveEurUsd;
     if (fxRateRaw === null && tickers.some((t) => !EU_EXCHANGE_RE.test((portfolioStore.tickerMeta[t]?.['yahoo'] as string) ?? t))) return null;
     const fxRate = fxRateRaw ?? 1;
@@ -539,17 +556,14 @@
 
       <!-- Card 2: Today -->
       <div class="card hero-today">
-        <div class="h-eyebrow" style="margin-bottom:8px">Vandaag</div>
-        {#if intradayStore.loaded && isIntradayFresh()}
+        <div class="h-eyebrow" style="margin-bottom:8px">{intradayStore.loaded ? intradayDateLabel() : 'Vandaag'}</div>
+        {#if intradayStore.loaded}
           <div class="mono" style="font-size:22px;font-weight:600;line-height:1;color:{totalDayPl >= 0 ? 'var(--c-pos)' : 'var(--c-neg)'}">
             <PrivacyValue value={signed(totalDayPl)} />
           </div>
           <div class="mono h-sm" style="margin-top:6px;color:{totalDayPl >= 0 ? 'var(--c-pos)' : 'var(--c-neg)'}">
             {fmtPct(totalDayPlPct)}
           </div>
-        {:else if intradayStore.loaded}
-          <div class="mono" style="font-size:22px;font-weight:600;line-height:1;color:var(--fg-muted)">—</div>
-          <div class="h-sm c-muted" style="margin-top:6px">Markt gesloten</div>
         {:else}
           <div class="h-sm c-muted">Laden…</div>
         {/if}
@@ -601,7 +615,7 @@
           <span class="headline-pct">{fmtPct(periodPlValue.pct)}</span>
         {:else}&nbsp;{/if}
       </div>
-      <div class="headline-caption">{periodLabel}</div>
+      <div class="headline-caption">{period === '1d' && intradayStore.loaded ? intradayDateLabel() : periodLabel}</div>
     </div>
 
     <div class="chart-header">
@@ -635,11 +649,7 @@
       {#if chartOption}
         <Chart option={chartOption} height="340px" />
       {:else if period === '1d'}
-        {#if intradayStore.loaded && !isIntradayFresh()}
-          <div class="chart-empty" style="height:340px">Geen intraday data voor vandaag</div>
-        {:else}
-          <div class="chart-empty" style="height:340px">Intraday data laden…</div>
-        {/if}
+        <div class="chart-empty" style="height:340px">Intraday data laden…</div>
       {:else if filtered.length <= 1}
         <div class="chart-empty" style="height:340px">Niet genoeg data voor deze periode</div>
       {/if}
@@ -727,7 +737,7 @@
                   </td>
                   <td class="right">
                     {@const dayInfo = intradayChangePctMap()[pos.ticker]}
-                    {#if dayInfo?.fresh && dayInfo.pct != null}
+                    {#if dayInfo?.pct != null}
                       <span class="pill-badge sm" class:pos={dayInfo.pct >= 0} class:neg={dayInfo.pct < 0}>
                         {dayInfo.pct >= 0 ? '▲' : '▼'} {Math.abs(dayInfo.pct).toFixed(1)}%
                       </span>
