@@ -145,10 +145,17 @@ function deriveSession(points, periods, lastDate, meta) {
 
   const todayPts = points.filter(p => p.ts >= regular.start && p.ts < regular.end);
   if (todayPts.length > 0) {
-    return {
-      sessionPoints: todayPts,
-      previousClose: derivePreviousClose(points, periods, lastDate, meta),
-    };
+    // Guard: only trust these if they're actually from today's calendar date.
+    // Yahoo sometimes serves a stale currentTradingPeriod pointing to yesterday's
+    // session window while today's candles are already in the data array.
+    const serverNow = new Date().toISOString().slice(0, 10);
+    if (todayPts.some(p => new Date(p.ts * 1000).toISOString().slice(0, 10) === serverNow)) {
+      return {
+        sessionPoints: todayPts,
+        previousClose: derivePreviousClose(points, periods, lastDate, meta),
+      };
+    }
+    // currentTradingPeriod.regular is stale — fall through to date-based heuristics
   }
 
   // todayPts is empty: either the market hasn't opened yet, or Yahoo's
@@ -246,6 +253,13 @@ async function fetchIntraday(yahooSymbol) {
 
   const { sessionPoints, previousClose } = deriveSession(points, periods, lastDate, meta);
 
+  // Use the date of the session points themselves, not the last raw candle date.
+  // lastDate may be today (due to pre-market candles) while sessionPoints are from
+  // yesterday, which would fool the frontend's freshness/stale-detection logic.
+  const sessionDate = sessionPoints.length > 0
+    ? new Date(sessionPoints[sessionPoints.length - 1].ts * 1000).toISOString().slice(0, 10)
+    : lastDate;
+
   // All points spanning today's full extended session (pre + regular + post).
   // When currentTradingPeriod is a future session (market closed, data is stale),
   // dayStart is tomorrow — filtering by it yields nothing. Fall back to lastDate so
@@ -258,7 +272,7 @@ async function fetchIntraday(yahooSymbol) {
     : points.filter(p => new Date(p.ts * 1000).toISOString().slice(0, 10) === lastDate);
 
   return {
-    date:          lastDate,
+    date:          sessionDate,
     previousClose,
     currency:      meta.currency || null,
     marketState:   deriveMarketState(periods),
