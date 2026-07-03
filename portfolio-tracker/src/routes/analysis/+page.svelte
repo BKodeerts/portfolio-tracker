@@ -82,7 +82,6 @@
       series: [{
         type: 'bar',
         barMaxWidth: 36,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: values.map((v) => ({
           value: v,
           itemStyle: { color: v >= 0 ? posBar : negBar, borderRadius: v >= 0 ? [3, 3, 0, 0] : [0, 0, 3, 3] },
@@ -196,7 +195,7 @@
 
   function fmtContrib(pl: number): string {
     const abs = Math.abs(Math.round(pl));
-    return `${pl >= 0 ? '+' : '-'}€ ${abs.toLocaleString('nl-BE')}`;
+    return `${pl >= 0 ? '+' : '-'}€ ${abs.toLocaleString('nl-BE')}`;
   }
 </script>
 
