@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.1] — 2026-07-03
+
+### Bug Fixes
+
+- Fixed add-on failing to start after 0.8.0: the Docker image did not include `shared/fx-defs.json`, crashing the server on boot with MODULE_NOT_FOUND.
+
 ## [0.8.0] — 2026-07-03
 
 ### Major Refactor
