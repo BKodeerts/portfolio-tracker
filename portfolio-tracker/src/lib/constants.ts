@@ -1,3 +1,5 @@
+import fxDefs from '../../shared/fx-defs.json';
+
 export const BENCHMARK_SYM = 'VWCE.DE';
 export const BENCHMARK_LBL = 'VWCE All-World';
 
@@ -7,21 +9,8 @@ export interface FxDef {
   scale?: number; // e.g. GBX = GBP / 100
 }
 
-export const FX_DEFS: Record<string, FxDef> = {
-  USD: { symbol: 'EURUSD=X', fallback: 1.09 },
-  GBP: { symbol: 'EURGBP=X', fallback: 0.86 },
-  GBX: { symbol: 'EURGBP=X', fallback: 0.86, scale: 100 },
-  CLP: { symbol: 'EURCLP=X', fallback: 1000 },
-  CHF: { symbol: 'EURCHF=X', fallback: 0.95 },
-  SEK: { symbol: 'EURSEK=X', fallback: 11.5 },
-  DKK: { symbol: 'EURDKK=X', fallback: 7.46 },
-  NOK: { symbol: 'EURNOK=X', fallback: 11.5 },
-  CAD: { symbol: 'EURCAD=X', fallback: 1.5 },
-  AUD: { symbol: 'EURAUD=X', fallback: 1.65 },
-  JPY: { symbol: 'EURJPY=X', fallback: 160 },
-  MXN: { symbol: 'EURMXN=X', fallback: 20 },
-  BRL: { symbol: 'EURBRL=X', fallback: 5.5 },
-};
+// Single source of truth shared with server/domain/fx.js.
+export const FX_DEFS: Record<string, FxDef> = fxDefs;
 
 export const SUPPORTED_CURRENCIES = ['EUR', ...Object.keys(FX_DEFS)];
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
-  import { EU_EXCHANGE_RE } from '$lib/utils/exchange';
+  import { getLiveData } from '$lib/derived/dashboard';
   import { fmt, fmtPct } from '$lib/utils/fmt';
   import PrivacyValue from './PrivacyValue.svelte';
 
@@ -11,30 +11,8 @@
     (intradayStore.lastLoaded !== null && Date.now() - intradayStore.lastLoaded > STALE_MS),
   );
 
-  // Compute live value + day P&L from intraday prices when available
-  const liveData = $derived((): { value: number; dayPl: number } | null => {
-    if (!intradayStore.loaded || portfolioStore.positions.length === 0) return null;
-    const fxRate = intradayStore.liveEurUsd;
-    let liveValue = 0;
-    let prevValue = 0;
-    for (const pos of portfolioStore.positions) {
-      const yahoo  = pos.yahoo ?? pos.ticker;
-      const intra  = intradayStore.data[yahoo];
-      const isEu   = EU_EXCHANGE_RE.test(yahoo);
-      const fx     = isEu ? 1 : fxRate;
-      if (!intra?.previousClose || (!isEu && fx == null)) {
-        // no intraday or missing FX — use the static position value as-is
-        liveValue += pos.value;
-        prevValue += pos.value;
-        continue;
-      }
-      const pts          = intra.points ?? [];
-      const currentPrice = pts.at(-1)?.close ?? intra.previousClose;
-      liveValue += (pos.shares * currentPrice) / fx!;
-      prevValue += (pos.shares * intra.previousClose) / fx!;
-    }
-    return { value: liveValue, dayPl: liveValue - prevValue };
-  });
+  // Live value + day P&L from intraday prices when available
+  const liveData = $derived(getLiveData);
 
   const totalValue = $derived(
     liveData()?.value ?? portfolioStore.positions.reduce((s, p) => s + p.value, 0),

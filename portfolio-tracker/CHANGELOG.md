@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.8.0] — 2026-07-03
+
+### Major Refactor
+
+- **SvelteKit 5 + TypeScript + ECharts frontend** (from the 0.7.0 beta line) is now the stable UI: at-a-glance dashboard with live hero, movers strip, positions table/cards, and a per-position deep-dive page.
+- **Deep-dive page on server data** — native-currency average cost is now computed server-side from FIFO lots; new Dividenden and Gerealiseerde W/V stat cards; Koers/Waarde chart toggle showing the holding's EUR value over time.
+
+### Bug Fixes
+
+- **Multi-currency live values** — positions traded in GBX/CHF/SEK/DKK/NOK were converted with a 1:1 FX rate in live dashboard values (London prices were off by ~100×). All live money math is now keyed on the position's trading currency with a live rate per held currency.
+- Fixed FX definition drift risk: one shared `shared/fx-defs.json` is consumed by both server and frontend.
+
+### Internal
+
+- Pure money math (FIFO, splits, XIRR, TWR, risk metrics, FX, chart series) extracted to `server/domain/` with a 44-test vitest suite.
+- Typed API contract for chart data and ticker metadata, with a runtime shape check on `/api/portfolio` responses.
+- Dashboard decomposed into components; SVG sparklines are a real Svelte component (no more HTML string injection); market-session logic consolidated into one module.
+- CI workflow: tests, type check, lint, and build on every PR.
+
 ## [0.6.1] — 2026-04-03
 
 ### Bug Fixes
