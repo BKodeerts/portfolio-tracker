@@ -58,8 +58,8 @@ export function getLiveData(): { value: number; dayPl: number } | null {
 export function buildCards(): SparkCard[] {
   return portfolioStore.currentTickers.map((ticker) => {
     const meta   = portfolioStore.tickerMeta[ticker];
-    const yahoo  = (meta?.['yahoo'] as string | undefined) ?? ticker;
-    const label  = (meta?.['label'] as string | undefined) ?? ticker;
+    const yahoo  = meta?.yahoo ?? ticker;
+    const label  = meta?.label ?? ticker;
     const pos    = portfolioStore.positions.find((p) => p.ticker === ticker);
     const shares = pos?.shares ?? 0;
     const intra  = intradayStore.data[yahoo];
@@ -68,7 +68,7 @@ export function buildCards(): SparkCard[] {
     const lastPt      = pts[pts.length - 1];
     const price       = lastPt?.close ?? null;
     const changePct   = price != null && prevClose ? ((price - prevClose) / prevClose) * 100 : null;
-    const currency  = pos?.currency ?? (meta?.['currency'] as string | undefined);
+    const currency  = pos?.currency ?? meta?.currency;
     const changeEur = price != null && prevClose && shares
       ? toEurLive(currency, (price - prevClose) * shares, intradayStore.liveRates)
       : null;
@@ -101,7 +101,7 @@ export function getDay1Pl(): { pl: number; pct: number } | null {
   let prevCloseTotal = 0;
   let currentTotal   = 0;
   for (const ticker of tickers) {
-    const yahoo  = (portfolioStore.tickerMeta[ticker]?.['yahoo'] as string) ?? ticker;
+    const yahoo  = portfolioStore.tickerMeta[ticker]?.yahoo ?? ticker;
     const intra  = intradayStore.data[yahoo];
     if (!intra) continue;
     const pos     = portfolioStore.positions.find((p) => p.ticker === ticker);
@@ -122,10 +122,10 @@ export function getPeriodPl(filtered: ChartPoint[]): { pl: number; pct: number }
   if (filtered.length < 2) return null;
   const first = filtered[0]!;
   const last  = filtered[filtered.length - 1]!;
-  const fv = (first.value as number) ?? 0;
-  const lv = (last.value  as number) ?? 0;
-  const fi = (first.invested as number) ?? 0;
-  const li = (last.invested  as number) ?? 0;
+  const fv = first.value ?? 0;
+  const lv = last.value ?? 0;
+  const fi = first.invested ?? 0;
+  const li = last.invested ?? 0;
   const pl   = (lv - li) - (fv - fi);
   const base = li > 0 ? li : fi;
   return { pl, pct: base > 0 ? (pl / base) * 100 : 0 };
@@ -135,13 +135,13 @@ export function getPeriodPl(filtered: ChartPoint[]): { pl: number; pct: number }
 export function posSparkValues(ticker: string, n = 12): number[] {
   return portfolioStore.chartData
     .slice(-n)
-    .map((pt) => (pt[ticker] as number | undefined) ?? 0)
+    .map((pt) => pt.positions[ticker]?.value ?? 0)
     .filter((v) => v > 0);
 }
 
 /** Intraday spark inputs for a position card; null when unavailable. */
 export function intradaySparkInputs(ticker: string): { points: { ts: number; close: number }[]; prevClose: number; tradingMins: number } | null {
-  const yahoo = (portfolioStore.tickerMeta[ticker]?.['yahoo'] as string) ?? ticker;
+  const yahoo = portfolioStore.tickerMeta[ticker]?.yahoo ?? ticker;
   const intra = intradayStore.data[yahoo];
   const pts = intra?.points ?? [];
   const prev = intra?.previousClose ?? null;

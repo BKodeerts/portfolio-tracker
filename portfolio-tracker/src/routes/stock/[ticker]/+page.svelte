@@ -22,20 +22,21 @@
 
   const ticker  = $derived(page.params['ticker'] ?? '');
   const meta    = $derived(portfolioStore.tickerMeta[ticker] ?? {});
-  const yahoo   = $derived((meta['yahoo'] as string | undefined) ?? ticker);
+  const yahoo   = $derived(meta.yahoo ?? ticker);
   const color   = $derived(getColor(ticker));
   const pos     = $derived(portfolioStore.positions.find((p) => p.ticker === ticker));
   const latest  = $derived(portfolioStore.chartData[portfolioStore.chartData.length - 1]);
 
   // Derived position stats from chart data
-  const val    = $derived((latest?.[ticker] as number | undefined) ?? 0);
-  const cost   = $derived((latest?.[`${ticker}_cost`] as number | undefined) ?? 0);
+  const slice  = $derived(latest?.positions[ticker]);
+  const val    = $derived(slice?.value ?? 0);
+  const cost   = $derived(slice?.cost ?? 0);
   const pl     = $derived(val - cost);
   const plPct  = $derived(cost > 0 ? (pl / cost) * 100 : 0);
-  const shares = $derived((latest?.[`${ticker}_shares`] as number | undefined) ?? pos?.shares ?? 0);
+  const shares = $derived(slice?.shares ?? pos?.shares ?? 0);
 
   // Currency symbol
-  const nativeCcy = $derived((meta['currency'] as string | undefined) ?? 'EUR');
+  const nativeCcy = $derived(meta.currency ?? 'EUR');
   const ccySym    = $derived(nativeCcy === 'EUR' ? '€' : nativeCcy === 'GBP' ? '£' : nativeCcy === 'USD' ? '$' : nativeCcy);
 
   // Intraday data
@@ -312,7 +313,7 @@
     <div class="sd-identity">
       <span class="color-dot" style="background:{color}"></span>
       <span class="sd-ticker">{ticker}</span>
-      {#if meta['label']}<span class="sd-name">{meta['label'] as string}</span>{/if}
+      {#if meta.label}<span class="sd-name">{meta.label}</span>{/if}
     </div>
     <div class="sd-price-row">
       {#if currentPrice != null}
@@ -335,8 +336,8 @@
 
   <!-- Mobile hero: name · big value · P&L pill -->
   <div class="sd-hero">
-    {#if meta['label']}
-      <div class="h-eyebrow" style="margin-bottom:6px">{(meta['label'] as string).toUpperCase()}</div>
+    {#if meta.label}
+      <div class="h-eyebrow" style="margin-bottom:6px">{meta.label.toUpperCase()}</div>
     {/if}
     <div class="sd-hero-value"><PrivacyValue value={fmt(val)} /></div>
     <div class="sd-hero-pl">

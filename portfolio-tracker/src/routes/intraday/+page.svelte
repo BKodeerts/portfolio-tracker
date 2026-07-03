@@ -12,8 +12,8 @@
   const cards = $derived((): IntradayCardItem[] => {
     return portfolioStore.currentTickers.map((ticker) => {
       const meta  = portfolioStore.tickerMeta[ticker];
-      const yahoo = (meta?.['yahoo'] as string | undefined) ?? ticker;
-      const label = (meta?.['label'] as string | undefined) ?? ticker;
+      const yahoo = meta?.yahoo ?? ticker;
+      const label = meta?.label ?? ticker;
       const pos   = portfolioStore.positions.find((p) => p.ticker === ticker);
       const shares = pos?.shares ?? 0;
 
@@ -29,7 +29,7 @@
         : null;
       const changeEur = price != null && prevClose && shares
         ? toEurLiveOrFallback(
-            pos?.currency ?? (meta?.['currency'] as string | undefined),
+            pos?.currency ?? meta?.currency,
             (price - prevClose) * shares,
             intradayStore.liveRates,
           )

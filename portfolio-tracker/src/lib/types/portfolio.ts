@@ -1,9 +1,17 @@
+/** Per-ticker slice of one chart row (all EUR). */
+export interface ChartPositionSlice {
+  value: number;
+  cost: number;
+  shares: number;
+}
+
 export interface ChartPoint {
   date: string;
+  /** Total portfolio value in EUR. */
   value: number;
-  invested?: number;
-  // per-ticker values keyed by ticker symbol
-  [ticker: string]: number | string | undefined;
+  /** Total FIFO cost basis in EUR. */
+  invested: number;
+  positions: Record<string, ChartPositionSlice>;
 }
 
 export interface BenchmarkPoint {
@@ -57,13 +65,21 @@ export interface WatchlistEntry {
   label?: string;
 }
 
+/**
+ * Ticker metadata as emitted by the server (buildMeta in
+ * server/domain/positions.js merges transactions + ticker_meta.json).
+ */
 export interface TickerMeta {
-  sector?: string;
-  industry?: string;
-  assetType?: string;
-  geo?: string;
-  manualPrice?: number;
-  [key: string]: unknown;
+  yahoo?: string;
+  label?: string;
+  currency?: string;
+  quoteType?: string | null;
+  sector?: string | null;
+  industry?: string | null;
+  geo?: string | null;
+  isin?: string;
+  manualPriceEur?: number | null;
+  manualPriceAsOf?: string | null;
 }
 
 export interface PortfolioResponse {

@@ -24,7 +24,7 @@ function periodAxisLabel(data: ChartPoint[], p: Period) {
   const show: boolean[] = new Array(data.length).fill(false);
   let last = '';
   for (let i = 0; i < data.length; i++) {
-    const k = keyOf(new Date(data[i]!.date as string));
+    const k = keyOf(new Date(data[i]!.date));
     if (k !== last) { show[i] = true; last = k; }
   }
   const fmtLabel = (value: string) => {
@@ -47,7 +47,7 @@ export function buildOption(
 ): echarts.EChartsOption {
   const c = chartColors();
   const xLabel = periodAxisLabel(data, p);
-  const dates = data.map((d) => d.date as string);
+  const dates = data.map((d) => d.date);
 
   if (v === 'total') {
     return {
@@ -69,13 +69,13 @@ export function buildOption(
       },
       series: [
         {
-          name: 'Portefeuille', type: 'line', data: data.map((d) => d.value as number),
+          name: 'Portefeuille', type: 'line', data: data.map((d) => d.value),
           smooth: false, symbol: 'none',
           lineStyle: { color: 'var(--accent)', width: 2 },
           areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'oklch(62% 0.14 255 / 0.18)' }, { offset: 1, color: 'oklch(62% 0.14 255 / 0.02)' }] } },
         },
         {
-          name: '__cost', type: 'line', data: data.map((d) => d.invested as number),
+          name: '__cost', type: 'line', data: data.map((d) => d.invested),
           smooth: false, symbol: 'none',
           lineStyle: { color: c.dashedRef, width: 1, type: 'dashed' },
           areaStyle: { color: themeStore.isDark ? 'rgba(80,80,80,0.07)' : 'rgba(0,0,0,0.03)' },
@@ -92,7 +92,7 @@ export function buildOption(
       xAxis: baseCategoryXAxis(c, dates, { interval: xLabel.interval, formatter: xLabel.formatter }),
       yAxis: baseValueYAxis(c, euroAxisFormatter),
       tooltip: baseTooltip(c),
-      series: tickers.map((t) => ({ name: t, type: 'line' as const, stack: 'total', data: data.map((d) => (d[t] as number | undefined) ?? 0), smooth: false, symbol: 'none', lineStyle: { color: getColor(t), width: 1.5 }, areaStyle: { color: getColor(t) + '28' } })),
+      series: tickers.map((t) => ({ name: t, type: 'line' as const, stack: 'total', data: data.map((d) => d.positions[t]?.value ?? 0), smooth: false, symbol: 'none', lineStyle: { color: getColor(t), width: 1.5 }, areaStyle: { color: getColor(t) + '28' } })),
     };
   }
 
@@ -104,7 +104,7 @@ export function buildOption(
       yAxis: baseValueYAxis(c, (n: number) => `${+n.toFixed(1)}%`),
       tooltip: baseTooltip(c),
       series: visibleTickers.map((t) => ({
-        name: t, type: 'line' as const, data: data.map((d) => { const raw = d[`${t}_pct`]; return raw != null ? +(raw as number) : null; }),
+        name: t, type: 'line' as const, data: data.map((d) => { const s = d.positions[t]; return s && s.cost > 0 ? +(((s.value - s.cost) / s.cost) * 100).toFixed(1) : null; }),
         smooth: false, symbol: 'none', connectNulls: true, lineStyle: { color: getColor(t), width: 2 },
       })),
     };
@@ -119,7 +119,7 @@ export function buildOption(
     tooltip: baseTooltip(c),
     series: tickers2.map((t) => ({
       name: t, type: 'line' as const, stack: 'total',
-      data: data.map((d) => { const val = d[t] as number | undefined; const cost = d[`${t}_cost`] as number | undefined; return val != null && cost != null ? val - cost : null; }),
+      data: data.map((d) => { const s = d.positions[t]; return s ? s.value - s.cost : null; }),
       smooth: false, symbol: 'none', connectNulls: true, lineStyle: { color: getColor(t), width: 1.5 }, areaStyle: { color: getColor(t) + '28' },
     })),
   };
@@ -141,7 +141,7 @@ export function build1DOption(v: DashboardView): echarts.EChartsOption | null {
   let sessionDate: string | null = null;
 
   for (const ticker of tickers) {
-    const yahoo = (portfolioStore.tickerMeta[ticker]?.['yahoo'] as string) ?? ticker;
+    const yahoo = portfolioStore.tickerMeta[ticker]?.yahoo ?? ticker;
     const intra = intradayStore.data[yahoo];
     if (!intra) continue;
     prevCloseMap[ticker] = intra.previousClose ?? 0;
