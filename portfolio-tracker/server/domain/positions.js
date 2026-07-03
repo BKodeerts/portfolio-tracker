@@ -188,11 +188,11 @@ function computeDividends(txsByTicker) {
 // ── FIFO cost basis & realized P&L ───────────────────────────────────────────
 
 /**
- * FIFO native-currency cost basis for open lots, converted to EUR at the latest FX rate.
- * Returns the EUR value the open position would have if prices hadn't moved but FX did.
- * Subtracting pos.cost from this gives the pure FX P&L.
+ * FIFO open lots with their native-currency cost per share (unscaled: GBX lots
+ * are in GBP here — apply FX_DEFS scale for display in pence).
+ * Returns null when the currency has no FX definition/rates.
  */
-function fifoCostNativeEur(txs, ticker, adjSharesFn, fxMaps, ccy, latestDate) {
+function fifoOpenLotsNative(txs, ticker, adjSharesFn, fxMaps, ccy) {
   const def = FX_DEFS[ccy];
   if (!def || !fxMaps[ccy]) return null;
   const lots = [];
@@ -211,9 +211,45 @@ function fifoCostNativeEur(txs, ticker, adjSharesFn, fxMaps, ccy, latestDate) {
       }
     }
   }
+  return lots.filter(l => l.shares > 0);
+}
+
+/**
+ * FIFO native-currency cost basis for open lots, converted to EUR at the latest FX rate.
+ * Returns the EUR value the open position would have if prices hadn't moved but FX did.
+ * Subtracting pos.cost from this gives the pure FX P&L.
+ */
+function fifoCostNativeEur(txs, ticker, adjSharesFn, fxMaps, ccy, latestDate) {
+  const lots = fifoOpenLotsNative(txs, ticker, adjSharesFn, fxMaps, ccy);
+  if (lots == null) return null;
+  const def = FX_DEFS[ccy];
   const fxRate1 = fxMaps[ccy]?.[latestDate] || def.fallback;
-  const totalNative = lots.filter(l => l.shares > 0).reduce((s, l) => s + l.shares * l.costNativePerShare, 0);
+  const totalNative = lots.reduce((s, l) => s + l.shares * l.costNativePerShare, 0);
   return totalNative / fxRate1;
+}
+
+/**
+ * Average cost per share in the trading currency (in the units Yahoo quotes,
+ * i.e. GBX averages are in pence). EUR positions average costEur directly.
+ * Returns null when no open shares or FX data is missing for the currency.
+ */
+function fifoAvgCostNative(txs, ticker, adjSharesFn, fxMaps, ccy) {
+  const nonDiv = txs.filter(t => !isDividend(t));
+  if (!ccy || ccy === 'EUR' || !FX_DEFS[ccy]) {
+    // EUR (or unknown currency): FIFO EUR cost of open shares / open shares
+    let net = 0;
+    for (const tx of nonDiv) net += adjSharesFn(tx, ticker);
+    if (net <= 0) return null;
+    const today = '9999-12-31';
+    return fifoCostBasis(txs, ticker, today, adjSharesFn) / net;
+  }
+  const lots = fifoOpenLotsNative(txs, ticker, adjSharesFn, fxMaps, ccy);
+  if (!lots || !lots.length) return null;
+  const totalShares = lots.reduce((s, l) => s + l.shares, 0);
+  if (totalShares <= 0) return null;
+  const totalNative = lots.reduce((s, l) => s + l.shares * l.costNativePerShare, 0);
+  const scale = FX_DEFS[ccy].scale || 1;
+  return (totalNative / totalShares) * scale;
 }
 
 /**
@@ -283,7 +319,9 @@ module.exports = {
   computeNetShares,
   isDividend,
   computeDividends,
+  fifoOpenLotsNative,
   fifoCostNativeEur,
+  fifoAvgCostNative,
   fifoCostBasis,
   computeRealizedPl,
 };

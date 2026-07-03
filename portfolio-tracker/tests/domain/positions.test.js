@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   fifoCostBasis,
+  fifoAvgCostNative,
+  fifoCostNativeEur,
   computeRealizedPl,
   computeDividends,
   detectSplitFactors,
@@ -154,5 +156,49 @@ describe('computeNetShares / buildMeta / findEarliestDate', () => {
 
   it('findEarliestDate returns the minimum date', () => {
     expect(findEarliestDate(transactions)).toBe('2024-01-02');
+  });
+});
+
+describe('fifoAvgCostNative', () => {
+  it('averages FIFO EUR cost per open share for EUR positions', () => {
+    const txs = [
+      { date: '2024-01-02', ticker: 'AAA', shares: 10, costEur: 100 }, // €10
+      { date: '2024-02-01', ticker: 'AAA', shares: 10, costEur: 200 }, // €20
+      { date: '2024-03-01', ticker: 'AAA', shares: -5, costEur: 150 }, // sell 5 from lot 1
+    ];
+    // Open: 5 @ €10 + 10 @ €20 = €250 / 15 shares
+    expect(fifoAvgCostNative(txs, 'AAA', noAdj, {}, 'EUR')).toBeCloseTo(250 / 15, 10);
+  });
+
+  it('converts to the trading currency at each buy-date FX rate (USD)', () => {
+    const fxMaps = { USD: { '2024-01-02': 1.10, '2024-02-01': 1.05 } };
+    const txs = [
+      { date: '2024-01-02', ticker: 'USD1', shares: 10, costEur: 1000 }, // $110/share
+      { date: '2024-02-01', ticker: 'USD1', shares: 10, costEur: 1000 }, // $105/share
+    ];
+    expect(fifoAvgCostNative(txs, 'USD1', noAdj, fxMaps, 'USD')).toBeCloseTo(107.5, 10);
+  });
+
+  it('returns GBX average in pence (scale 100)', () => {
+    const fxMaps = { GBX: { '2024-01-02': 0.85 } };
+    const txs = [{ date: '2024-01-02', ticker: 'GBX1', shares: 4, costEur: 400 }]; // €100/share = £85 = 8500p
+    expect(fifoAvgCostNative(txs, 'GBX1', noAdj, fxMaps, 'GBX')).toBeCloseTo(8500, 8);
+  });
+
+  it('returns null when the position is fully sold', () => {
+    const txs = [
+      { date: '2024-01-02', ticker: 'AAA', shares: 10, costEur: 100 },
+      { date: '2024-03-01', ticker: 'AAA', shares: -10, costEur: 150 },
+    ];
+    expect(fifoAvgCostNative(txs, 'AAA', noAdj, {}, 'EUR')).toBeNull();
+    const fxMaps = { USD: { '2024-01-02': 1.1 } };
+    expect(fifoAvgCostNative(txs, 'AAA', noAdj, fxMaps, 'USD')).toBeNull();
+  });
+
+  it('stays consistent with fifoCostNativeEur (same lots, no scale in EUR total)', () => {
+    const fxMaps = { GBX: { '2024-01-02': 0.85, '2024-06-01': 0.90 } };
+    const txs = [{ date: '2024-01-02', ticker: 'GBX1', shares: 4, costEur: 400 }];
+    // Native total = 4 * £85 = £340 → at latest 0.90: €377.78
+    expect(fifoCostNativeEur(txs, 'GBX1', noAdj, fxMaps, 'GBX', '2024-06-01')).toBeCloseTo(340 / 0.9, 8);
   });
 });
