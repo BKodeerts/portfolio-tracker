@@ -1,3 +1,7 @@
+/**
+ * Market-session logic: exchange definitions, open/closed detection,
+ * trading-session lengths and Yahoo market-state normalisation.
+ */
 export const EU_EXCHANGE_RE = /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i;
 
 interface ExchangeDef {
@@ -80,40 +84,4 @@ export function sessionBounds(yahooSymbol: string, dateStr: string): { open: num
     open:  unixAtLocal(def.open[0],  def.open[1]),
     close: unixAtLocal(def.close[0], def.close[1]),
   };
-}
-
-/** Build an inline SVG sparkline from intraday points. */
-export function sparklineSVG(
-  points: { ts: number; close: number }[],
-  prevClose: number,
-  tradingMins: number,
-  muted = false,
-): string {
-  if (!points || points.length < 2 || !prevClose) return '';
-  const pcts = points.map((p) => ((p.close - prevClose) / prevClose) * 100);
-  const min = Math.min(0, ...pcts);
-  const max = Math.max(0, ...pcts);
-  const range = max - min || 0.1;
-  const W = 200, H = 38;
-  const firstTs   = points[0]!.ts;
-  const totalSecs = tradingMins ? tradingMins * 60 : points[points.length - 1]!.ts - firstTs;
-  const xs = points.map((p) => Math.min(W, Math.max(0, ((p.ts - firstTs) / totalSecs) * W)));
-  const ys = pcts.map((v) => H - 3 - ((v - min) / range) * (H - 6));
-  const polyPts  = xs.map((x, i) => `${x.toFixed(1)},${ys[i]!.toFixed(1)}`).join(' ');
-  const fillPath = `M${xs[0]!.toFixed(1)},${ys[0]!.toFixed(1)} ` +
-    xs.slice(1).map((x, i) => `L${x.toFixed(1)},${ys[i + 1]!.toFixed(1)}`).join(' ') +
-    ` L${xs[xs.length - 1]!.toFixed(1)},${H} L${xs[0]!.toFixed(1)},${H} Z`;
-  const zeroY = (H - 3 - ((-min) / range) * (H - 6)).toFixed(1);
-  const last  = pcts[pcts.length - 1] ?? 0;
-  const clr   = last >= 0 ? '#4ade80' : '#f87171';
-  const uid   = `sp${Math.random().toString(36).slice(2, 7)}`;
-  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;margin-top:8px" opacity="${muted ? '0.45' : '1'}">
-  <defs><linearGradient id="${uid}" x1="0" x2="0" y1="0" y2="1">
-    <stop offset="0%" stop-color="${clr}" stop-opacity="0.2"/>
-    <stop offset="100%" stop-color="${clr}" stop-opacity="0.02"/>
-  </linearGradient></defs>
-  <line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="rgba(128,128,128,0.2)" stroke-width="1"/>
-  <path d="${fillPath}" fill="url(#${uid})"/>
-  <polyline points="${polyPts}" fill="none" stroke="${clr}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
 }
