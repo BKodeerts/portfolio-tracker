@@ -125,7 +125,7 @@ price + regular/extended split, position stats (shares, avg cost in native ccy *
 |---|---|---|
 | ~~Non-USD foreign positions (GBX/CHF/SEK/DKK/NOK) get fx=1 in live dashboard values~~ **fixed** | `src/lib/fx.ts` + currency-aware live math | 2 ✅ |
 | ~~Only EURUSD live rate exists client-side~~ **fixed** — `liveRates` per held currency | `intraday.svelte.ts` | 2 ✅ |
-| Stock page derives avg cost via implied FX (wrong when price moved intraday) | `stock/[ticker]/+page.svelte:77-79` | 5 |
+| ~~Stock page derives avg cost via implied FX~~ **fixed** — server `avgCostNative` | `server/domain/positions.js` | 5 ✅ |
 | ~~Dashboard total FX inconsistency; SummaryBar duplicated liveData~~ **fixed** — one `getLiveData` | `derived/dashboard.ts` | 2 ✅ |
 | ~~FX_DEFS drift risk between server and client~~ **fixed** — `shared/fx-defs.json` | shared JSON | 2 ✅ |
 | ~~Stale CLAUDE.md misdirects tooling~~ **fixed** | repo root | 0 ✅ |
@@ -135,5 +135,8 @@ price + regular/extended split, position stats (shares, avg cost in native ccy *
 - **HA add-on breakage:** scheduler/MQTT consume the same engine; keep `computeCurrentSnapshot`'s output shape stable until Phase 6, and smoke-test the Docker build (`docker-compose up --build`) at each phase boundary.
 - **Yahoo API fragility:** untouched by this plan (`server/yahoo.js` + cache stay as-is); domain extraction injects candle data, which also makes tests independent of Yahoo.
 
-## 6. Effort estimate
+## 6. Status
+Phases 0, 1, 2, 3, 4 (decomposition part), 5 and 6 (CI) are implemented on this branch. Remaining follow-ups: fold analysis/intraday tabs into dashboard/deep-dive (4/5 tail), move stock/analysis chart builders onto `charts/base.ts`, revisit the TWR-dividend and benchmark-FX-fallback oddities noted in Phase 1, and smoke-test the Docker/HA build.
+
+## 7. Effort estimate
 Phases 0–1: ~1–2 days · Phase 2: ~1 day · Phase 3: ~1 day · Phase 4: ~2 days · Phase 5: ~1 day · Phase 6: ~1 day. Each phase leaves the app shippable.
