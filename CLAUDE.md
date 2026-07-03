@@ -57,7 +57,7 @@ Run both `dev` and `dev:server` simultaneously for local development.
 ## Key Conventions
 
 - **Version bumps**: Edit only `portfolio-tracker/config.yaml` (`version:` field). Do NOT touch `package.json` — config.yaml is the HA add-on version source of truth.
-- **Multi-currency**: `FX_DEFS` currently duplicated between `server/portfolio.js` and `src/lib/constants.ts` — keep in sync (consolidation planned, see REFACTOR_PLAN.md)
+- **Multi-currency**: `FX_DEFS` lives in `portfolio-tracker/shared/fx-defs.json`, consumed by `server/domain/fx.js` and `src/lib/constants.ts` — edit only the JSON
 - **Transaction format**: `ticker` (internal name), `yahoo` (Yahoo symbol), `currency` (stock trading currency), `costEur` (absolute EUR cost), `shares` (negative = sale, 0 = dividend)
 - **Benchmark**: `VWCE.DE`, indexed to 100 at first portfolio date; S&P 500 (`^GSPC`) secondary
 - **DeGiro import**: Dutch number format (`1.234,56`), split-lot aggregation by Order ID + ISIN (`src/lib/utils/csv.ts`)

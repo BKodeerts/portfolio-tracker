@@ -5,6 +5,7 @@ import { themeStore } from '$lib/stores/theme.svelte';
 import { fmt } from '$lib/utils/fmt';
 import { getColor } from '$lib/utils/color';
 import { EU_EXCHANGE_RE } from '$lib/market';
+import { toEurLive, liveRateFor } from '$lib/fx';
 import { chartColors, euroAxisFormatter, baseTooltip, baseCategoryXAxis, baseValueYAxis } from './base';
 import type { Period } from '$lib/utils/period';
 import type { ChartPoint } from '$lib/types/portfolio';
@@ -128,9 +129,9 @@ export function buildOption(
 export function build1DOption(v: DashboardView): echarts.EChartsOption | null {
   const tickers = portfolioStore.currentTickers;
   if (!tickers.length || !intradayStore.loaded) return null;
-  const fxRateRaw = intradayStore.liveEurUsd;
-  if (fxRateRaw === null && tickers.some((t) => !EU_EXCHANGE_RE.test((portfolioStore.tickerMeta[t]?.['yahoo'] as string) ?? t))) return null;
-  const fxRate = fxRateRaw ?? 1;
+  // Require a live rate for every held non-EUR currency before rendering.
+  const rates = intradayStore.liveRates;
+  if (portfolioStore.positions.some((p) => liveRateFor(p.currency, rates) == null)) return null;
   const c = chartColors();
 
   const allTsSet = new Set<number>();
@@ -225,8 +226,9 @@ export function build1DOption(v: DashboardView): echarts.EChartsOption | null {
     },
   };
 
-  const fxFor     = (t: string) => EU_EXCHANGE_RE.test((portfolioStore.tickerMeta[t]?.['yahoo'] as string) ?? t) ? 1 : fxRate;
-  const sharesFor = (t: string) => portfolioStore.positions.find((p) => p.ticker === t)?.shares ?? 0;
+  const posFor    = (t: string) => portfolioStore.positions.find((p) => p.ticker === t);
+  const eurFor    = (t: string, amount: number) => toEurLive(posFor(t)?.currency, amount, rates) ?? 0;
+  const sharesFor = (t: string) => posFor(t)?.shares ?? 0;
 
   const priceOverTime: Record<string, number[]> = {};
   for (const ticker of tickers) {
@@ -242,11 +244,11 @@ export function build1DOption(v: DashboardView): echarts.EChartsOption | null {
     for (let i = 0; i < sortedTs.length; i++) {
       if (sortedTs[i]! > nowSec) { seriesValues.push(null); continue; }
       let total = 0;
-      for (const ticker of tickers) total += (sharesFor(ticker) * (priceOverTime[ticker]?.[i] ?? 0)) / fxFor(ticker);
+      for (const ticker of tickers) total += eurFor(ticker, sharesFor(ticker) * (priceOverTime[ticker]?.[i] ?? 0));
       seriesValues.push(Math.round(total * 100) / 100);
     }
     let prevCloseTotal = 0;
-    for (const ticker of tickers) prevCloseTotal += (sharesFor(ticker) * (prevCloseMap[ticker] ?? 0)) / fxFor(ticker);
+    for (const ticker of tickers) prevCloseTotal += eurFor(ticker, sharesFor(ticker) * (prevCloseMap[ticker] ?? 0));
     prevCloseTotal = Math.round(prevCloseTotal * 100) / 100;
     const lastVal = seriesValues.findLast((v) => v !== null) ?? 0;
     const isUp    = lastVal >= prevCloseTotal;
@@ -286,13 +288,12 @@ export function build1DOption(v: DashboardView): echarts.EChartsOption | null {
   const series = tickersOrdered.map((t, idx) => {
     const prev = prevCloseMap[t] ?? 0;
     const shr  = sharesFor(t);
-    const fx   = fxFor(t);
     const prices = priceOverTime[t] ?? [];
     const data: (number | null)[] = prices.map((p, i) => {
       if (sortedTs[i]! > nowSec) return null;
-      if (v === 'individual') return Math.round(((shr * p) / fx) * 100) / 100;
+      if (v === 'individual') return Math.round(eurFor(t, shr * p) * 100) / 100;
       if (v === 'pct')        return prev > 0 ? +(((p - prev) / prev) * 100).toFixed(3) : 0;
-      return Math.round((((p - prev) * shr) / fx) * 100) / 100;
+      return Math.round(eurFor(t, (p - prev) * shr) * 100) / 100;
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const s: any = { name: t, type: 'line', data, smooth: false, symbol: 'none', lineStyle: { color: getColor(t), width: v === 'pct' ? 2 : 1.5 } };

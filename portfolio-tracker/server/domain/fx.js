@@ -6,21 +6,8 @@
 const FX_FALLBACK = 1.09; // backward compat (EURUSD)
 
 // FX definitions: stock currency → { Yahoo FX symbol (EUR-base), fallback rate, optional /scale }
-const FX_DEFS = {
-  USD: { symbol: 'EURUSD=X', fallback: 1.09  },
-  GBP: { symbol: 'EURGBP=X', fallback: 0.86  },
-  GBX: { symbol: 'EURGBP=X', fallback: 0.86, scale: 100 }, // pence sterling
-  CLP: { symbol: 'EURCLP=X', fallback: 1000  },
-  CHF: { symbol: 'EURCHF=X', fallback: 0.95  },
-  SEK: { symbol: 'EURSEK=X', fallback: 11.5  },
-  DKK: { symbol: 'EURDKK=X', fallback: 7.46  },
-  NOK: { symbol: 'EURNOK=X', fallback: 11.5  },
-  CAD: { symbol: 'EURCAD=X', fallback: 1.5   },
-  AUD: { symbol: 'EURAUD=X', fallback: 1.65  },
-  JPY: { symbol: 'EURJPY=X', fallback: 160   },
-  MXN: { symbol: 'EURMXN=X', fallback: 20    },
-  BRL: { symbol: 'EURBRL=X', fallback: 5.5   },
-};
+// Shared with the frontend (src/lib/constants.ts) via shared/fx-defs.json.
+const FX_DEFS = require('../../shared/fx-defs.json');
 
 /**
  * Convert a price in any currency to EUR using a date-keyed fxMaps object.

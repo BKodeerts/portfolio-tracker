@@ -123,12 +123,12 @@ price + regular/extended split, position stats (shares, avg cost in native ccy *
 ## 4. Known bugs to fix along the way (tracked per phase)
 | Bug | Where | Phase |
 |---|---|---|
-| Non-USD foreign positions (GBX/CHF/SEK/DKK/NOK) get fx=1 in live dashboard values | `EU_EXCHANGE_RE` usage in `+page.svelte`, `exchange.ts` | 2 |
-| Only EURUSD live rate exists client-side | `intraday.svelte.ts` | 2 |
+| ~~Non-USD foreign positions (GBX/CHF/SEK/DKK/NOK) get fx=1 in live dashboard values~~ **fixed** | `src/lib/fx.ts` + currency-aware live math | 2 ✅ |
+| ~~Only EURUSD live rate exists client-side~~ **fixed** — `liveRates` per held currency | `intraday.svelte.ts` | 2 ✅ |
 | Stock page derives avg cost via implied FX (wrong when price moved intraday) | `stock/[ticker]/+page.svelte:77-79` | 5 |
-| Dashboard total can disagree with positions table (live vs served values) | `+page.svelte` `liveData` | 2 |
-| FX_DEFS drift risk between server and client | `server/portfolio.js` / `src/lib/constants.ts` | 2 |
-| Stale CLAUDE.md misdirects tooling | repo root | 0 |
+| ~~Dashboard total FX inconsistency; SummaryBar duplicated liveData~~ **fixed** — one `getLiveData` | `derived/dashboard.ts` | 2 ✅ |
+| ~~FX_DEFS drift risk between server and client~~ **fixed** — `shared/fx-defs.json` | shared JSON | 2 ✅ |
+| ~~Stale CLAUDE.md misdirects tooling~~ **fixed** | repo root | 0 ✅ |
 
 ## 5. Risks & mitigations
 - **Money-math regressions:** Phase 1 tests are written against *current* outputs first (golden-master on a fixture portfolio), then corrected deliberately — so refactors are provably behaviour-preserving.

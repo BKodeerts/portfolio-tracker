@@ -3,7 +3,8 @@
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
   import { fmt, fmtPct } from '$lib/utils/fmt';
-  import { isExchangeOpen, getTradingMins, normalizeMarketState, EU_EXCHANGE_RE } from '$lib/market';
+  import { isExchangeOpen, getTradingMins, normalizeMarketState } from '$lib/market';
+  import { toEurLiveOrFallback } from '$lib/fx';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
   import IntradayCards from '$lib/components/dashboard/IntradayCards.svelte';
   import type { IntradayCardItem } from '$lib/components/dashboard/IntradayCards.svelte';
@@ -27,7 +28,11 @@
         ? ((price - prevClose) / prevClose) * 100
         : null;
       const changeEur = price != null && prevClose && shares
-        ? ((price - prevClose) * shares) / (EU_EXCHANGE_RE.test(yahoo) ? 1 : (intradayStore.liveEurUsd ?? 1.1))
+        ? toEurLiveOrFallback(
+            pos?.currency ?? (meta?.['currency'] as string | undefined),
+            (price - prevClose) * shares,
+            intradayStore.liveRates,
+          )
         : null;
 
       const rawState  = intra?.marketState ?? '';

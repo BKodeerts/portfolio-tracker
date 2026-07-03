@@ -1,6 +1,7 @@
 import { portfolioStore } from '$lib/stores/portfolio.svelte';
 import { intradayStore } from '$lib/stores/intraday.svelte';
-import { EU_EXCHANGE_RE, getTradingMins, isExchangeOpen, normalizeMarketState } from '$lib/market';
+import { getTradingMins, isExchangeOpen, normalizeMarketState } from '$lib/market';
+import { toEurLive, liveRateFor } from '$lib/fx';
 import type { ChartPoint } from '$lib/types/portfolio';
 
 /**
@@ -28,23 +29,27 @@ export interface Movers {
 /** Live portfolio value + day P&L from intraday quotes (null until loaded). */
 export function getLiveData(): { value: number; dayPl: number } | null {
   if (!intradayStore.loaded || portfolioStore.positions.length === 0) return null;
-  const fxRate = intradayStore.liveEurUsd;
+  const rates = intradayStore.liveRates;
   let liveValue = 0;
   let prevValue = 0;
   for (const pos of portfolioStore.positions) {
-    const yahoo  = pos.yahoo ?? pos.ticker;
-    const intra  = intradayStore.data[yahoo];
-    const isEu   = EU_EXCHANGE_RE.test(yahoo);
-    const fx     = isEu ? 1 : fxRate;
-    if (!intra?.previousClose || (!isEu && fx == null)) {
+    const yahoo = pos.yahoo ?? pos.ticker;
+    const intra = intradayStore.data[yahoo];
+    // No intraday data or no live FX rate for this position's currency:
+    // fall back to the server-computed static value.
+    const liveEur = intra?.previousClose
+      ? toEurLive(pos.currency, pos.shares * ((intra.points ?? []).at(-1)?.close ?? intra.previousClose), rates)
+      : null;
+    const prevEur = intra?.previousClose
+      ? toEurLive(pos.currency, pos.shares * intra.previousClose, rates)
+      : null;
+    if (liveEur == null || prevEur == null) {
       liveValue += pos.value;
       prevValue += pos.value;
       continue;
     }
-    const pts          = intra.points ?? [];
-    const currentPrice = pts.at(-1)?.close ?? intra.previousClose;
-    liveValue += (pos.shares * currentPrice) / fx!;
-    prevValue += (pos.shares * intra.previousClose) / fx!;
+    liveValue += liveEur;
+    prevValue += prevEur;
   }
   return { value: liveValue, dayPl: liveValue - prevValue };
 }
@@ -63,9 +68,10 @@ export function buildCards(): SparkCard[] {
     const lastPt      = pts[pts.length - 1];
     const price       = lastPt?.close ?? null;
     const changePct   = price != null && prevClose ? ((price - prevClose) / prevClose) * 100 : null;
-    const isEu  = EU_EXCHANGE_RE.test(yahoo);
-    const fx    = isEu ? 1 : intradayStore.liveEurUsd;
-    const changeEur = price != null && prevClose && shares && fx != null ? ((price - prevClose) * shares) / fx : null;
+    const currency  = pos?.currency ?? (meta?.['currency'] as string | undefined);
+    const changeEur = price != null && prevClose && shares
+      ? toEurLive(currency, (price - prevClose) * shares, intradayStore.liveRates)
+      : null;
     const rawState    = intra?.marketState ?? '';
     const marketState = normalizeMarketState(yahoo, rawState || (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
     return { ticker, yahoo, label, shares, prevClose, price, changePct, changeEur, marketState };
@@ -88,22 +94,23 @@ export function getMovers(cards: SparkCard[]): Movers {
 export function getDay1Pl(): { pl: number; pct: number } | null {
   const tickers = portfolioStore.currentTickers;
   if (!tickers.length || !intradayStore.loaded) return null;
-  const fxRate = intradayStore.liveEurUsd;
-  if (fxRate === null && tickers.some((t) => !EU_EXCHANGE_RE.test((portfolioStore.tickerMeta[t]?.['yahoo'] as string) ?? t))) return null;
+  const rates = intradayStore.liveRates;
+  // Require a live rate for every held non-EUR currency before showing a total.
+  const held = portfolioStore.positions.map((p) => p.currency);
+  if (held.some((c) => liveRateFor(c, rates) == null)) return null;
   let prevCloseTotal = 0;
   let currentTotal   = 0;
   for (const ticker of tickers) {
     const yahoo  = (portfolioStore.tickerMeta[ticker]?.['yahoo'] as string) ?? ticker;
     const intra  = intradayStore.data[yahoo];
     if (!intra) continue;
-    const isEu    = EU_EXCHANGE_RE.test(yahoo);
-    const fx      = isEu ? 1 : fxRate!;
-    const shares  = portfolioStore.positions.find((p) => p.ticker === ticker)?.shares ?? 0;
+    const pos     = portfolioStore.positions.find((p) => p.ticker === ticker);
+    const shares  = pos?.shares ?? 0;
     const prevClose = intra.previousClose ?? 0;
     const pts     = intra.points ?? [];
     const lastPrice = pts[pts.length - 1]?.close ?? prevClose;
-    prevCloseTotal += (shares * prevClose)  / fx;
-    currentTotal   += (shares * lastPrice)  / fx;
+    prevCloseTotal += toEurLive(pos?.currency, shares * prevClose, rates) ?? 0;
+    currentTotal   += toEurLive(pos?.currency, shares * lastPrice, rates) ?? 0;
   }
   if (prevCloseTotal <= 0) return null;
   const diff = currentTotal - prevCloseTotal;
