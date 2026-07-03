@@ -4,8 +4,10 @@
   import { intradayStore } from '$lib/stores/intraday.svelte';
   import { themeStore } from '$lib/stores/theme.svelte';
   import { fmt, fmtPct } from '$lib/utils/fmt';
-  import { sparklineSVG, isExchangeOpen, getTradingMins, normalizeMarketState, EU_EXCHANGE_RE } from '$lib/market';
+  import { isExchangeOpen, getTradingMins, normalizeMarketState, EU_EXCHANGE_RE } from '$lib/market';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
+  import Sparkline from '$lib/components/Sparkline.svelte';
+  import type { IntradayPoint } from '$lib/types/candle';
 
   interface SparkCard {
     ticker: string;
@@ -17,7 +19,9 @@
     changePct: number | null;
     changeEur: number | null;
     marketState: string;
-    sparkHtml: string;
+    points: IntradayPoint[];
+    tradingMins: number;
+    muted: boolean;
   }
 
   const cards = $derived((): SparkCard[] => {
@@ -45,12 +49,9 @@
       const rawState  = intra?.marketState ?? '';
       const marketState = normalizeMarketState(yahoo, rawState || (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
 
-      const muted   = marketState !== 'REGULAR';
-      const sparkHtml = pts.length >= 2 && prevClose
-        ? sparklineSVG(pts, prevClose, tradingMins, muted)
-        : '';
+      const muted = marketState !== 'REGULAR';
 
-      return { ticker, yahoo, label, shares, prevClose, price, changePct, changeEur, marketState, sparkHtml };
+      return { ticker, yahoo, label, shares, prevClose, price, changePct, changeEur, marketState, points: pts, tradingMins, muted };
     });
   });
 
@@ -113,8 +114,9 @@
               <PrivacyValue value={`${card.changeEur >= 0 ? '+' : ''}${fmt(card.changeEur)}`} />
             </div>
           {/if}
-          <!-- svelte-ignore html-self-closing-tags -->
-          {@html card.sparkHtml}
+          {#if card.points.length >= 2 && card.prevClose}
+            <Sparkline points={card.points} prevClose={card.prevClose} tradingMins={card.tradingMins} muted={card.muted} />
+          {/if}
         </a>
       {/each}
     </div>
@@ -152,8 +154,7 @@
                 {/if}
               </div>
               {#if pts.length >= 2 && prev}
-                <!-- svelte-ignore html-self-closing-tags -->
-                {@html sparklineSVG(pts, prev, getTradingMins(w.yahoo), state !== 'REGULAR')}
+                <Sparkline points={pts} prevClose={prev} tradingMins={getTradingMins(w.yahoo)} muted={state !== 'REGULAR'} />
               {/if}
             </div>
           {/each}

@@ -7,7 +7,7 @@
   import { fmt, fmtPct } from '$lib/utils/fmt';
   import { filterByPeriod } from '$lib/utils/period';
   import { getColor } from '$lib/utils/color';
-  import { sparklineSVG, isExchangeOpen, getTradingMins, normalizeMarketState, EU_EXCHANGE_RE } from '$lib/market';
+  import { isExchangeOpen, getTradingMins, normalizeMarketState, EU_EXCHANGE_RE } from '$lib/market';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
   import Chart from '$lib/components/Chart.svelte';
   import type { Period } from '$lib/utils/period';
@@ -55,7 +55,7 @@
     ticker: string; yahoo: string; label: string; shares: number;
     prevClose: number | null; price: number | null;
     changePct: number | null; changeEur: number | null;
-    marketState: string; sparkHtml: string;
+    marketState: string;
   }
 
   const cards = $derived((): SparkCard[] => {
@@ -77,9 +77,7 @@
       const changeEur = price != null && prevClose && shares && fx != null ? ((price - prevClose) * shares) / fx : null;
       const rawState    = intra?.marketState ?? '';
       const marketState = normalizeMarketState(yahoo, rawState || (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
-      const muted       = marketState !== 'REGULAR';
-      const sparkHtml   = pts.length >= 2 && prevClose ? sparklineSVG(pts, prevClose, tradingMins, muted) : '';
-      return { ticker, yahoo, label, shares, prevClose, price, changePct, changeEur, marketState, sparkHtml };
+      return { ticker, yahoo, label, shares, prevClose, price, changePct, changeEur, marketState };
     });
   });
 
