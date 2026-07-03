@@ -4,7 +4,7 @@
   import { intradayStore } from '$lib/stores/intraday.svelte';
   import { themeStore } from '$lib/stores/theme.svelte';
   import { fmt, fmtPct } from '$lib/utils/fmt';
-  import { sparklineSVG, isExchangeOpen, getTradingMins, normalizeMarketState, EU_EXCHANGE_RE } from '$lib/utils/exchange';
+  import { sparklineSVG, isExchangeOpen, getTradingMins, normalizeMarketState, EU_EXCHANGE_RE } from '$lib/market';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
 
   interface SparkCard {

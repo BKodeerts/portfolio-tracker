@@ -7,7 +7,7 @@
   import { fmt, fmtPct } from '$lib/utils/fmt';
   import { filterByPeriod } from '$lib/utils/period';
   import { getColor } from '$lib/utils/color';
-  import { sparklineSVG, isExchangeOpen, getTradingMins, normalizeMarketState, EU_EXCHANGE_RE } from '$lib/utils/exchange';
+  import { sparklineSVG, isExchangeOpen, getTradingMins, normalizeMarketState, EU_EXCHANGE_RE } from '$lib/market';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
   import Chart from '$lib/components/Chart.svelte';
   import type { Period } from '$lib/utils/period';

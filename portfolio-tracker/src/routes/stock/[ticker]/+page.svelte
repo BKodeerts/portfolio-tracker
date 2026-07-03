@@ -7,7 +7,7 @@
   import { fetchCandles } from '$lib/api/candles';
   import { fmt } from '$lib/utils/fmt';
   import { getColor } from '$lib/utils/color';
-  import { isExchangeOpen, normalizeMarketState, EU_EXCHANGE_RE, sessionBounds } from '$lib/utils/exchange';
+  import { isExchangeOpen, normalizeMarketState, EU_EXCHANGE_RE, sessionBounds } from '$lib/market';
   import { periodCutoff } from '$lib/utils/period';
   import Chart from '$lib/components/Chart.svelte';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';

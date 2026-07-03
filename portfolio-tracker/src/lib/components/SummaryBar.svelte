@@ -1,7 +1,7 @@
 <script lang="ts">
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
-  import { EU_EXCHANGE_RE } from '$lib/utils/exchange';
+  import { EU_EXCHANGE_RE } from '$lib/market';
   import { fmt, fmtPct } from '$lib/utils/fmt';
   import PrivacyValue from './PrivacyValue.svelte';
 

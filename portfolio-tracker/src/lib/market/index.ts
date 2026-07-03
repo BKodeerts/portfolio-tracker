@@ -1,3 +1,7 @@
+/**
+ * Market-session logic: exchange definitions, open/closed detection,
+ * trading-session lengths and Yahoo market-state normalisation.
+ */
 export const EU_EXCHANGE_RE = /\.(DE|AS|PA|L|MI|BR|SW|ST|HE|CO|OL)$/i;
 
 interface ExchangeDef {
