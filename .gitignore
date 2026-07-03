@@ -3,3 +3,6 @@ cache/
 .env
 portfolio-tracker/dist/
 portfolio-tracker/.svelte-kit/
+.DS_Store
+.idea/
+*.bak.json
