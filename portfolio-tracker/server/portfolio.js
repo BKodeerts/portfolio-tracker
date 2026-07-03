@@ -23,6 +23,7 @@ const {
   isDividend,
   computeDividends,
   fifoCostNativeEur,
+  fifoAvgCostNative,
   fifoCostBasis,
   computeRealizedPl,
 } = require('./domain/positions.js');
@@ -351,6 +352,8 @@ async function computeFullPortfolio() {
           value,
           costEur,
           avgCost:    shares > 0 ? costEur / shares : 0,
+          // Average cost per share in the trading currency (GBX in pence), FIFO over open lots
+          avgCostNative: fifoAvgCostNative(txByTicker[ticker] || [], ticker, adjSharesFn, fxMaps, meta[ticker].currency || 'EUR'),
           pl:         value - costEur,
           plPct:      costEur > 0 ? Number.parseFloat((((value - costEur) / costEur) * 100).toFixed(1)) : 0,
           shares,
