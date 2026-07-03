@@ -27,13 +27,17 @@
   const pos     = $derived(portfolioStore.positions.find((p) => p.ticker === ticker));
   const latest  = $derived(portfolioStore.chartData[portfolioStore.chartData.length - 1]);
 
-  // Derived position stats from chart data
+  // Position stats: server positions[] entry first, latest chartData slice as fallback
   const slice  = $derived(latest?.positions[ticker]);
-  const val    = $derived(slice?.value ?? 0);
-  const cost   = $derived(slice?.cost ?? 0);
+  const val    = $derived(pos?.value ?? slice?.value ?? 0);
+  const cost   = $derived(pos?.costEur ?? slice?.cost ?? 0);
   const pl     = $derived(val - cost);
   const plPct  = $derived(cost > 0 ? (pl / cost) * 100 : 0);
-  const shares = $derived(slice?.shares ?? pos?.shares ?? 0);
+  const shares = $derived(pos?.shares ?? slice?.shares ?? 0);
+
+  // Per-ticker extras carried by the /api/portfolio response
+  const dividends  = $derived(portfolioStore.dividendsPerTicker[ticker] ?? 0);
+  const realizedPl = $derived(portfolioStore.realizedPlPerTicker[ticker] ?? 0);
 
   // Currency symbol
   const nativeCcy = $derived(meta.currency ?? 'EUR');
@@ -74,15 +78,23 @@
       : null,
   );
 
-  // Derive native-currency avg cost using current implicit FX rate (value/shares/currentPrice)
-  const priceEur      = $derived(shares > 0 && currentPrice != null && currentPrice > 0 ? val / shares : null);
-  const impliedFx     = $derived(priceEur && priceEur > 0 && currentPrice != null ? currentPrice / priceEur : null);
-  const avgCostNative = $derived(pos?.avgCost != null && impliedFx != null ? pos.avgCost * impliedFx : null);
+  // Native-currency avg cost — server-computed from FIFO lots (no implied-FX reconstruction)
+  const avgCostNative = $derived(pos?.avgCostNative ?? null);
 
-  // Period + candles
+  // Period + candles + chart mode (Koers = candle price, Waarde = EUR holding value)
   let period   = $state<Period>('3m');
   let candles  = $state<Candle[]>([]);
   let loading  = $state(false);
+  let chartMode = $state<'koers' | 'waarde'>('koers');
+
+  // Per-position EUR value history from chartData (only dates where shares are held)
+  const valuePoints = $derived.by(() => {
+    const cutoff = periodCutoff(period);
+    return portfolioStore.chartData
+      .filter((row) => (!cutoff || row.date >= cutoff))
+      .map((row) => ({ date: row.date, value: row.positions[ticker]?.value ?? null, shares: row.positions[ticker]?.shares ?? 0 }))
+      .filter((p) => p.value != null && p.shares > 0) as { date: string; value: number }[];
+  });
 
   $effect(() => {
     if (period === '1d') { candles = []; return; }
@@ -228,6 +240,49 @@
       };
     }
 
+    // "Waarde" mode: EUR value of the holding over time, from server chartData.
+    if (chartMode === 'waarde') {
+      const pts = valuePoints;
+      if (!pts.length) return {};
+      return {
+        backgroundColor: 'transparent',
+        grid: { top: 16, right: 16, bottom: 32, left: 64 },
+        xAxis: {
+          type: 'category',
+          data: pts.map((p) => p.date),
+          axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+          axisLabel: { color: textColor, fontSize: 10, interval: 'auto' },
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { color: gridColor } },
+          axisLabel: {
+            color: textColor, fontSize: 10,
+            formatter: (v: number) => themeStore.privacyMode ? '●●●' : `€${v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : v.toFixed(0)}`,
+          },
+        },
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: tooltipBg, borderColor: tooltipBord, borderWidth: 1,
+          textStyle: { fontSize: 11, color: isDark ? '#e2e8f0' : '#1c1c1c' },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          formatter: (params: any) => {
+            const p = (params as Array<{ axisValue: string; value: number }>)[0];
+            if (!p) return '';
+            return `${p.axisValue}<br>${themeStore.privacyMode ? '●●●' : fmt(p.value)}`;
+          },
+        },
+        series: [{
+          name: `${ticker} waarde`,
+          type: 'line',
+          data: pts.map((p) => p.value),
+          smooth: false, symbol: 'none',
+          lineStyle: { color, width: 2 },
+          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: color + '33' }, { offset: 1, color: color + '05' }] } },
+        }],
+      };
+    }
+
     // Historical candle chart. Server may return a cached superset (back to 2021)
     // regardless of our `from` query, so always filter to the selected period.
     const cutoff = periodCutoff(period);
@@ -354,13 +409,19 @@
 
   <!-- Chart -->
   <div class="sd-chart-wrap">
-    {#if loading}
+    {#if chartMode === 'koers' && loading}
       <div class="chart-placeholder">Laden…</div>
-    {:else if candles.length > 1}
+    {:else if chartMode === 'waarde' ? valuePoints.length > 1 : candles.length > 1}
       <Chart option={chartOption()} height="240px" />
     {:else}
       <div class="chart-placeholder">Geen data voor deze periode</div>
     {/if}
+  </div>
+
+  <!-- Chart mode toggle -->
+  <div class="sd-mode">
+    <button class="sd-mode-btn" class:on={chartMode === 'koers'} onclick={() => (chartMode = 'koers')}>Koers</button>
+    <button class="sd-mode-btn" class:on={chartMode === 'waarde'} onclick={() => (chartMode = 'waarde')}>Waarde</button>
   </div>
 
   <!-- Period selector -->
@@ -409,6 +470,28 @@
       <div class="sd-stat-sub {pl >= 0 ? 'c-pos' : 'c-neg'}"><PrivacyValue value="{pl >= 0 ? '+' : ''}{fmt(pl)}" /></div>
     </div>
   </div>
+
+  <!-- Extra stats: dividends & realized P&L (only when nonzero) -->
+  {#if dividends > 0 || realizedPl !== 0}
+    <div class="sd-stats">
+      {#if dividends > 0}
+        <div class="sd-stat card">
+          <div class="sd-stat-label">Dividenden</div>
+          <div class="sd-stat-val mono"><PrivacyValue value={fmt(dividends)} /></div>
+          <div class="sd-stat-sub">totaal ontvangen</div>
+        </div>
+      {/if}
+      {#if realizedPl !== 0}
+        <div class="sd-stat card">
+          <div class="sd-stat-label">Gerealiseerde W/V</div>
+          <div class="sd-stat-val mono {realizedPl >= 0 ? 'c-pos' : 'c-neg'}">
+            <PrivacyValue value="{realizedPl >= 0 ? '+' : ''}{fmt(realizedPl)}" />
+          </div>
+          <div class="sd-stat-sub">via verkopen</div>
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   <!-- Transactions list -->
   {#if txs.length > 0}
@@ -498,6 +581,17 @@
     display: flex; align-items: center; justify-content: center;
     height: 160px; color: var(--fg-muted); font-size: 13px;
   }
+
+  /* ── Chart mode toggle ── */
+  .sd-mode { display: flex; gap: 6px; margin-top: 12px; }
+  .sd-mode-btn {
+    padding: 5px 12px; font-size: 11px; font-weight: 600;
+    background: none; border: 1px solid var(--border); cursor: pointer;
+    color: var(--fg-muted); border-radius: 999px;
+    transition: color 0.1s, background 0.1s;
+  }
+  .sd-mode-btn:hover { color: var(--fg); }
+  .sd-mode-btn.on { background: var(--surface-3, var(--surface-2)); color: var(--fg); border-color: transparent; }
 
   /* ── Period selector ── */
   .sd-periods {

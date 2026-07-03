@@ -26,6 +26,10 @@ export interface Position {
   currency: string;
   shares: number;
   avgCost: number;      // average cost per share in EUR
+  /** Avg cost per share in the trading currency (GBX in pence), FIFO over open lots. Server-computed. */
+  avgCostNative?: number | null;
+  /** FIFO realized P&L for this ticker in EUR. */
+  realizedPl?: number;
   costEur: number;      // total cost in EUR
   value: number;        // current value in EUR
   pl: number;           // unrealised P&L in EUR
