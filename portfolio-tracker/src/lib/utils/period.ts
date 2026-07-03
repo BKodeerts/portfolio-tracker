@@ -1,8 +1,8 @@
 export type Period = '1d' | '1m' | '3m' | '6m' | 'ytd' | '1y' | '2y' | '3y' | 'total';
 
-export interface ChartPoint {
+/** Minimal shape needed for period filtering: anything with a date. */
+export interface DatedPoint {
   date: string;
-  [key: string]: unknown;
 }
 
 /** Returns a cutoff date string (YYYY-MM-DD) for the given period, or null for 'total'. */
@@ -21,7 +21,7 @@ export function periodCutoff(period: Period): string | null {
   return d.toISOString().slice(0, 10);
 }
 
-export function filterByPeriod<T extends ChartPoint>(data: T[], period: Period): T[] {
+export function filterByPeriod<T extends DatedPoint>(data: T[], period: Period): T[] {
   const cutoff = periodCutoff(period);
   if (!cutoff) return data;
   return data.filter((d) => d.date >= cutoff);

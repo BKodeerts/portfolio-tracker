@@ -16,8 +16,8 @@ function computeRiskMetrics(chartData, benchmarkData) {
   // Daily portfolio returns
   const portfolioReturns = [];
   for (let i = 1; i < chartData.length; i++) {
-    const prev = chartData[i - 1].total;
-    const curr = chartData[i].total;
+    const prev = chartData[i - 1].value;
+    const curr = chartData[i].value;
     if (prev > 0) portfolioReturns.push((curr - prev) / prev);
   }
   if (portfolioReturns.length < 20) return null;
@@ -40,7 +40,7 @@ function computeRiskMetrics(chartData, benchmarkData) {
   const volatility = Math.sqrt(variance * 252);
 
   // Annualized return (CAGR)
-  const totalReturn  = chartData.at(-1).total / chartData[0].total;
+  const totalReturn  = chartData.at(-1).value / chartData[0].value;
   const annualReturn = Math.pow(totalReturn, 252 / n) - 1;
 
   // Sharpe ratio (configurable risk-free rate, default 3%)
@@ -60,10 +60,10 @@ function computeRiskMetrics(chartData, benchmarkData) {
   }
 
   // Max drawdown: largest peak-to-trough % decline in portfolio value
-  let maxDDPct = 0, runningPeak = chartData[0].total;
+  let maxDDPct = 0, runningPeak = chartData[0].value;
   for (const row of chartData) {
-    if (row.total > runningPeak) runningPeak = row.total;
-    const dd = runningPeak > 0 ? (runningPeak - row.total) / runningPeak * 100 : 0;
+    if (row.value > runningPeak) runningPeak = row.value;
+    const dd = runningPeak > 0 ? (runningPeak - row.value) / runningPeak * 100 : 0;
     if (dd > maxDDPct) maxDDPct = dd;
   }
 
@@ -116,8 +116,8 @@ function computeRollingReturns(chartData, benchmarkData, sp500Data, twrPct = nul
 
   function calcReturn(startRow) {
     if (!startRow || startRow.date === latest.date) return null;
-    const portfolio = startRow.total > 0
-      ? Number.parseFloat(((latest.total / startRow.total - 1) * 100).toFixed(2))
+    const portfolio = startRow.value > 0
+      ? Number.parseFloat(((latest.value / startRow.value - 1) * 100).toFixed(2))
       : null;
     return {
       portfolio,
@@ -240,22 +240,22 @@ function computeServerTWR(chartData, transactions) {
   }
 
   let twrFactor = 1.0;
-  let subStart  = chartData[0].total;
+  let subStart  = chartData[0].value;
 
   for (let i = 1; i < chartData.length; i++) {
     const row       = chartData[i];
     const txsToday  = txByDate[row.date];
     if (txsToday?.length) {
       const netCF        = txsToday.reduce((s, tx) => s + (tx.shares > 0 ? tx.costEur : -tx.costEur), 0);
-      const valueBeforeCF = row.total - netCF;
+      const valueBeforeCF = row.value - netCF;
       if (subStart > 0) twrFactor *= valueBeforeCF / subStart;
-      subStart = row.total;
+      subStart = row.value;
     }
   }
 
   const lastRow = chartData.at(-1);
   const finalTwr = subStart > 0
-    ? (twrFactor * lastRow.total / subStart - 1) * 100
+    ? (twrFactor * lastRow.value / subStart - 1) * 100
     : (twrFactor - 1) * 100;
 
   return Number.parseFloat(finalTwr.toFixed(2));

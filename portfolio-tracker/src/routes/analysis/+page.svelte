@@ -28,7 +28,7 @@
 
   const startYear = $derived(() => {
     const d = portfolioStore.chartData[0];
-    return d ? new Date(d.date as string).getFullYear() : null;
+    return d ? new Date(d.date).getFullYear() : null;
   });
 
   const totalValue = $derived(portfolioStore.positions.reduce((s, p) => s + p.value, 0));
@@ -150,8 +150,8 @@
     if (!latest) return [];
     const map: Record<string, number> = {};
     for (const t of portfolioStore.currentTickers) {
-      const s = (portfolioStore.tickerMeta[t]?.['sector'] as string | undefined) ?? 'Overig';
-      map[s] = (map[s] ?? 0) + ((latest[t] as number | undefined) ?? 0);
+      const s = portfolioStore.tickerMeta[t]?.sector ?? 'Overig';
+      map[s] = (map[s] ?? 0) + (latest.positions[t]?.value ?? 0);
     }
     return toAllocItems(map, SECTOR_COLORS);
   });
@@ -160,8 +160,8 @@
     if (!latest) return [];
     const map: Record<string, number> = {};
     for (const t of portfolioStore.currentTickers) {
-      const g = (portfolioStore.tickerMeta[t]?.['geo'] as string | undefined) ?? 'Overig';
-      map[g] = (map[g] ?? 0) + ((latest[t] as number | undefined) ?? 0);
+      const g = portfolioStore.tickerMeta[t]?.geo ?? 'Overig';
+      map[g] = (map[g] ?? 0) + (latest.positions[t]?.value ?? 0);
     }
     return toAllocItems(map, GEO_COLORS);
   });

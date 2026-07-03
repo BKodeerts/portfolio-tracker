@@ -208,7 +208,7 @@ async function appendTodaySnapshot(chartData, meta, transactions, fxMaps, adjSha
     (txByTicker[tx.ticker] = txByTicker[tx.ticker] || []).push(tx);
   }
 
-  const row = { date: todayDate };
+  const rowPositions = {};
   let tv = 0, tc = 0;
 
   for (const [ticker, txs] of Object.entries(txByTicker)) {
@@ -219,23 +219,21 @@ async function appendTodaySnapshot(chartData, meta, transactions, fxMaps, adjSha
     }
     const price = prices[m.yahoo];
     if (sh > 0 && price) {
-      const val = toEurAtRate(m.currency, sh * price, liveRates);
-      row[ticker]              = Math.round(val);
-      row[`${ticker}_shares`] = sh;
-      tv += val;
+      const val  = toEurAtRate(m.currency, sh * price, liveRates);
       const cost = fifoCostBasis(txs, ticker, todayDate, adjSharesFn);
-      row[`${ticker}_cost`]  = Math.round(cost);
+      rowPositions[ticker] = { value: Math.round(val), cost: Math.round(cost), shares: sh };
+      tv += val;
       tc += cost;
-      if (cost > 0) row[`${ticker}_pct`] = (((val - cost) / cost) * 100).toFixed(1);
     }
   }
 
   if (tv > 0) {
-    row.total     = Math.round(tv);
-    row.totalCost = Math.round(tc);
-    row.profit    = Math.round(tv - tc);
-    row.pctReturn = tc > 0 ? (((tv - tc) / tc) * 100).toFixed(1) : '0.0';
-    chartData.push(row);
+    chartData.push({
+      date:     todayDate,
+      value:    Math.round(tv),
+      invested: Math.round(tc),
+      positions: rowPositions,
+    });
   }
   return chartData;
 }
@@ -341,9 +339,10 @@ async function computeFullPortfolio() {
   const latest = chartData.at(-1);
   const positions = latest
     ? currentTickers.map(ticker => {
-        const value   = latest[ticker]              || 0;
-        const costEur = latest[`${ticker}_cost`]    || 0;
-        const shares  = latest[`${ticker}_shares`]  || 0;
+        const slice   = latest.positions[ticker];
+        const value   = slice?.value  || 0;
+        const costEur = slice?.cost   || 0;
+        const shares  = slice?.shares || 0;
         return {
           ticker,
           label:      meta[ticker].label,
@@ -353,7 +352,7 @@ async function computeFullPortfolio() {
           costEur,
           avgCost:    shares > 0 ? costEur / shares : 0,
           pl:         value - costEur,
-          plPct:      Number.parseFloat(latest[`${ticker}_pct`] || '0'),
+          plPct:      costEur > 0 ? Number.parseFloat((((value - costEur) / costEur) * 100).toFixed(1)) : 0,
           shares,
           realizedPl: realizedPlPerTicker[ticker] || 0,
         };
@@ -409,7 +408,7 @@ async function computeFullPortfolio() {
   }
 
   // Currency exposure per currency
-  const totalValue = latest?.total || 0;
+  const totalValue = latest?.value || 0;
   const currencyExposure = {};
   for (const pos of positions) {
     const ccy = meta[pos.ticker].currency || 'EUR';
@@ -444,15 +443,8 @@ async function computeFullPortfolio() {
     totalInvested:  Math.round(totalInvested * 100) / 100,
   });
 
-  // Map internal keys to frontend-expected keys
-  const frontendChartData = chartData.map(row => ({
-    ...row,
-    value:    row.total,
-    invested: row.totalCost,
-  }));
-
   return {
-    chartData: frontendChartData, benchmarkData, sp500Data, meta, currentTickers, latestFxRate, positions,
+    chartData, benchmarkData, sp500Data, meta, currentTickers, latestFxRate, positions,
     realizedPl, realizedPlPerTicker, usdExposurePct, currencyExposure,
     totalDividends, dividendsPerTicker, annualPl,
     totalInvested: Math.round(totalInvested * 100) / 100,

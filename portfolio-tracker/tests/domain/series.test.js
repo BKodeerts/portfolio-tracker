@@ -19,33 +19,40 @@ describe('buildChartData (smoke)', () => {
   };
   const fxMaps = { USD: { '2024-01-02': 1.1, '2024-01-03': 1.1, '2024-01-04': 1.1 } };
 
-  it('produces per-ticker value/cost/shares keys and totals per date', () => {
+  it('produces per-ticker position slices and totals per date', () => {
     const rows = buildChartData(meta, transactions, priceMaps, fxMaps, dates, noAdj);
     expect(rows).toHaveLength(3);
 
     // Day 1: only AAA held (10 * €10)
     expect(rows[0].date).toBe('2024-01-02');
-    expect(rows[0].AAA).toBe(100);
-    expect(rows[0].AAA_cost).toBe(100);
-    expect(rows[0].AAA_shares).toBe(10);
-    expect(rows[0].BBB).toBeUndefined();
-    expect(rows[0].total).toBe(100);
-    expect(rows[0].totalCost).toBe(100);
-    expect(rows[0].profit).toBe(0);
+    expect(rows[0].positions.AAA).toEqual({ value: 100, cost: 100, shares: 10 });
+    expect(rows[0].positions.BBB).toBeUndefined();
+    expect(rows[0].value).toBe(100);
+    expect(rows[0].invested).toBe(100);
 
     // Day 2: AAA 10*11=110, BBB 5*11 USD / 1.1 = €50
-    expect(rows[1].AAA).toBe(110);
-    expect(rows[1].BBB).toBe(50);
-    expect(rows[1].BBB_cost).toBe(50);
-    expect(rows[1].BBB_shares).toBe(5);
-    expect(rows[1].total).toBe(160);
-    expect(rows[1].totalCost).toBe(150);
+    expect(rows[1].positions.AAA.value).toBe(110);
+    expect(rows[1].positions.BBB).toEqual({ value: 50, cost: 50, shares: 5 });
+    expect(rows[1].value).toBe(160);
+    expect(rows[1].invested).toBe(150);
 
-    // Day 3: AAA 120, BBB 5*22/1.1 = €100 → total 220, profit 70
-    expect(rows[2].total).toBe(220);
-    expect(rows[2].profit).toBe(70);
-    expect(rows[2].pctReturn).toBe(((220 - 150) / 150 * 100).toFixed(1));
-    expect(rows[2].AAA_pct).toBe('20.0');
+    // Day 3: AAA 120, BBB 5*22/1.1 = €100 → total 220
+    expect(rows[2].value).toBe(220);
+    expect(rows[2].invested).toBe(150);
+    expect(rows[2].positions.AAA.value).toBe(120);
+  });
+
+  it('rows carry exactly the explicit contract shape (no magic per-ticker keys)', () => {
+    const rows = buildChartData(meta, transactions, priceMaps, fxMaps, dates, noAdj);
+    for (const row of rows) {
+      expect(Object.keys(row).sort()).toEqual(['date', 'invested', 'positions', 'value']);
+      expect(typeof row.date).toBe('string');
+      expect(typeof row.value).toBe('number');
+      expect(typeof row.invested).toBe('number');
+      for (const slice of Object.values(row.positions)) {
+        expect(Object.keys(slice).sort()).toEqual(['cost', 'shares', 'value']);
+      }
+    }
   });
 
   it('skips dates where nothing is held', () => {
@@ -57,8 +64,8 @@ describe('buildChartData (smoke)', () => {
 describe('buildBenchmarkData', () => {
   it('indexes the benchmark to 100 at the first chart date', () => {
     const chartData = [
-      { date: '2024-01-02', total: 100 },
-      { date: '2024-01-03', total: 110 },
+      { date: '2024-01-02', value: 100 },
+      { date: '2024-01-03', value: 110 },
     ];
     const priceMaps = { 'VWCE.DE': { '2024-01-02': 50, '2024-01-03': 55 } };
     const bench = buildBenchmarkData(priceMaps, chartData, 'VWCE.DE');
@@ -69,6 +76,6 @@ describe('buildBenchmarkData', () => {
   });
 
   it('returns empty array when the symbol has no prices', () => {
-    expect(buildBenchmarkData({}, [{ date: '2024-01-02', total: 1 }], 'NOPE')).toEqual([]);
+    expect(buildBenchmarkData({}, [{ date: '2024-01-02', value: 1 }], 'NOPE')).toEqual([]);
   });
 });

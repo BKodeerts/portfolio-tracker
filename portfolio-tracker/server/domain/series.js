@@ -11,6 +11,7 @@ const SP500_SYM     = '^GSPC';
 
 /**
  * Build daily portfolio snapshot time series.
+ * Each row: { date, value, invested, positions: { [ticker]: { value, cost, shares } } }
  */
 function buildChartData(meta, transactions, priceMaps, fxMaps, sortedDates, adjSharesFn) {
   const txByTicker = {};
@@ -19,7 +20,7 @@ function buildChartData(meta, transactions, priceMaps, fxMaps, sortedDates, adjS
   }
 
   return sortedDates.map(date => {
-    const row = { date };
+    const positions = {};
     let totalValue = 0, totalCost = 0;
 
     for (const [ticker, txs] of Object.entries(txByTicker)) {
@@ -31,22 +32,20 @@ function buildChartData(meta, transactions, priceMaps, fxMaps, sortedDates, adjS
       const price = priceMaps[m.yahoo]?.[date];
       if (sharesHeld > 0 && price != null) {
         const value = toEur(m.currency, sharesHeld * price, date, fxMaps);
-        row[ticker]              = Math.round(value);
-        row[`${ticker}_shares`] = sharesHeld;
+        const cost  = fifoCostBasis(txs, ticker, date, adjSharesFn);
+        positions[ticker] = { value: Math.round(value), cost: Math.round(cost), shares: sharesHeld };
         totalValue += value;
-        const cost = fifoCostBasis(txs, ticker, date, adjSharesFn);
-        row[`${ticker}_cost`]  = Math.round(cost);
-        totalCost += cost;
-        if (cost > 0) row[`${ticker}_pct`] = (((value - cost) / cost) * 100).toFixed(1);
+        totalCost  += cost;
       }
     }
 
     if (totalValue === 0) return null;
-    row.total     = Math.round(totalValue);
-    row.totalCost = Math.round(totalCost);
-    row.profit    = Math.round(totalValue - totalCost);
-    row.pctReturn = totalCost > 0 ? (((totalValue - totalCost) / totalCost) * 100).toFixed(1) : '0.0';
-    return row;
+    return {
+      date,
+      value:    Math.round(totalValue),
+      invested: Math.round(totalCost),
+      positions,
+    };
   }).filter(Boolean);
 }
 

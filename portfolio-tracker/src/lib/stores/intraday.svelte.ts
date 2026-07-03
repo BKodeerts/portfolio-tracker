@@ -18,7 +18,7 @@ function createIntradayStore() {
 
     // Collect all yahoo symbols from portfolio + watchlist
     const yahooSymbols = tickers
-      .map((t) => portfolioStore.tickerMeta[t]?.['yahoo'] as string | undefined ?? t)
+      .map((t) => portfolioStore.tickerMeta[t]?.yahoo ?? t)
       .filter(Boolean);
 
     const watchlistSymbols = portfolioStore.watchlistData.map((w) => w.yahoo).filter(Boolean);
