@@ -6,3 +6,4 @@ portfolio-tracker/.svelte-kit/
 .DS_Store
 .idea/
 *.bak.json
+.claude/worktrees/
