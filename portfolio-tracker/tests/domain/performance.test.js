@@ -29,9 +29,9 @@ describe('computeXIRR', () => {
 describe('computeServerTWR', () => {
   it('chains sub-period returns around a deposit', () => {
     const chartData = [
-      { date: '2024-01-02', total: 1000 },
-      { date: '2024-02-01', total: 2100 }, // €1000 deposited this day; grew 10% before the deposit
-      { date: '2024-03-01', total: 2310 }, // +10% after the deposit
+      { date: '2024-01-02', value: 1000 },
+      { date: '2024-02-01', value: 2100 }, // €1000 deposited this day; grew 10% before the deposit
+      { date: '2024-03-01', value: 2310 }, // +10% after the deposit
     ];
     const transactions = [
       { date: '2024-01-02', ticker: 'AAA', shares: 10, costEur: 1000 },
@@ -43,7 +43,7 @@ describe('computeServerTWR', () => {
   });
 
   it('returns null for fewer than 2 points', () => {
-    expect(computeServerTWR([{ date: '2024-01-02', total: 100 }], [])).toBeNull();
+    expect(computeServerTWR([{ date: '2024-01-02', value: 100 }], [])).toBeNull();
   });
 });
 
