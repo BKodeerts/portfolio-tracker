@@ -9,7 +9,7 @@
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
   import Chart from '$lib/components/Chart.svelte';
   import type { DashboardView } from '$lib/charts/dashboard';
-  import type { Period } from '$lib/utils/period';
+  import type { LegacyPeriod as Period } from '$lib/utils/period';
 
   /** Dashboard portfolio chart: period/view controls, headline P&L, legend. */
 

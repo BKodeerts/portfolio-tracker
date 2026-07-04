@@ -3,11 +3,9 @@
   import { resolve } from '$app/paths';
 
   const tabs = [
-    { path: '/',             label: 'Dashboard' },
-    { path: '/analysis',     label: 'Analyse' },
-    { path: '/transactions', label: 'Transacties' },
-    { path: '/import',       label: 'Import' },
-    { path: '/bonus',        label: 'Bonus' },
+    { path: '/',             label: 'Portfolio' },
+    { path: '/analysis',     label: 'Analysis' },
+    { path: '/transactions', label: 'Activity' },
   ] as const;
 
   type TabPath = (typeof tabs)[number]['path'];
@@ -32,7 +30,7 @@
   const backLabel     = $derived(isBonusDetail ? '← Bonus' : '← Portfolio');
 </script>
 
-<nav class="app-nav" aria-label="Navigatie">
+<nav class="app-nav" aria-label="Navigation">
   {#if isDetailPage}
     <a href={backHref} class="nav-btn back-btn">{backLabel}</a>
   {/if}

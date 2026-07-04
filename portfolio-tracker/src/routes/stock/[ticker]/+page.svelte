@@ -11,7 +11,7 @@
   import { periodCutoff } from '$lib/utils/period';
   import Chart from '$lib/components/Chart.svelte';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
-  import type { Period } from '$lib/utils/period';
+  import type { LegacyPeriod as Period } from '$lib/utils/period';
   import type { Candle, IntradayData } from '$lib/types/candle';
   import type { EChartsOption } from 'echarts';
 
