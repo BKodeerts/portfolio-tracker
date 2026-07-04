@@ -7,7 +7,7 @@ import { getColor } from '$lib/utils/color';
 import { EU_EXCHANGE_RE } from '$lib/market';
 import { toEurLive, liveRateFor } from '$lib/fx';
 import { chartColors, euroAxisFormatter, baseTooltip, baseCategoryXAxis, baseValueYAxis } from './base';
-import type { Period } from '$lib/utils/period';
+import type { LegacyPeriod as Period } from '$lib/utils/period';
 import type { ChartPoint } from '$lib/types/portfolio';
 
 export type DashboardView = 'total' | 'individual' | 'pct' | 'pl';

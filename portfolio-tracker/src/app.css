@@ -530,6 +530,8 @@ body.privacy .pos-table tfoot td:nth-child(n+2):not(:last-child) {
 @media (max-width: 640px) {
   .mobile-only           { display: initial !important; }
   .desktop-only          { display: none !important; }
+  /* Pages render their own top bar on mobile (revamp design); global chrome is desktop-only */
+  .top-bar               { display: none; }
   .top-bar-inner         { padding: 10px 16px; }
   .summary-hero          { margin-bottom: 8px; align-items: flex-start; }
   .summary-hero-value    { font-size: 22px; }
