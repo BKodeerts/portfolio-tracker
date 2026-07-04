@@ -1,333 +1,67 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
+  import { browser } from '$app/environment';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
-  import { themeStore } from '$lib/stores/theme.svelte';
   import { fetchCandles } from '$lib/api/candles';
-  import { fmt } from '$lib/utils/fmt';
-  import { getColor } from '$lib/utils/color';
+  import { fmtEur, fmtEurSigned, fmtNative, fmtNativeSigned, fmtPct, fmtPct1 } from '$lib/utils/fmt';
+  import { PERIOD_OPTIONS, periodCutoff } from '$lib/utils/period';
   import { isExchangeOpen, normalizeMarketState, sessionBounds } from '$lib/market';
-  import { periodCutoff } from '$lib/utils/period';
-  import Chart from '$lib/components/Chart.svelte';
+  import { toEurLiveOrFallback } from '$lib/fx';
+  import PeriodPills from '$lib/components/shared/PeriodPills.svelte';
+  import PeriodChart from '$lib/components/shared/PeriodChart.svelte';
+  import ActivityList from '$lib/components/shared/ActivityList.svelte';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
-  import type { LegacyPeriod as Period } from '$lib/utils/period';
+  import type { Period } from '$lib/utils/period';
   import type { Candle, IntradayData } from '$lib/types/candle';
-  import type { EChartsOption } from 'echarts';
+  import type { Transaction } from '$lib/types/transaction';
 
-  const PERIODS: { key: Period; label: string }[] = [
-    { key: '1m', label: '1M' }, { key: '3m', label: '3M' }, { key: '6m', label: '6M' },
-    { key: 'ytd', label: 'YTD' }, { key: '1y', label: '1J' }, { key: 'total', label: 'Max' },
-  ];
+  /* ── Local helpers (shared modules don't export these; see report) ── */
 
-  const ticker  = $derived(page.params['ticker'] ?? '');
-  const meta    = $derived(portfolioStore.tickerMeta[ticker] ?? {});
-  const yahoo   = $derived(meta.yahoo ?? ticker);
-  const color   = $derived(getColor(ticker));
-  const pos     = $derived(portfolioStore.positions.find((p) => p.ticker === ticker));
-  const latest  = $derived(portfolioStore.chartData[portfolioStore.chartData.length - 1]);
+  // Exchange label per yahoo suffix. $lib/market keeps its EXCHANGE_DEFS
+  // private, so this mirrors those labels locally.
+  const EXCHANGE_LABELS: Record<string, string> = {
+    '': 'US', '.DE': 'XETRA', '.AS': 'AEX', '.PA': 'EPA', '.L': 'LSE',
+    '.MI': 'MIL', '.BR': 'XBRU', '.SW': 'SWX', '.ST': 'SSEX', '.HE': 'OMX',
+    '.CO': 'KFX', '.OL': 'OSE', '.CL': 'SCL', '.TO': 'TSX', '.AX': 'ASX',
+    '.T': 'TSE', '.MX': 'BMV',
+  };
+  function exchangeLabel(sym: string): string {
+    const m = sym.match(/\.([A-Z]{1,2})$/i);
+    const sfx = m?.[1] ? `.${m[1].toUpperCase()}` : '';
+    return EXCHANGE_LABELS[sfx] ?? 'US';
+  }
 
-  // Position stats: server positions[] entry first, latest chartData slice as fallback
-  const slice  = $derived(latest?.positions[ticker]);
-  const val    = $derived(pos?.value ?? slice?.value ?? 0);
-  const cost   = $derived(pos?.costEur ?? slice?.cost ?? 0);
-  const pl     = $derived(val - cost);
-  const plPct  = $derived(cost > 0 ? (pl / cost) * 100 : 0);
-  const shares = $derived(pos?.shares ?? slice?.shares ?? 0);
+  // Europe/Brussels minutes-of-day conversion (same technique as
+  // $lib/derived/intraday.ts, which doesn't export it).
+  const DAY_SECS = 86400;
+  function brusselsOffsetSecs(at: Date): number {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Europe/Brussels', hour12: false, year: 'numeric', month: '2-digit',
+      day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(at);
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+    const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'), get('second'));
+    return Math.round((asUtc - at.getTime()) / 1000);
+  }
+  function brusselsMinuteOfDay(ts: number): number {
+    const offset = brusselsOffsetSecs(new Date(ts * 1000));
+    return Math.floor(((ts + offset) % DAY_SECS) / 60);
+  }
+  function fmtMin(m: number): string {
+    return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  }
 
-  // Per-ticker extras carried by the /api/portfolio response
-  const dividends  = $derived(portfolioStore.dividendsPerTicker[ticker] ?? 0);
-  const realizedPl = $derived(portfolioStore.realizedPlPerTicker[ticker] ?? 0);
+  /* ── Identity ── */
 
-  // Currency symbol
-  const nativeCcy = $derived(meta.currency ?? 'EUR');
-  const ccySym    = $derived(nativeCcy === 'EUR' ? '€' : nativeCcy === 'GBP' ? '£' : nativeCcy === 'USD' ? '$' : nativeCcy);
+  const ticker   = $derived(page.params['ticker'] ?? '');
+  const meta     = $derived(portfolioStore.tickerMeta[ticker] ?? {});
+  const yahoo    = $derived(meta.yahoo ?? ticker);
+  const currency = $derived(meta.currency ?? 'EUR');
+  const pos      = $derived(portfolioStore.positions.find((p) => p.ticker === ticker));
 
-  // Intraday data
-  const iData = $derived(intradayStore.data[yahoo] as IntradayData | null | undefined);
-  // `points` is regular-session only (server-side filtered). `allPoints` spans
-  // pre + regular + post for the most recent trading day.
-  const pts   = $derived(iData?.points ?? []);
-  const allPts = $derived(iData?.allPoints ?? pts);
-  const prevClose   = $derived(iData?.previousClose ?? null);
-  // Absolute-latest tick (may be post-market) → header price
-  const lastAllPt   = $derived(allPts[allPts.length - 1] ?? null);
-  const currentPrice = $derived(lastAllPt?.close ?? prevClose ?? null);
-  // Last regular-session tick → reference point for regular vs extended split
-  const lastRegularClose = $derived(pts[pts.length - 1]?.close ?? null);
-
-  const rawMarketState = $derived(iData?.marketState ?? (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
-  const marketState    = $derived(normalizeMarketState(yahoo, rawMarketState));
-
-  // Regular-session move (market open → close). Always versus prevClose.
-  const regularChangePct = $derived(
-    lastRegularClose != null && prevClose && prevClose !== 0
-      ? ((lastRegularClose - prevClose) / prevClose) * 100
-      : null,
-  );
-  // Extended-hours move relative to last regular close (shown only in PRE/POST).
-  const extChangePct = $derived(
-    currentPrice != null && lastRegularClose && lastRegularClose !== 0 && marketState !== 'REGULAR'
-      ? ((currentPrice - lastRegularClose) / lastRegularClose) * 100
-      : null,
-  );
-  // Combined day change (fallback when we can't split, or during REGULAR).
-  const dayChangePct = $derived(
-    currentPrice != null && prevClose && prevClose !== 0
-      ? ((currentPrice - prevClose) / prevClose) * 100
-      : null,
-  );
-
-  // Native-currency avg cost — server-computed from FIFO lots (no implied-FX reconstruction)
-  const avgCostNative = $derived(pos?.avgCostNative ?? null);
-
-  // Period + candles + chart mode (Koers = candle price, Waarde = EUR holding value)
-  let period   = $state<Period>('3m');
-  let candles  = $state<Candle[]>([]);
-  let loading  = $state(false);
-  let chartMode = $state<'koers' | 'waarde'>('koers');
-
-  // Per-position EUR value history from chartData (only dates where shares are held)
-  const valuePoints = $derived.by(() => {
-    const cutoff = periodCutoff(period);
-    return portfolioStore.chartData
-      .filter((row) => (!cutoff || row.date >= cutoff))
-      .map((row) => ({ date: row.date, value: row.positions[ticker]?.value ?? null, shares: row.positions[ticker]?.shares ?? 0 }))
-      .filter((p) => p.value != null && p.shares > 0) as { date: string; value: number }[];
-  });
-
-  $effect(() => {
-    if (period === '1d') { candles = []; return; }
-    const cutoff = periodCutoff(period) ?? '2000-01-01';
-    loading = true;
-    fetchCandles(yahoo, cutoff)
-      .then((c) => { candles = c; })
-      .catch(() => { candles = []; })
-      .finally(() => { loading = false; });
-  });
-
-  // Chart option
-  const chartOption = $derived((): EChartsOption => {
-    const isDark    = themeStore.isDark;
-    const textColor = isDark ? '#94a3b8' : '#64748b';
-    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-    const tooltipBg   = isDark ? '#1e293b' : '#ffffff';
-    const tooltipBord = isDark ? '#334155' : '#e2e8f0';
-
-    if (period === '1d') {
-      if (!allPts.length || !prevClose) return {};
-      // Use `pts` (server-computed regular-only points) to identify the actual
-      // session boundaries. tradingPeriods.regular points to the NEXT session
-      // when the market is closed, so we can't trust it for segmentation.
-      const regOpenTs  = pts[0]?.ts    ?? null;
-      const regCloseTs = pts[pts.length - 1]?.ts ?? null;
-
-      // Pad the timestamp grid to cover the full trading session so the x-axis
-      // always spans the whole day (same behaviour as the dashboard 1D chart).
-      const tsSet = new Set<number>(allPts.map((p) => p.ts));
-      const sessionDate = iData?.date ?? null;
-      const bounds = sessionDate ? sessionBounds(yahoo, sessionDate) : null;
-      if (bounds) {
-        for (let ts = bounds.open; ts <= bounds.close; ts += 300) tsSet.add(ts);
-      }
-      const sortedTs = [...tsSet].sort((a, b) => a - b);
-      const ptMap    = new Map(allPts.map((p) => [p.ts, p]));
-
-      const labels = sortedTs.map((ts) => new Date(ts * 1000).toISOString());
-
-      // Solid line for regular hours, dashed for extended (pre/post); null for padded timestamps.
-      const regularData = sortedTs.map((ts) => {
-        const p = ptMap.get(ts);
-        if (!p) return null;
-        return regOpenTs && regCloseTs && p.ts >= regOpenTs && p.ts <= regCloseTs
-          ? ((p.close - prevClose) / prevClose) * 100
-          : null;
-      });
-      const extData = sortedTs.map((ts) => {
-        const p = ptMap.get(ts);
-        if (!p) return null;
-        return !regOpenTs || !regCloseTs || p.ts < regOpenTs || p.ts > regCloseTs
-          ? ((p.close - prevClose) / prevClose) * 100
-          : null;
-      });
-      const zeroLine = sortedTs.map(() => 0);
-
-      // Symmetric y-axis: equal space above and below the zero/prevClose line.
-      const allPcts = [...regularData, ...extData].filter((v): v is number => v !== null);
-      const maxAbs  = Math.max(...allPcts.map(Math.abs), 0.5);
-      const yPad    = maxAbs * 1.1;
-
-      // Green/red based on current day move vs prev close.
-      const lastPct  = lastAllPt && prevClose ? ((lastAllPt.close - prevClose) / prevClose) * 100 : 0;
-      const lineClr  = lastPct >= 0 ? '#4ade80' : '#f87171';
-
-      // Open marker: first actual data point; Close marker: scheduled session end.
-      const openIdx  = regOpenTs   ? sortedTs.findIndex((ts) => ts === regOpenTs)  : -1;
-      const closeIdx = bounds?.close ? sortedTs.findIndex((ts) => ts >= bounds.close) : -1;
-      const openLabel  = openIdx  >= 0 ? (labels[openIdx]  ?? null) : null;
-      const closeLabel = closeIdx >= 0 ? (labels[closeIdx] ?? null) : null;
-      const sessionMarkers = [
-        openLabel  ? { xAxis: openLabel,  label: { formatter: 'Open',  position: 'insideEndTop'   as const, color: textColor, fontSize: 9 } } : null,
-        closeLabel ? { xAxis: closeLabel, label: { formatter: 'Close', position: 'insideStartTop' as const, color: textColor, fontSize: 9 } } : null,
-      ].filter((m): m is NonNullable<typeof m> => m !== null);
-
-      return {
-        backgroundColor: 'transparent',
-        grid: { top: 16, right: 16, bottom: 32, left: 56 },
-        xAxis: {
-          type: 'category',
-          data: labels,
-          axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
-          axisLabel: {
-            color: textColor, fontSize: 9,
-            formatter: (v: string) => new Date(v).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' }),
-            interval: ((index: number) => {
-              const ts = sortedTs[index];
-              return ts !== undefined && new Date(ts * 1000).getMinutes() === 0;
-            }) as unknown as number,
-          },
-        },
-        yAxis: {
-          type: 'value',
-          min: -yPad,
-          max:  yPad,
-          splitLine: { lineStyle: { color: gridColor } },
-          axisLabel: { color: textColor, fontSize: 10, formatter: (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%` },
-        },
-        tooltip: {
-          trigger: 'axis',
-          backgroundColor: tooltipBg, borderColor: tooltipBord, borderWidth: 1,
-          textStyle: { fontSize: 11, color: isDark ? '#e2e8f0' : '#1c1c1c' },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter: (params: any) => {
-            const time = new Date((params[0]?.axisValue ?? '') as string).toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' });
-            const pct  = (params as Array<{ value: number | null }>).find((p) => p.value != null)?.value;
-            if (pct == null) return time;
-            const absChange = pct / 100 * (prevClose ?? 0);
-            return `${time}<br>${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%<br>${themeStore.privacyMode ? '●●●' : `${ccySym}${absChange.toFixed(2)}`}`;
-          },
-        },
-        series: [
-          {
-            name: 'Regulier',
-            type: 'line',
-            data: regularData,
-            smooth: false, symbol: 'none', connectNulls: false,
-            lineStyle: { color: lineClr, width: 2 },
-            areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: lineClr + '33' }, { offset: 1, color: lineClr + '05' }] } },
-            markLine: sessionMarkers.length ? {
-              symbol: 'none', silent: true, animation: false,
-              lineStyle: { color: isDark ? '#64748b' : '#94a3b8', width: 1, type: 'solid' as const, opacity: 0.6 },
-              data: sessionMarkers,
-            } : undefined,
-          },
-          {
-            name: 'Extended',
-            type: 'line',
-            data: extData,
-            smooth: false, symbol: 'none', connectNulls: false,
-            lineStyle: { color: lineClr + '88', width: 1.5, type: 'dashed' as const },
-          },
-          {
-            name: '__zero',
-            type: 'line',
-            data: zeroLine,
-            smooth: false, symbol: 'none',
-            lineStyle: { color: isDark ? '#334155' : '#94a3b8', width: 1, type: 'dashed' as const },
-            tooltip: { show: false },
-          },
-        ],
-      };
-    }
-
-    // "Waarde" mode: EUR value of the holding over time, from server chartData.
-    if (chartMode === 'waarde') {
-      const pts = valuePoints;
-      if (!pts.length) return {};
-      return {
-        backgroundColor: 'transparent',
-        grid: { top: 16, right: 16, bottom: 32, left: 64 },
-        xAxis: {
-          type: 'category',
-          data: pts.map((p) => p.date),
-          axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
-          axisLabel: { color: textColor, fontSize: 10, interval: 'auto' },
-        },
-        yAxis: {
-          type: 'value',
-          splitLine: { lineStyle: { color: gridColor } },
-          axisLabel: {
-            color: textColor, fontSize: 10,
-            formatter: (v: number) => themeStore.privacyMode ? '●●●' : `€${v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : v.toFixed(0)}`,
-          },
-        },
-        tooltip: {
-          trigger: 'axis',
-          backgroundColor: tooltipBg, borderColor: tooltipBord, borderWidth: 1,
-          textStyle: { fontSize: 11, color: isDark ? '#e2e8f0' : '#1c1c1c' },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter: (params: any) => {
-            const p = (params as Array<{ axisValue: string; value: number }>)[0];
-            if (!p) return '';
-            return `${p.axisValue}<br>${themeStore.privacyMode ? '●●●' : fmt(p.value)}`;
-          },
-        },
-        series: [{
-          name: `${ticker} waarde`,
-          type: 'line',
-          data: pts.map((p) => p.value),
-          smooth: false, symbol: 'none',
-          lineStyle: { color, width: 2 },
-          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: color + '33' }, { offset: 1, color: color + '05' }] } },
-        }],
-      };
-    }
-
-    // Historical candle chart. Server may return a cached superset (back to 2021)
-    // regardless of our `from` query, so always filter to the selected period.
-    const cutoff = periodCutoff(period);
-    const visible = cutoff ? candles.filter((c) => c.date >= cutoff) : candles;
-    if (!visible.length) return {};
-    return {
-      backgroundColor: 'transparent',
-      grid: { top: 16, right: 16, bottom: 32, left: 64 },
-      xAxis: {
-        type: 'category',
-        data: visible.map((c) => c.date),
-        axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
-        axisLabel: { color: textColor, fontSize: 10, interval: 'auto' },
-      },
-      yAxis: {
-        type: 'value',
-        splitLine: { lineStyle: { color: gridColor } },
-        axisLabel: {
-          color: textColor, fontSize: 10,
-          formatter: (v: number) => `${ccySym}${v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : v.toFixed(2)}`,
-        },
-      },
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: tooltipBg, borderColor: tooltipBord, borderWidth: 1,
-        textStyle: { fontSize: 11, color: isDark ? '#e2e8f0' : '#1c1c1c' },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        formatter: (params: any) => {
-          const p = (params as Array<{ axisValue: string; value: number }>)[0];
-          if (!p) return '';
-          return `${p.axisValue}<br>${ccySym}${p.value.toFixed(2)}`;
-        },
-      },
-      series: [{
-        name: ticker,
-        type: 'line',
-        data: visible.map((c) => c.close),
-        smooth: false, symbol: 'none',
-        lineStyle: { color, width: 2 },
-        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: color + '33' }, { offset: 1, color: color + '05' }] } },
-      }],
-    };
-  });
-
-  // Transactions for this ticker
   const txs = $derived(
     portfolioStore.rawTransactions
       .filter((t) => t.ticker === ticker)
@@ -335,297 +69,468 @@
       .sort((a, b) => b.date.localeCompare(a.date)),
   );
 
-  function msBadgeClass(s: string) {
-    if (s === 'REGULAR') return 'badge-open';
-    if (s === 'PRE' || s === 'POST') return 'badge-ext';
-    return 'badge-closed';
+  const known = $derived(
+    pos != null || portfolioStore.tickerMeta[ticker] != null || txs.length > 0,
+  );
+
+  /* ── Position stats (sold-out fallback: latest chartData slice, like the old page) ── */
+
+  const latestSlice = $derived(
+    portfolioStore.chartData[portfolioStore.chartData.length - 1]?.positions[ticker],
+  );
+  const shares = $derived(pos?.shares ?? latestSlice?.shares ?? 0);
+  const value  = $derived(pos?.value ?? latestSlice?.value ?? 0);
+  const cost   = $derived(pos?.costEur ?? latestSlice?.cost ?? 0);
+  const pl     = $derived(pos?.pl ?? value - cost);
+  const plPct  = $derived(pos?.plPct ?? (cost > 0 ? (pl / cost) * 100 : 0));
+
+  const dividends = $derived(portfolioStore.dividendsPerTicker[ticker] ?? 0);
+
+  const totalValue = $derived(portfolioStore.positions.reduce((s, p) => s + p.value, 0));
+  const weightPct  = $derived(totalValue > 0 ? (value / totalValue) * 100 : 0);
+
+  /* ── Candles state (fetch effect further down) ── */
+
+  let candles        = $state<Candle[]>([]);
+  let candlesLoading = $state(false);
+
+  /* ── Intraday / market price ── */
+
+  const iData     = $derived(intradayStore.data[yahoo] as IntradayData | null | undefined);
+  const iPts      = $derived(iData?.points ?? []);
+  const allPts    = $derived(iData?.allPoints ?? iPts);
+  const prevClose = $derived(iData?.previousClose ?? null);
+
+  // THE market price: last intraday tick ?? prev close ?? last daily candle close.
+  const lastTick  = $derived(allPts[allPts.length - 1]?.close ?? null);
+  const livePrice = $derived(lastTick ?? prevClose ?? candles[candles.length - 1]?.close ?? null);
+
+  // Day change in native currency vs prev close (only when we have real ticks).
+  const dayChangeAbs = $derived(
+    lastTick != null && prevClose != null ? lastTick - prevClose : null,
+  );
+  const dayChangePct = $derived(
+    dayChangeAbs != null && prevClose ? (dayChangeAbs / prevClose) * 100 : null,
+  );
+
+  const rawState    = $derived(iData?.marketState ?? (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
+  const marketState = $derived(normalizeMarketState(yahoo, rawState));
+  const isOpen      = $derived(marketState === 'REGULAR');
+
+  // Live day P&L in EUR from intraday ticks; falls back to server-computed dayPl.
+  const dayPl = $derived.by((): number | null => {
+    if (pos && prevClose != null && lastTick != null && pos.shares > 0) {
+      return toEurLiveOrFallback(currency, pos.shares * (lastTick - prevClose), intradayStore.liveRates);
+    }
+    return pos?.dayPl ?? null;
+  });
+
+  /* ── Period state (persisted per page) ── */
+
+  const LS_KEY = 'pt.stock.period';
+  let period = $state<Period>('1d');
+  onMount(() => {
+    const saved = localStorage.getItem(LS_KEY);
+    if (saved && PERIOD_OPTIONS.some((o) => o.value === saved)) period = saved as Period;
+  });
+  function selectPeriod(v: string) {
+    period = v as Period;
+    if (browser) localStorage.setItem(LS_KEY, v);
   }
-  function msBadgeLabel(s: string) {
-    if (s === 'REGULAR') return 'Open';
-    if (s === 'PRE')     return 'Pre';
-    if (s === 'POST')    return 'Post';
-    return 'Gesloten';
+
+  /* ── Candles: fetch max range once per symbol, slice client-side per period ── */
+
+  $effect(() => {
+    const sym = yahoo;
+    if (!sym) { candles = []; return; }
+    let stale = false;
+    candlesLoading = true;
+    fetchCandles(sym, '2000-01-01')
+      .then((c) => { if (!stale) candles = c; })
+      .catch(() => { if (!stale) candles = []; })
+      .finally(() => { if (!stale) candlesLoading = false; });
+    return () => { stale = true; };
+  });
+
+  /* ── 1D chart geometry ── */
+
+  const intraSession = $derived.by(() => {
+    // Session bounds in Brussels minutes-of-day. tradingPeriods.regular may
+    // point at the next session when closed, but wall-clock minutes are the
+    // same, so the conversion stays valid.
+    const reg = iData?.tradingPeriods?.regular;
+    let start = reg ? brusselsMinuteOfDay(reg.start) : null;
+    let end   = reg ? brusselsMinuteOfDay(reg.end)   : null;
+    if (start == null || end == null || end <= start) {
+      const dateStr = iData?.date ?? new Date().toISOString().slice(0, 10);
+      const b = sessionBounds(yahoo, dateStr);
+      if (b) { start = brusselsMinuteOfDay(b.open); end = brusselsMinuteOfDay(b.close); }
+    }
+    if (start == null || end == null || end <= start) { start = 9 * 60; end = 22 * 60; }
+    return { start, end };
+  });
+
+  const intraPoints = $derived(
+    iPts.map((p) => ({ min: brusselsMinuteOfDay(p.ts), value: p.close })),
+  );
+
+  const intraTicks = $derived.by(() => {
+    const { start, end } = intraSession;
+    const span = end - start;
+    // ~4 intervals, snapped to half hours (US 15:30–22:00 → 90min steps,
+    // EU 09:00–17:30 → 120min steps).
+    const step = Math.max(30, Math.round(span / 4 / 30) * 30);
+    const ticks: { x: number; label: string }[] = [];
+    for (let m = start; m <= end; m += step) ticks.push({ x: m, label: fmtMin(m) });
+    return ticks;
+  });
+
+  /* ── History chart geometry ── */
+
+  const visibleCandles = $derived.by(() => {
+    if (period === '1d') return [];
+    const cutoff = periodCutoff(period);
+    return cutoff ? candles.filter((c) => c.date >= cutoff) : candles;
+  });
+
+  const historyData = $derived(
+    visibleCandles.map((c) => ({ x: Date.parse(c.date), value: c.close })),
+  );
+
+  const historyTicks = $derived.by(() => {
+    const cs = visibleCandles;
+    if (cs.length < 2) return [];
+    const spanDays = (Date.parse(cs[cs.length - 1]!.date) - Date.parse(cs[0]!.date)) / 86_400_000;
+    const yearly = spanDays > 800;
+    const marks: { x: number; label: string }[] = [];
+    let prevKey = cs[0]!.date.slice(0, yearly ? 4 : 7);
+    for (const c of cs) {
+      const key = c.date.slice(0, yearly ? 4 : 7);
+      if (key !== prevKey) {
+        prevKey = key;
+        marks.push({
+          x: Date.parse(c.date),
+          label: yearly ? key : new Date(c.date).toLocaleDateString('en-US', { month: 'short' }),
+        });
+      }
+    }
+    const step = Math.max(1, Math.ceil(marks.length / 5));
+    return marks.filter((_, i) => i % step === 0);
+  });
+
+  const formatPrice = $derived((v: number) => fmtNative(v, currency));
+
+  /* ── Your history rows ── */
+
+  function dateLabel(date: string): string {
+    const mmdd = date.slice(5);
+    const yr = date.slice(0, 4);
+    return yr === String(new Date().getFullYear()) ? mmdd : `${mmdd} '${yr.slice(2)}`;
   }
+  // Transactions carry no native per-share price, so derive the EUR per-share
+  // price from costEur / |shares| (deviation from the "$44.71" prototype copy).
+  function txDetail(t: Transaction): string {
+    const d = dateLabel(t.date);
+    if (t.shares === 0) return `Dividend · ${d}`;
+    const perShare = Math.abs(t.costEur) / Math.abs(t.shares);
+    const sh = Math.abs(t.shares).toLocaleString('en-US', { maximumFractionDigits: 4 });
+    return `${sh} sh @ €${perShare.toFixed(2)} · ${d}`;
+  }
+  const historyItems = $derived(txs.map((t) => ({
+    date: t.date, ticker: t.ticker, shares: t.shares, costEur: t.costEur, detail: txDetail(t),
+  })));
+
+  /* ── Display strings ── */
+
+  const sharesStr = $derived(shares.toLocaleString('en-US', { maximumFractionDigits: 4 }));
+  const avgCostNative = $derived(pos?.avgCostNative ?? null);
 </script>
 
-<div class="page-root">
-  <!-- Mobile top bar -->
-  <div class="mobile-topbar">
-    <a href={resolve('/')} class="mobile-circle-btn" aria-label="Terug">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-    </a>
-    <div class="mobile-topbar-title">
-      <span class="mobile-avatar" style="background:{color}">{ticker.slice(0, 2)}</span>
-      <span class="mobile-topbar-ticker">{ticker}</span>
-    </div>
-    <button class="mobile-circle-btn" aria-label="Meer opties">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
-    </button>
-  </div>
-
-  <!-- Desktop header (hidden on mobile) -->
-  <div class="sd-desktop-header">
-    <div class="sd-identity">
-      <span class="color-dot" style="background:{color}"></span>
-      <span class="sd-ticker">{ticker}</span>
-      {#if meta.label}<span class="sd-name">{meta.label}</span>{/if}
-    </div>
-    <div class="sd-price-row">
-      {#if currentPrice != null}
-        <span class="sd-price"><PrivacyValue value="{ccySym}{currentPrice.toFixed(2)}" /></span>
-      {/if}
-      {#if extChangePct != null && regularChangePct != null}
-        <span class="sd-change-group">
-          <span class="sd-change-lbl">Markt</span>
-          <span class="sd-change {regularChangePct >= 0 ? 'c-pos' : 'c-neg'}">{regularChangePct >= 0 ? '+' : ''}{regularChangePct.toFixed(2)}%</span>
-          <span class="sd-change-sep">·</span>
-          <span class="sd-change-lbl">{marketState === 'PRE' ? 'Pre' : 'Post'}</span>
-          <span class="sd-change {extChangePct >= 0 ? 'c-pos' : 'c-neg'}">{extChangePct >= 0 ? '+' : ''}{extChangePct.toFixed(2)}%</span>
-        </span>
-      {:else if dayChangePct != null}
-        <span class="sd-change {dayChangePct >= 0 ? 'c-pos' : 'c-neg'}">{dayChangePct >= 0 ? '+' : ''}{dayChangePct.toFixed(2)}%</span>
-      {/if}
-      <span class="badge {msBadgeClass(marketState)}">{msBadgeLabel(marketState)}</span>
+{#if portfolioStore.loaded && !known}
+  <!-- Unknown ticker -->
+  <div class="page">
+    <div class="empty-state">
+      <div class="empty-title">Unknown ticker</div>
+      <div class="empty-sub">"{ticker}" isn't in your portfolio.</div>
+      <a class="empty-back" href={resolve('/')}>&larr; Back to portfolio</a>
     </div>
   </div>
-
-  <!-- Mobile hero: name · big value · P&L pill -->
-  <div class="sd-hero">
-    {#if meta.label}
-      <div class="h-eyebrow" style="margin-bottom:6px">{meta.label.toUpperCase()}</div>
-    {/if}
-    <div class="sd-hero-value"><PrivacyValue value={fmt(val)} /></div>
-    <div class="sd-hero-pl">
-      {#if pl !== 0}
-        <span class="sd-pl-pill {pl >= 0 ? 'pos' : 'neg'}">
-          {pl >= 0 ? '▲' : '▼'} {Math.abs(plPct).toFixed(2)}%
-        </span>
-        <span class="sd-pl-total {pl >= 0 ? 'c-pos' : 'c-neg'}">
-          {pl >= 0 ? '+' : ''}<PrivacyValue value={fmt(pl)} /> totaal
-        </span>
-      {/if}
+{:else}
+  <div class="page">
+    <!-- ── Top bar ── -->
+    <div class="topbar">
+      <a class="back-btn" href={resolve('/')} aria-label="Back to portfolio">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+      </a>
+      <div class="topbar-id">
+        <div class="topbar-ticker">{ticker}</div>
+        <div class="topbar-sub">{meta.label ?? ticker} · {exchangeLabel(yahoo)}</div>
+      </div>
+      <div class="market-chip mono" class:open={isOpen}>
+        <span class="market-dot"></span>
+        {isOpen ? 'OPEN' : 'CLOSED'}
+      </div>
     </div>
-  </div>
 
-  <!-- Chart -->
-  <div class="sd-chart-wrap">
-    {#if chartMode === 'koers' && loading}
-      <div class="chart-placeholder">Laden…</div>
-    {:else if chartMode === 'waarde' ? valuePoints.length > 1 : candles.length > 1}
-      <Chart option={chartOption()} height="240px" />
-    {:else}
-      <div class="chart-placeholder">Geen data voor deze periode</div>
-    {/if}
-  </div>
-
-  <!-- Chart mode toggle -->
-  <div class="sd-mode">
-    <button class="sd-mode-btn" class:on={chartMode === 'koers'} onclick={() => (chartMode = 'koers')}>Koers</button>
-    <button class="sd-mode-btn" class:on={chartMode === 'waarde'} onclick={() => (chartMode = 'waarde')}>Waarde</button>
-  </div>
-
-  <!-- Period selector -->
-  <div class="sd-periods card">
-    {#each PERIODS as p}
-      <button class="sd-period-btn" class:on={period === p.key} onclick={() => (period = p.key)}>
-        {p.label}
-      </button>
-    {/each}
-  </div>
-
-  <!-- 2×2 stat cards -->
-  <div class="sd-stats">
-    <div class="sd-stat card">
-      <div class="sd-stat-label">Aantal</div>
-      <div class="sd-stat-val mono"><PrivacyValue value={String(shares)} /></div>
-      {#if currentPrice != null}
-        <div class="sd-stat-sub">{nativeCcy} {currentPrice.toFixed(2)}</div>
-      {/if}
+    <!-- ── Market hero: THE market price, native currency ── -->
+    <div class="hero">
+      <div class="hero-row">
+        {#if livePrice != null}
+          <div class="hero-price mono">{fmtNative(livePrice, currency)}</div>
+        {:else}
+          <div class="hero-price mono">—</div>
+        {/if}
+        {#if dayChangeAbs != null && dayChangePct != null}
+          <div class="hero-change mono" class:pos={dayChangeAbs >= 0} class:neg={dayChangeAbs < 0}>
+            {fmtNativeSigned(dayChangeAbs, currency)} ({fmtPct(dayChangePct)})
+          </div>
+        {/if}
+      </div>
+      <div class="hero-caption">Market price · today</div>
     </div>
-    <div class="sd-stat card">
-      <div class="sd-stat-label">Gem. kost</div>
-      {#if avgCostNative != null}
-        <div class="sd-stat-val mono">{nativeCcy} {avgCostNative.toFixed(2)}</div>
-      {:else if pos?.avgCost}
-        <div class="sd-stat-val mono">€ {pos.avgCost.toFixed(2)}</div>
-      {/if}
-      <div class="sd-stat-sub"><PrivacyValue value={fmt(cost)} /></div>
-    </div>
-    <div class="sd-stat card">
-      <div class="sd-stat-label">Vandaag</div>
-      {#if pos?.dayPl != null}
-        <div class="sd-stat-val {pos.dayPl >= 0 ? 'c-pos' : 'c-neg'}">
-          <PrivacyValue value="€ {pos.dayPl >= 0 ? '+' : ''}{pos.dayPl.toFixed(0)}" />
-        </div>
-        <div class="sd-stat-sub {pos.dayPl >= 0 ? 'c-pos' : 'c-neg'}">{(pos.dayPlPct ?? 0) >= 0 ? '+' : ''}{(pos.dayPlPct ?? 0).toFixed(2)}%</div>
-      {:else if dayChangePct != null}
-        <div class="sd-stat-val {dayChangePct >= 0 ? 'c-pos' : 'c-neg'}">{dayChangePct >= 0 ? '+' : ''}{dayChangePct.toFixed(2)}%</div>
+
+    <!-- ── Chart (full-bleed, market price only) ── -->
+    <div class="chart-bleed">
+      {#if period === '1d'}
+        {#if prevClose != null}
+          <PeriodChart
+            mode="intraday"
+            height={190}
+            formatY={formatPrice}
+            points={intraPoints}
+            {prevClose}
+            sessionStart={intraSession.start}
+            sessionEnd={intraSession.end}
+            xTicks={intraTicks}
+            emptyLabel="Market opens at {fmtMin(intraSession.start)}"
+          />
+        {:else}
+          <div class="chart-placeholder">No intraday data</div>
+        {/if}
+      {:else if historyData.length >= 2}
+        <PeriodChart
+          mode="history"
+          height={190}
+          formatY={formatPrice}
+          data={historyData}
+          xTicks={historyTicks}
+        />
       {:else}
-        <div class="sd-stat-val c-muted">—</div>
+        <div class="chart-placeholder">{candlesLoading ? 'Loading…' : 'No data for this period'}</div>
       {/if}
     </div>
-    <div class="sd-stat card">
-      <div class="sd-stat-label">P&amp;L %</div>
-      <div class="sd-stat-val {pl >= 0 ? 'c-pos' : 'c-neg'}">{pl >= 0 ? '+' : ''}{plPct.toFixed(1)}%</div>
-      <div class="sd-stat-sub {pl >= 0 ? 'c-pos' : 'c-neg'}"><PrivacyValue value="{pl >= 0 ? '+' : ''}{fmt(pl)}" /></div>
-    </div>
-  </div>
 
-  <!-- Extra stats: dividends & realized P&L (only when nonzero) -->
-  {#if dividends > 0 || realizedPl !== 0}
-    <div class="sd-stats">
-      {#if dividends > 0}
-        <div class="sd-stat card">
-          <div class="sd-stat-label">Dividenden</div>
-          <div class="sd-stat-val mono"><PrivacyValue value={fmt(dividends)} /></div>
-          <div class="sd-stat-sub">totaal ontvangen</div>
-        </div>
-      {/if}
-      {#if realizedPl !== 0}
-        <div class="sd-stat card">
-          <div class="sd-stat-label">Gerealiseerde W/V</div>
-          <div class="sd-stat-val mono {realizedPl >= 0 ? 'c-pos' : 'c-neg'}">
-            <PrivacyValue value="{realizedPl >= 0 ? '+' : ''}{fmt(realizedPl)}" />
-          </div>
-          <div class="sd-stat-sub">via verkopen</div>
-        </div>
-      {/if}
+    <!-- ── Period pills ── -->
+    <div class="pills-row">
+      <PeriodPills options={PERIOD_OPTIONS} selected={period} onselect={selectPeriod} />
     </div>
-  {/if}
 
-  <!-- Transactions list -->
-  {#if txs.length > 0}
-    <div class="card sd-tx-card">
-      <div class="sd-tx-title">Laatste transacties</div>
-      {#each txs as tx}
-        {@const isDividend = tx.shares === 0}
-        {@const isSale = !isDividend && tx.shares < 0}
-        <div class="sd-tx-row">
-          <div class="sd-tx-left">
-            <div class="sd-tx-type">
-              {isDividend ? 'Dividend' : isSale ? 'Verkoop' : 'Koop'}{#if !isDividend} · {Math.abs(tx.shares).toLocaleString('nl-BE', { maximumFractionDigits: 4 })} aandelen{/if}
+    <!-- ── Your position ── -->
+    <div class="pos-card">
+      <div class="pos-head">
+        <div class="pos-title">Your position</div>
+        <div class="pos-hint">all in €</div>
+      </div>
+      <div class="pos-value-row">
+        <div class="pos-value mono"><PrivacyValue value={fmtEur(value)} /></div>
+        <div class="pos-pl mono" class:pos={pl >= 0} class:neg={pl < 0}>
+          <PrivacyValue value="{fmtEurSigned(pl)} ({fmtPct1(plPct)})" />
+        </div>
+      </div>
+      <div class="pos-grid">
+        <div class="stat">
+          <div class="stat-label">Shares</div>
+          <div class="stat-val mono"><PrivacyValue value={sharesStr} /></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Avg cost</div>
+          {#if avgCostNative != null}
+            <div class="stat-val mono">{fmtNative(avgCostNative, currency)}</div>
+            <div class="stat-sub">{fmtNative(pos?.avgCost ?? 0, 'EUR')} /sh</div>
+          {:else}
+            <div class="stat-val mono">{fmtNative(pos?.avgCost ?? 0, 'EUR')}</div>
+          {/if}
+        </div>
+        <div class="stat">
+          <div class="stat-label">Today</div>
+          {#if dayPl != null}
+            <div class="stat-val mono" class:pos={dayPl >= 0} class:neg={dayPl < 0}>
+              <PrivacyValue value={fmtEurSigned(dayPl)} />
             </div>
-            <div class="sd-tx-date">{tx.date}</div>
-          </div>
-          <div class="sd-tx-amount mono"><PrivacyValue value={fmt(tx.costEur)} /></div>
+          {:else}
+            <div class="stat-val mono muted">—</div>
+          {/if}
         </div>
-      {/each}
+        <div class="stat">
+          <div class="stat-label">Invested</div>
+          <div class="stat-val mono"><PrivacyValue value={fmtEur(cost)} /></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Weight</div>
+          <div class="stat-val mono">{weightPct.toFixed(1)}%</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Dividends</div>
+          <div class="stat-val mono"><PrivacyValue value={fmtEur(dividends)} /></div>
+        </div>
+      </div>
     </div>
-  {/if}
-</div>
+
+    <!-- ── Your history ── -->
+    {#if historyItems.length > 0}
+      <div class="history">
+        <div class="history-title">Your history</div>
+        <ActivityList items={historyItems} showTicker={false} />
+      </div>
+    {/if}
+  </div>
+{/if}
 
 <style>
-  /* ── Mobile topbar ── */
-  .mobile-topbar {
-    display: none; align-items: center; justify-content: space-between; padding: 10px 0 6px;
+  .page {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 20px 20px 90px;
+    background: var(--bg);
   }
-  .mobile-topbar-title { display: flex; align-items: center; gap: 8px; }
-  .mobile-avatar {
-    width: 32px; height: 32px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 700; color: #fff; letter-spacing: 0.02em; flex-shrink: 0; opacity: 0.85;
+  .mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-feature-settings: 'tnum', 'zero';
   }
-  .mobile-topbar-ticker { font-size: 16px; font-weight: 700; }
-  .mobile-circle-btn {
-    width: 40px; height: 40px; border-radius: 50%;
-    background: var(--surface-2); border: none; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--fg); text-decoration: none; flex-shrink: 0;
-  }
-  .mobile-circle-btn:hover { background: var(--surface-3, var(--surface-2)); }
+  .pos { color: var(--c-pos); }
+  .neg { color: var(--c-neg); }
+  .muted { color: var(--fg-faint); }
 
-  @media (max-width: 640px) { .mobile-topbar { display: flex; } }
+  /* ── Top bar ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 0 18px;
+  }
+  .back-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fg);
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+  .back-btn:hover { background: var(--surface-3); }
+  .topbar-id { min-width: 0; }
+  .topbar-ticker { font-size: 15px; font-weight: 700; line-height: 1.1; }
+  .topbar-sub {
+    font-size: 11px;
+    color: var(--fg-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .market-chip {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--fg-faint);
+    flex-shrink: 0;
+  }
+  .market-chip.open { color: var(--c-pos); }
+  .market-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
 
-  /* ── Desktop header ── */
-  .sd-desktop-header {
-    display: flex; align-items: center; gap: 12px; padding: 16px 0 12px; flex-wrap: wrap;
+  /* ── Market hero ── */
+  .hero { margin-bottom: 4px; }
+  .hero-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .hero-price {
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
   }
-  .sd-identity { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
-  .color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-  .sd-ticker { font-size: 18px; font-weight: 700; }
-  .sd-name { font-size: 12px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sd-price-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .sd-price { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; }
-  .sd-change { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
-  .sd-change-group { display: inline-flex; align-items: baseline; gap: 4px; font-family: 'JetBrains Mono', monospace; }
-  .sd-change-lbl { font-size: 10px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .sd-change-sep { color: var(--fg-muted); opacity: 0.5; margin: 0 2px; }
-  .badge { font-size: 9px; font-weight: 600; letter-spacing: 0.05em; padding: 2px 5px; border-radius: 3px; text-transform: uppercase; white-space: nowrap; }
-  .badge-open   { background: rgba(74,222,128,0.15); color: #4ade80; }
-  .badge-ext    { background: rgba(251,191,36,0.15);  color: #fbbf24; }
-  .badge-closed { background: rgba(100,116,139,0.15); color: #64748b; }
-  @media (max-width: 640px) { .sd-desktop-header { display: none; } }
-
-  /* ── Hero ── */
-  .sd-hero { padding: 4px 0 12px; }
-  .sd-hero-value {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 36px; font-weight: 700; letter-spacing: -0.02em;
-    line-height: 1.1; margin-bottom: 8px;
-  }
-  .sd-hero-pl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .sd-pl-pill {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 3px 8px; border-radius: 6px;
-    font-size: 12px; font-weight: 600;
-  }
-  .sd-pl-pill.pos { background: rgba(4,120,87,0.12); color: var(--c-pos, #047857); }
-  .sd-pl-pill.neg { background: rgba(185,28,28,0.1);  color: var(--c-neg, #b91c1c); }
-  .sd-pl-total { font-size: 13px; font-weight: 500; }
-  @media (min-width: 641px) { .sd-hero { display: none; } }
+  .hero-change { font-size: 14px; font-weight: 600; }
+  .hero-caption { font-size: 11px; color: var(--fg-faint); margin-top: 4px; }
 
   /* ── Chart ── */
-  .sd-chart-wrap { margin: 0 -16px; }
-  @media (min-width: 641px) { .sd-chart-wrap { margin: 12px 0 0; } }
+  .chart-bleed { margin: 8px -20px 0; }
   .chart-placeholder {
-    display: flex; align-items: center; justify-content: center;
-    height: 160px; color: var(--fg-muted); font-size: 13px;
+    height: 190px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--fg-faint);
   }
+  .pills-row { margin-top: 8px; }
 
-  /* ── Chart mode toggle ── */
-  .sd-mode { display: flex; gap: 6px; margin-top: 12px; }
-  .sd-mode-btn {
-    padding: 5px 12px; font-size: 11px; font-weight: 600;
-    background: none; border: 1px solid var(--border); cursor: pointer;
-    color: var(--fg-muted); border-radius: 999px;
-    transition: color 0.1s, background 0.1s;
+  /* ── Your position card ── */
+  .pos-card {
+    margin-top: 24px;
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    padding: 16px 18px;
   }
-  .sd-mode-btn:hover { color: var(--fg); }
-  .sd-mode-btn.on { background: var(--surface-3, var(--surface-2)); color: var(--fg); border-color: transparent; }
-
-  /* ── Period selector ── */
-  .sd-periods {
-    display: flex; align-items: center; justify-content: space-between;
-    margin: 12px 0; padding: 4px;
+  .pos-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 12px;
   }
-  .sd-period-btn {
-    flex: 1; padding: 7px 4px; font-size: 12px; font-weight: 500;
-    background: none; border: none; cursor: pointer;
-    color: var(--fg-muted); border-radius: 8px; text-align: center;
-    transition: color 0.1s, background 0.1s;
+  .pos-title { font-size: 13px; font-weight: 600; }
+  .pos-hint { font-size: 11px; color: var(--fg-faint); }
+  .pos-value-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .pos-value {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
-  .sd-period-btn:hover { color: var(--fg); }
-  .sd-period-btn.on { background: var(--surface-3, var(--surface-2)); color: var(--fg); font-weight: 700; }
-
-  /* ── 2×2 stat cards ── */
-  .sd-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-  .sd-stat { padding: 14px 16px; }
-  .sd-stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--fg-muted); margin-bottom: 6px; }
-  .sd-stat-val { font-size: 20px; font-weight: 700; line-height: 1.1; margin-bottom: 3px; }
-  .sd-stat-sub { font-size: 12px; color: var(--fg-muted); }
-
-  /* ── Transactions list ── */
-  .sd-tx-card { overflow: hidden; }
-  .sd-tx-title { font-size: 15px; font-weight: 700; padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
-  .sd-tx-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 11px 16px; border-bottom: 1px solid var(--border);
+  .pos-pl { font-size: 13px; font-weight: 600; }
+  .pos-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--hairline);
   }
-  .sd-tx-row:last-child { border-bottom: none; }
-  .sd-tx-left { display: flex; flex-direction: column; gap: 2px; }
-  .sd-tx-type { font-size: 13px; font-weight: 600; }
-  .sd-tx-date { font-size: 11px; color: var(--fg-muted); }
-  .sd-tx-amount { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; }
+  .stat-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+    margin-bottom: 3px;
+  }
+  .stat-val { font-size: 14px; font-weight: 600; }
+  .stat-sub { font-size: 10px; color: var(--fg-faint); margin-top: 1px; }
 
-  .mono { font-family: 'JetBrains Mono', monospace; }
+  /* ── Your history ── */
+  .history { margin-top: 26px; }
+  .history-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+
+  /* ── Unknown ticker ── */
+  .empty-state {
+    padding: 60px 0;
+    text-align: center;
+  }
+  .empty-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .empty-sub { font-size: 12px; color: var(--fg-faint); margin-bottom: 16px; }
+  .empty-back {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--fg);
+    text-decoration: none;
+  }
+  .empty-back:hover { text-decoration: underline; }
 </style>
