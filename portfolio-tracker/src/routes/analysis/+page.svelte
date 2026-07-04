@@ -1,491 +1,429 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
+  import { browser } from '$app/environment';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
-  import { themeStore } from '$lib/stores/theme.svelte';
-  import { fmt, fmtPct, fmtNum } from '$lib/utils/fmt';
+  import { fmtPct1 } from '$lib/utils/fmt';
   import { getColor } from '$lib/utils/color';
-  import Chart from '$lib/components/Chart.svelte';
+  import PeriodPills from '$lib/components/shared/PeriodPills.svelte';
+  import AllocationBar from '$lib/components/shared/AllocationBar.svelte';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
-  import type { EChartsOption } from 'echarts';
+  import type { RiskMetrics } from '$lib/types/portfolio';
 
-  const SECTOR_COLORS = ['var(--accent)','#8b5cf6','#14b8a6','#f59e0b','#ec4899','#10b981','#f97316','#06b6d4','#e11d48','#84cc16'];
-  const GEO_COLORS    = ['var(--accent)','#8b5cf6','#14b8a6','#f59e0b','#ec4899','#10b981','#f97316'];
-  const CCY_COLORS    = ['var(--accent)','#8b5cf6','#14b8a6','#f59e0b','#ec4899','#10b981','#f97316'];
+  // ── Performance ──────────────────────────────────────────────────────────────
 
-  function chartColors() {
-    const isDark = themeStore.isDark;
-    return {
-      text:        isDark ? '#8b929c' : '#6a6f78',
-      grid:        isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-      tooltipBg:   isDark ? '#15181c' : '#ffffff',
-      tooltipBord: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(16,18,22,0.12)',
-      tooltipText: isDark ? '#f2f4f7' : '#101216',
-      posBar:      isDark ? '#34d399' : '#047857',
-      negBar:      isDark ? '#f87171' : '#b91c1c',
-    };
-  }
+  const twr = $derived(portfolioStore.twrPct);
+  const irr = $derived(portfolioStore.irrPct);
 
-  // ── KPI values ───────────────────────────────────────────────────────────────
-
-  const startYear = $derived(() => {
-    const d = portfolioStore.chartData[0];
-    return d ? new Date(d.date).getFullYear() : null;
+  /** "since Jan 2023" from the first chart point; falls back to method label. */
+  const twrSub = $derived(() => {
+    const first = portfolioStore.chartData[0];
+    if (!first) return 'time-weighted';
+    const d = new Date(first.date);
+    return `since ${d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
   });
 
-  const totalValue = $derived(portfolioStore.positions.reduce((s, p) => s + p.value, 0));
+  // ── Return by position ───────────────────────────────────────────────────────
 
-  const twr = $derived(() => {
-    const cost = portfolioStore.totalInvested;
-    if (cost <= 0) return null;
-    return ((totalValue - cost) / cost) * 100;
+  const returnBars = $derived(() => {
+    const positions = [...portfolioStore.positions].sort((a, b) => b.plPct - a.plPct);
+    if (!positions.length) return [];
+    // Default domain −20%..+120%; expand to fit outliers, keeping zero placed correctly.
+    const lo = Math.min(-20, ...positions.map((p) => p.plPct));
+    const hi = Math.max(120, ...positions.map((p) => p.plPct));
+    const span = hi - lo || 1;
+    const zeroPct = ((0 - lo) / span) * 100;
+    return positions.map((p) => {
+      const vPct = ((p.plPct - lo) / span) * 100;
+      return {
+        ticker: p.ticker,
+        color: getColor(p.ticker),
+        zeroLeft: zeroPct,
+        barLeft: Math.min(zeroPct, vPct),
+        barWidth: Math.max(0.5, Math.abs(vPct - zeroPct)),
+        pos: p.plPct >= 0,
+        pctStr: fmtPct1(p.plPct),
+      };
+    });
   });
 
-  const rm = $derived(portfolioStore.riskMetrics);
+  // ── Rolling returns ──────────────────────────────────────────────────────────
 
-  // ── Rolling returns chart ────────────────────────────────────────────────────
-
-  // Backend keys: '1w', '1m', '3m', 'ytd', '1y', 'inception'
-  const PERIOD_ORDER: Array<[string, string]> = [
+  // Backend keys → display labels (same keys the old analysis page used)
+  const ROLLING_PERIODS: Array<[string, string]> = [
     ['1w', '1W'], ['1m', '1M'], ['3m', '3M'], ['ytd', 'YTD'], ['1y', '1Y'], ['inception', 'Max'],
   ];
 
-  const orderedRolling = $derived(() => {
+  const rollingTiles = $derived(() => {
     const rr = portfolioStore.rollingReturns;
-    if (!rr) return [];
-    return PERIOD_ORDER
-      .map(([key, label]) => {
-        const r = rr[key];
-        return r && r.portfolio != null ? { period: label, portfolio: r.portfolio, vwce: r.vwce } : null;
-      })
-      .filter((r): r is NonNullable<typeof r> => r != null);
+    return ROLLING_PERIODS.map(([key, label]) => {
+      const v = rr?.[key]?.portfolio ?? null;
+      return { label, value: v };
+    });
   });
 
-  const rollingChartOption = $derived((): EChartsOption => {
-    const rows = orderedRolling();
-    if (!rows.length) return {};
-    const { text, grid, posBar, negBar } = chartColors();
-    const values = rows.map((r) => +(r.portfolio ?? 0));
-    return {
-      backgroundColor: 'transparent',
-      grid: { top: 36, right: 12, bottom: 24, left: 44, containLabel: false },
-      xAxis: {
-        type: 'category',
-        data: rows.map((r) => r.period),
-        axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
-        axisLabel: { color: text, fontSize: 10 },
-      },
-      yAxis: {
-        type: 'value',
-        splitLine: { lineStyle: { color: grid } },
-        axisLabel: { color: text, fontSize: 10, formatter: (v: number) => `${v.toFixed(0)}%` },
-      },
-      tooltip: { show: false },
-      series: [{
-        type: 'bar',
-        barMaxWidth: 36,
-        data: values.map((v) => ({
-          value: v,
-          itemStyle: { color: v >= 0 ? posBar : negBar, borderRadius: v >= 0 ? [3, 3, 0, 0] : [0, 0, 3, 3] },
-          label: {
-            show: true,
-            position: v >= 0 ? 'top' : 'bottom',
-            color: v >= 0 ? posBar : negBar,
-            fontSize: 9,
-            fontWeight: 600,
-            formatter: () => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`,
-          },
-        })),
-      }],
-    };
+  // ── Risk ─────────────────────────────────────────────────────────────────────
+
+  // The server emits `maxDrawdownPct` (positive % decline); the hand-written
+  // type still says `maxDrawdown`. Accept both, render as a negative %.
+  type RmRuntime = Partial<RiskMetrics> & { maxDrawdownPct?: number | null };
+  const rm = $derived(portfolioStore.riskMetrics as RmRuntime | null);
+
+  const riskRows = $derived(() => {
+    const dd = rm?.maxDrawdown ?? rm?.maxDrawdownPct ?? null;
+    return [
+      { label: 'Volatility',   sub: '1Y, annualized',           value: rm?.volatility != null ? fmtPct1(rm.volatility) : null, neg: false },
+      { label: 'Max drawdown', sub: 'worst peak-to-trough',     value: dd != null ? fmtPct1(-Math.abs(dd)) : null,             neg: true },
+      { label: 'Sharpe',       sub: 'return per unit of risk',  value: rm?.sharpe != null ? rm.sharpe.toFixed(2) : null,       neg: false },
+      { label: 'Sortino',      sub: 'downside risk only',       value: rm?.sortino != null ? rm.sortino.toFixed(2) : null,     neg: false },
+      { label: 'Beta',         sub: 'vs VWCE All-World',        value: rm?.beta != null ? rm.beta.toFixed(2) : null,           neg: false },
+    ];
   });
 
-  // ── Risk profile bars ────────────────────────────────────────────────────────
-
-  const riskBars = $derived(() => {
-    if (!rm) return [];
-    const isDark = themeStore.isDark;
-    const pos  = isDark ? '#34d399' : '#047857';
-    const neg  = isDark ? '#f87171' : '#b91c1c';
-    const neu  = isDark ? '#8b929c' : '#6a6f78';
-    const acc  = isDark ? '#818cf8' : '#6366f1';
-    const bars = [];
-    if (rm.volatility != null)
-      bars.push({ label: 'Volatiliteit (1J)', display: fmtPct(rm.volatility), barPct: Math.min(100, Math.abs(rm.volatility) / 130 * 100), color: neg });
-    if (rm.beta != null)
-      bars.push({ label: 'Beta', display: fmtNum(rm.beta), barPct: Math.min(100, Math.abs(rm.beta) / 2 * 100), color: acc });
-    if (rm.sharpe != null)
-      bars.push({ label: 'Sharpe', display: fmtNum(rm.sharpe), barPct: Math.min(100, Math.max(0, rm.sharpe) / 3 * 100), color: rm.sharpe >= 1 ? pos : neu });
-    if (portfolioStore.irrPct != null)
-      bars.push({ label: 'Annual return', display: fmtPct(portfolioStore.irrPct), barPct: Math.min(100, Math.abs(portfolioStore.irrPct) / 100 * 100), color: portfolioStore.irrPct >= 0 ? pos : neg });
-    return bars;
-  });
-
-  // ── Risk narrative ────────────────────────────────────────────────────────────
-
-  const riskNarrative = $derived(() => {
-    if (!rm) return '';
-    const parts: string[] = [];
-    if (rm.sharpe != null) parts.push(rm.sharpe > 1 ? 'Hoog rendement' : rm.sharpe < 0.5 ? 'Laag rendement' : 'Gemiddeld rendement');
-    if (rm.volatility != null) parts.push(rm.volatility > 30 ? 'hoge volatiliteit' : rm.volatility < 10 ? 'lage volatiliteit' : 'gemiddelde volatiliteit');
-    const top3 = [...portfolioStore.positions].sort((a, b) => b.value - a.value).slice(0, 3);
-    const top3val = top3.reduce((s, p) => s + p.value, 0);
-    const conc = totalValue > 0 ? Math.round(top3val / totalValue * 100) : 0;
-    if (conc > 50 && top3.length >= 3) parts.push(`Concentratierisico: ${conc}% van portefeuille in ${top3.length} namen`);
-    if (!parts.length) return '';
-    return parts.join(', ') + '.';
-  });
-
-  // ── Allocation panels ────────────────────────────────────────────────────────
-
-  const latest = $derived(portfolioStore.chartData[portfolioStore.chartData.length - 1]);
-
-  function toAllocItems(map: Record<string, number>, colors: string[]) {
-    const total = Object.values(map).reduce((a, b) => a + b, 0) || 1;
-    return Object.entries(map)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, val], i) => ({ name, pct: val / total * 100, color: colors[i % colors.length]! }));
-  }
-
-  const sectorItems = $derived(() => {
-    if (!latest) return [];
-    const map: Record<string, number> = {};
-    for (const t of portfolioStore.currentTickers) {
-      const s = portfolioStore.tickerMeta[t]?.sector ?? 'Overig';
-      map[s] = (map[s] ?? 0) + (latest.positions[t]?.value ?? 0);
-    }
-    return toAllocItems(map, SECTOR_COLORS);
-  });
-
-  const geoItems = $derived(() => {
-    if (!latest) return [];
-    const map: Record<string, number> = {};
-    for (const t of portfolioStore.currentTickers) {
-      const g = portfolioStore.tickerMeta[t]?.geo ?? 'Overig';
-      map[g] = (map[g] ?? 0) + (latest.positions[t]?.value ?? 0);
-    }
-    return toAllocItems(map, GEO_COLORS);
-  });
-
-  const currencyItems = $derived(() => {
-    const exp = portfolioStore.currencyExposure ?? {};
-    if (!Object.keys(exp).length) {
-      const usd = portfolioStore.usdExposurePct ?? 0;
-      return [
-        { name: 'USD', pct: usd,       color: CCY_COLORS[0]! },
-        { name: 'EUR', pct: 100 - usd, color: CCY_COLORS[1]! },
-      ];
-    }
-    return toAllocItems(exp, CCY_COLORS);
-  });
-
-  // ── Contribution to return ───────────────────────────────────────────────────
-
-  const contributionItems = $derived(() => {
+  /** Share of total value in the top-3 positions; null hides the note. */
+  const concentrationPct = $derived(() => {
     const positions = portfolioStore.positions;
-    if (!positions.length) return [];
-    const maxAbs = Math.max(...positions.map((p) => Math.abs(p.pl)), 1);
-    return [...positions]
-      .sort((a, b) => b.pl - a.pl)
-      .map((p) => ({
-        ticker: p.ticker,
-        pl: p.pl,
-        plPct: p.plPct,
-        barPct: Math.abs(p.pl) / maxAbs * 78,
-      }));
+    if (positions.length < 4) return null;
+    const total = positions.reduce((s, p) => s + p.value, 0);
+    if (total <= 0) return null;
+    const top3 = [...positions].sort((a, b) => b.value - a.value).slice(0, 3);
+    const pct = Math.round((top3.reduce((s, p) => s + p.value, 0) / total) * 100);
+    return pct >= 50 ? pct : null;
   });
 
-  function fmtContrib(pl: number): string {
-    const abs = Math.abs(Math.round(pl));
-    return `${pl >= 0 ? '+' : '-'}€ ${abs.toLocaleString('nl-BE')}`;
+  // ── Allocation ───────────────────────────────────────────────────────────────
+
+  type Dim = 'ticker' | 'sector' | 'currency';
+  const DIM_OPTIONS = [
+    { value: 'ticker', label: 'Ticker' },
+    { value: 'sector', label: 'Sector' },
+    { value: 'currency', label: 'Currency' },
+  ];
+  const DIM_STORAGE_KEY = 'analysis.dim';
+  const PALETTE = ['var(--accent)', '#8b5cf6', '#14b8a6', '#f59e0b', '#ec4899', '#10b981', '#06b6d4', '#f97316'];
+
+  let dim = $state<Dim>('ticker');
+  if (browser) {
+    const saved = localStorage.getItem(DIM_STORAGE_KEY);
+    if (saved === 'ticker' || saved === 'sector' || saved === 'currency') dim = saved;
   }
+  function setDim(v: string) {
+    dim = v as Dim;
+    if (browser) localStorage.setItem(DIM_STORAGE_KEY, v);
+  }
+
+  function toPctItems(entries: [string, number][]) {
+    const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
+    return entries
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, v], i) => ({ name, pct: (v / total) * 100, color: PALETTE[i % PALETTE.length]! }));
+  }
+
+  const allocItems = $derived(() => {
+    const positions = portfolioStore.positions;
+    if (dim === 'ticker') {
+      const total = positions.reduce((s, p) => s + p.value, 0) || 1;
+      return [...positions]
+        .sort((a, b) => b.value - a.value)
+        .map((p) => ({ name: p.ticker, pct: (p.value / total) * 100, color: getColor(p.ticker) }));
+    }
+    if (dim === 'sector') {
+      const map: Record<string, number> = {};
+      for (const p of positions) {
+        const s = portfolioStore.tickerMeta[p.ticker]?.sector ?? 'Other';
+        map[s] = (map[s] ?? 0) + p.value;
+      }
+      return toPctItems(Object.entries(map));
+    }
+    return toPctItems(Object.entries(portfolioStore.currencyExposure ?? {}));
+  });
 </script>
 
-<div class="page-root">
+<div class="analysis-page">
 
-  <!-- ── Page header ──────────────────────────────────────────────────────────── -->
-  <div style="margin-bottom:20px">
-    <div class="h-eyebrow" style="margin-bottom:4px">Analyse</div>
-    <div class="h-xl">Prestaties &amp; risico</div>
+  <!-- ── Header ── -->
+  <div class="head-row">
+    <h1 class="page-title">Analysis</h1>
+    <a href={resolve('/settings')} class="gear-btn" title="Settings" aria-label="Settings">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </a>
   </div>
 
   {#if portfolioStore.loaded && portfolioStore.positions.length > 0}
 
-    <!-- ── KPI strip ──────────────────────────────────────────────────────────── -->
-    <div class="kpi-grid">
-      <div class="card kpi-card">
-        <div class="h-eyebrow">TWR{startYear() ? ` SINDS ${startYear()}` : ''}</div>
-        <div class="kpi-val mono {(twr() ?? 0) >= 0 ? 'c-pos' : 'c-neg'}">
-          <PrivacyValue value={twr() != null ? `${(twr()! >= 0 ? '+' : '')}${twr()!.toFixed(1)}%` : '—'} />
+    <!-- ── Performance ── -->
+    <section class="perf-grid">
+      <div>
+        <div class="kpi-label">Total return (TWR)</div>
+        <div class="kpi-value mono {twr != null ? (twr >= 0 ? 'c-pos' : 'c-neg') : 'null-val'}">
+          <PrivacyValue value={twr != null ? fmtPct1(twr) : '–'} />
         </div>
-        <div class="h-sm">Tijd-gewogen</div>
+        <div class="kpi-sub">{twrSub()}</div>
       </div>
-
-      <div class="card kpi-card">
-        <div class="h-eyebrow">IRR (GELD-GEWOGEN)</div>
-        <div class="kpi-val mono {(portfolioStore.irrPct ?? 0) >= 0 ? 'c-pos' : 'c-neg'}">
-          <PrivacyValue value={portfolioStore.irrPct != null ? fmtPct(portfolioStore.irrPct) : '—'} />
+      <div>
+        <div class="kpi-label">Annualized (IRR)</div>
+        <div class="kpi-value mono {irr != null ? (irr >= 0 ? 'c-pos' : 'c-neg') : 'null-val'}">
+          <PrivacyValue value={irr != null ? fmtPct1(irr) : '–'} />
         </div>
-        <div class="h-sm">Jaarlijks</div>
+        <div class="kpi-sub">money-weighted</div>
       </div>
+    </section>
 
-      {#if rm}
-        <div class="card kpi-card">
-          <div class="h-eyebrow">SHARPE</div>
-          <div class="kpi-val mono">{rm.sharpe != null ? fmtNum(rm.sharpe) : '—'}</div>
-          <div class="h-sm">Rendement / risico</div>
-        </div>
-
-        <div class="card kpi-card">
-          <div class="h-eyebrow">MAX DRAWDOWN</div>
-          <div class="kpi-val mono c-neg">
-            <PrivacyValue value={rm.maxDrawdown != null ? fmtPct(rm.maxDrawdown) : '—'} />
+    <!-- ── Return by position ── -->
+    <section>
+      <div class="sect-head">
+        <h2 class="sect-title">Return by position</h2>
+        <span class="sect-hint">% since purchase</span>
+      </div>
+      {#each returnBars() as b (b.ticker)}
+        <div class="ret-row">
+          <div class="ret-id">
+            <span class="tdot" style="background:{b.color}"></span>
+            <span class="ret-ticker">{b.ticker}</span>
           </div>
-          <div class="h-sm">Worst stretch</div>
-        </div>
-      {/if}
-    </div>
-
-    <!-- ── Rolling returns + Risk profile ─────────────────────────────────────── -->
-    <div class="analysis-split">
-
-      <!-- Rolling returns chart -->
-      <div class="card">
-        <div class="split-card-head">
-          <div class="h-md">Rolling returns</div>
-          <div class="h-sm" style="margin-top:1px">Portefeuille per periode</div>
-        </div>
-        {#if orderedRolling().length > 0}
-          <Chart option={rollingChartOption()} height="220px" />
-        {:else}
-          <div class="empty-msg">Geen rolling returns beschikbaar</div>
-        {/if}
-      </div>
-
-      <!-- Risk profile -->
-      <div class="card risk-card">
-        <div class="split-card-head">
-          <div class="h-md">Risico-profiel</div>
-        </div>
-        {#if riskBars().length > 0}
-          <div class="risk-bars">
-            {#each riskBars() as bar}
-              <div class="risk-row">
-                <div class="risk-label">{bar.label}</div>
-                <div class="risk-track">
-                  <div class="risk-fill" style="width:{bar.barPct}%;background:{bar.color}"></div>
-                </div>
-                <div class="risk-val mono" style="color:{bar.color}">{bar.display}</div>
-              </div>
-            {/each}
+          <div class="ret-track">
+            <div class="ret-zero" style="left:{b.zeroLeft}%"></div>
+            <div class="ret-bar {b.pos ? 'pos' : 'neg'}" style="left:{b.barLeft}%; width:{b.barWidth}%"></div>
           </div>
-          {#if rm}
-            <div class="risk-extra">
-              <div class="risk-extra-row">
-                <span class="h-sm">Sortino</span>
-                <span class="mono" style="font-size:12px;font-weight:600">{rm.sortino != null ? fmtNum(rm.sortino) : '—'}</span>
-              </div>
-              <div class="risk-extra-row">
-                <span class="h-sm">Calmar</span>
-                <span class="mono" style="font-size:12px;font-weight:600">{rm.calmar != null ? fmtNum(rm.calmar) : '—'}</span>
-              </div>
-              <div class="risk-extra-row">
-                <span class="h-sm">Gerealiseerd</span>
-                <span class="mono {portfolioStore.realizedPl >= 0 ? 'c-pos' : 'c-neg'}" style="font-size:12px;font-weight:600">
-                  <PrivacyValue value={`${portfolioStore.realizedPl >= 0 ? '+' : ''}${fmt(portfolioStore.realizedPl)}`} />
-                </span>
-              </div>
+          <div class="ret-pct mono {b.pos ? 'c-pos' : 'c-neg'}">{b.pctStr}</div>
+        </div>
+      {/each}
+    </section>
+
+    <!-- ── Rolling returns ── -->
+    <section>
+      <h2 class="sect-title" style="margin-bottom:8px">Rolling returns</h2>
+      <div class="rr-grid">
+        {#each rollingTiles() as t (t.label)}
+          {#if t.value != null}
+            <div class="rr-tile" class:tint-pos={t.value >= 0} class:tint-neg={t.value < 0}>
+              <div class="rr-val mono {t.value >= 0 ? 'c-pos' : 'c-neg'}">{fmtPct1(t.value)}</div>
+              <div class="rr-period">{t.label}</div>
+            </div>
+          {:else}
+            <div class="rr-tile tint-null">
+              <div class="rr-val mono null-val">–</div>
+              <div class="rr-period">{t.label}</div>
             </div>
           {/if}
-          {#if riskNarrative()}
-            <div class="risk-narrative">{riskNarrative()}</div>
-          {/if}
-        {:else}
-          <div class="empty-msg">Onvoldoende data</div>
-        {/if}
+        {/each}
       </div>
+    </section>
 
-    </div>
-
-    <!-- ── Allocation panels ──────────────────────────────────────────────────── -->
-    <div class="alloc-grid">
-      {#each [
-        { title: 'Sector', items: sectorItems() },
-        { title: 'Regio',  items: geoItems() },
-        { title: 'Munt',   items: currencyItems() },
-      ] as panel}
-        <div class="card alloc-card">
-          <div class="h-md" style="margin-bottom:10px">{panel.title}</div>
-          <!-- Stacked bar -->
-          <div class="alloc-stack">
-            {#each panel.items as item}
-              <div class="alloc-seg" style="width:{item.pct}%;background:{item.color}"></div>
-            {/each}
+    <!-- ── Risk ── -->
+    <section>
+      <h2 class="sect-title" style="margin-bottom:2px">Risk</h2>
+      {#each riskRows() as r (r.label)}
+        <div class="risk-row">
+          <div>
+            <div class="risk-label">{r.label}</div>
+            <div class="risk-sub">{r.sub}</div>
           </div>
-          <!-- List -->
-          <div class="alloc-list">
-            {#each panel.items as item}
-              <div class="alloc-row">
-                <span class="dot" style="background:{item.color}"></span>
-                <span class="alloc-name">{item.name}</span>
-                <span class="alloc-pct mono">{item.pct.toFixed(1)}%</span>
-              </div>
-            {/each}
+          <div class="risk-val mono" class:c-neg={r.neg && r.value != null} class:null-val={r.value == null}>
+            {r.value ?? '–'}
           </div>
         </div>
       {/each}
-    </div>
-
-    <!-- ── Bijdrage aan rendement ──────────────────────────────────────────────── -->
-    {#if contributionItems().length > 0}
-      <div class="card contrib-card">
-        <div style="padding:14px 18px 12px;border-bottom:1px solid var(--border)">
-          <div class="h-md">Bijdrage aan rendement</div>
-          <div class="h-sm" style="margin-top:2px">Welke posities dreven de performance</div>
+      {#if concentrationPct() != null}
+        <div class="conc-note">
+          Concentration: {concentrationPct()}% of the portfolio sits in 3 names.
         </div>
-        {#each contributionItems() as item}
-          <div class="contrib-row">
-            <span class="dot" style="background:{getColor(item.ticker)}"></span>
-            <span class="contrib-ticker">{item.ticker}</span>
-            <div class="contrib-track">
-              <div class="contrib-fill {item.pl >= 0 ? 'pos' : 'neg'}" style="width:{item.barPct}%"></div>
-              <span class="contrib-amount mono {item.pl >= 0 ? 'c-pos' : 'c-neg'}">
-                <PrivacyValue value={fmtContrib(item.pl)} />
-              </span>
-            </div>
-            <span class="contrib-pct mono {item.plPct >= 0 ? 'c-pos' : 'c-neg'}">{fmtPct(item.plPct)}</span>
-          </div>
-        {/each}
+      {/if}
+    </section>
+
+    <!-- ── Allocation ── -->
+    <section>
+      <div class="sect-head center" style="margin-bottom:10px">
+        <h2 class="sect-title">Allocation</h2>
+        <PeriodPills options={DIM_OPTIONS} selected={dim} onselect={setDim} size="small" />
       </div>
-    {/if}
+      <AllocationBar items={allocItems()} legend="rows" />
+    </section>
 
   {:else if portfolioStore.loaded}
-    <div class="empty-msg" style="padding:32px 0">Voeg transacties toe om de analyse te zien.</div>
+    <div class="empty-msg">Add transactions to see the analysis.</div>
   {/if}
 
 </div>
 
 <style>
-  /* ── KPI strip ──────────────────────── */
-  .kpi-grid {
+  .analysis-page {
+    padding: 14px 20px 90px;
+    max-width: 560px;
+    margin: 0 auto;
+    background: var(--bg);
+  }
+  .analysis-page section { margin-bottom: 24px; }
+  .analysis-page section:last-child { margin-bottom: 0; }
+
+  .mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-feature-settings: 'tnum', 'zero';
+  }
+  .c-pos { color: var(--c-pos); }
+  .c-neg { color: var(--c-neg); }
+  .null-val { color: var(--fg-faint); }
+
+  /* ── Header ── */
+  .head-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .page-title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .gear-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-hover);
+    color: var(--fg);
+    text-decoration: none;
+    transition: background 0.12s;
+  }
+  .gear-btn:hover { background: var(--surface-3); }
+
+  /* ── Section headers ── */
+  .sect-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .sect-head.center { align-items: center; }
+  .sect-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .sect-hint { font-size: 11px; color: var(--fg-faint); }
+
+  /* ── Performance ── */
+  .perf-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
-    margin-bottom: 12px;
   }
-  .kpi-card { padding: 16px 18px; }
-  .kpi-val {
-    font-size: 26px; font-weight: 700;
-    letter-spacing: -0.03em; line-height: 1;
-    margin: 6px 0 4px;
+  .kpi-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fg-faint);
+    margin-bottom: 4px;
+  }
+  .kpi-value {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--fg-faint);
+    margin-top: 2px;
   }
 
-  @media (max-width: 860px) { .kpi-grid { grid-template-columns: 1fr 1fr; } }
-  @media (max-width: 480px) { .kpi-grid { grid-template-columns: 1fr 1fr; } .kpi-val { font-size: 20px; } }
-
-  /* ── Rolling + Risk split ───────────── */
-  .analysis-split {
+  /* ── Return by position ── */
+  .ret-row {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 12px;
-    margin-bottom: 12px;
+    grid-template-columns: 44px 1fr 58px;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
   }
-  .split-card-head { padding: 14px 16px 10px; }
-  .risk-card { display: flex; flex-direction: column; }
+  .ret-id { display: flex; align-items: center; gap: 6px; }
+  .tdot {
+    width: 6px;
+    height: 6px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .ret-ticker { font-size: 12px; font-weight: 700; }
+  .ret-track { position: relative; height: 14px; }
+  .ret-zero {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--border-2);
+  }
+  .ret-bar {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    border-radius: 3px;
+  }
+  .ret-bar.pos { background: color-mix(in srgb, var(--c-pos) 55%, transparent); }
+  .ret-bar.neg { background: color-mix(in srgb, var(--c-neg) 55%, transparent); }
+  .ret-pct {
+    font-size: 11.5px;
+    font-weight: 600;
+    text-align: right;
+  }
 
-  /* Risk bars */
-  .risk-bars { padding: 4px 16px 8px; }
+  /* ── Rolling returns ── */
+  .rr-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+  }
+  .rr-tile {
+    text-align: center;
+    padding: 10px 2px;
+    border-radius: 10px;
+  }
+  .rr-tile.tint-pos { background: var(--c-pos-tint); }
+  .rr-tile.tint-neg { background: var(--c-neg-tint); }
+  .rr-tile.tint-null { background: var(--surface-2); }
+  .rr-val { font-size: 12px; font-weight: 700; }
+  .rr-period {
+    font-size: 10px;
+    color: var(--fg-faint);
+    margin-top: 3px;
+  }
+
+  /* ── Risk ── */
   .risk-row {
-    display: grid;
-    grid-template-columns: 120px 1fr 56px;
-    align-items: center; gap: 10px;
-    padding: 7px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--hairline);
   }
-  .risk-label { font-size: 11px; color: var(--fg-muted); white-space: nowrap; }
-  .risk-track {
-    height: 6px; border-radius: 3px;
-    background: var(--surface-2); overflow: hidden;
+  .risk-label { font-size: 12.5px; font-weight: 500; }
+  .risk-sub {
+    font-size: 10.5px;
+    color: var(--fg-faint);
+    margin-top: 1px;
   }
-  .risk-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
-  .risk-val { font-size: 12px; font-weight: 700; text-align: right; }
+  .risk-val { font-size: 13px; font-weight: 600; }
 
-  /* Extra small stats */
-  .risk-extra {
-    margin: 2px 16px 0;
-    padding: 8px 0;
-    border-top: 1px solid var(--border);
-    display: flex; gap: 0; flex-direction: column;
-  }
-  .risk-extra-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 4px 0;
-  }
-
-  .risk-narrative {
-    margin: 0 16px 14px;
+  .conc-note {
+    margin-top: 10px;
     padding: 10px 12px;
-    background: var(--surface-2); border-radius: 8px;
-    font-size: 12px; color: var(--fg-muted); line-height: 1.5;
+    background: var(--warn-tint);
+    border-radius: 10px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--warn-fg);
   }
 
-  @media (max-width: 700px) {
-    .analysis-split { grid-template-columns: 1fr; }
-    .risk-row { grid-template-columns: 100px 1fr 52px; }
+  /* ── Misc ── */
+  .empty-msg {
+    padding: 32px 0;
+    text-align: center;
+    font-size: 13px;
+    color: var(--fg-muted);
   }
-
-  /* ── Allocation panels ──────────────── */
-  .alloc-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-  .alloc-card { padding: 14px 16px 12px; }
-  .alloc-stack {
-    height: 7px; border-radius: 999px;
-    display: flex; overflow: hidden; gap: 2px;
-    margin-bottom: 12px;
-  }
-  .alloc-seg { height: 100%; min-width: 2px; }
-  .alloc-list { display: flex; flex-direction: column; gap: 6px; }
-  .alloc-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-  .alloc-name { flex: 1; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .alloc-pct  { font-size: 11px; font-weight: 600; color: var(--fg); min-width: 40px; text-align: right; }
-
-  @media (max-width: 640px) { .alloc-grid { grid-template-columns: 1fr; } }
-
-  /* ── Contribution ───────────────────── */
-  .contrib-card { overflow: hidden; }
-  .contrib-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 18px;
-    border-bottom: 1px solid var(--border);
-  }
-  .contrib-row:last-child { border-bottom: none; }
-  .contrib-ticker { font-size: 12px; font-weight: 700; width: 52px; flex-shrink: 0; }
-  .contrib-track {
-    flex: 1; position: relative; height: 26px;
-    background: var(--surface-2); border-radius: 5px; overflow: hidden;
-    display: flex; align-items: center;
-  }
-  .contrib-fill {
-    position: absolute; left: 0; top: 0; height: 100%; border-radius: 5px;
-    transition: width 0.3s;
-  }
-  .contrib-fill.pos { background: var(--c-pos-bg-strong); }
-  .contrib-fill.neg { background: var(--c-neg-bg-strong); }
-  .contrib-amount {
-    position: relative; z-index: 1;
-    padding: 0 8px; font-size: 11px; font-weight: 700;
-    white-space: nowrap;
-  }
-  .contrib-pct { font-size: 11px; font-weight: 700; min-width: 54px; text-align: right; flex-shrink: 0; }
-
-  @media (max-width: 640px) {
-    .contrib-ticker { width: 40px; }
-    .contrib-pct { min-width: 44px; }
-    .risk-row { grid-template-columns: 90px 1fr 48px; }
-  }
-
-  /* ── Misc ───────────────────────────── */
-  .empty-msg { padding: 24px; text-align: center; font-size: 13px; color: var(--fg-muted); }
-  .mono { font-family: 'JetBrains Mono', monospace; }
 </style>
