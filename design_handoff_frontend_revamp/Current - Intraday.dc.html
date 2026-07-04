@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="./mock.js"></script>
+  <style>
+    body { margin: 0; background: #fafaf8; }
+  </style>
+</helmet>
+<div data-screen-label="Current Intraday (mobile)" style="width:390px; min-height:844px; background:#fafaf8; color:#101216; font-family:Inter,ui-sans-serif,system-ui,sans-serif; letter-spacing:-0.005em; margin:0 auto">
+  <div style="padding:16px 16px 90px">
+
+    <!-- Day summary -->
+    <div style="display:flex; align-items:center; gap:12px; padding:12px 16px; margin-bottom:16px; flex-wrap:wrap; background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04)">
+      <div style="font-size:12px; color:#6a6f78">Vandaag</div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:600; color:{{ dayColor }}">{{ dayPlStr }}</div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:13px; color:{{ dayColor }}">{{ dayPctStr }}</div>
+      <div style="margin-left:auto; font-size:11px; color:#6a6f78; font-family:'JetBrains Mono',monospace">EUR/USD 1.1690</div>
+    </div>
+
+    <!-- Spark card grid (NOTE: different card design vs dashboard grid view) -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+      <sc-for list="{{ cards }}" as="c" hint-placeholder-count="6">
+        <div style="padding:12px 14px; background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04); min-width:0; overflow:hidden">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px">
+            <div style="font-size:13px; font-weight:700">{{ c.ticker }}</div>
+            <span style="font-size:9px; font-weight:600; letter-spacing:0.05em; padding:2px 5px; border-radius:3px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; background:{{ c.badgeBg }}; color:{{ c.badgeColor }}">{{ c.badge }}</span>
+          </div>
+          <div style="font-size:11px; color:#6a6f78; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ c.label }}</div>
+          <div style="display:flex; align-items:baseline; gap:6px; margin-top:6px">
+            <span style="font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:600">{{ c.priceStr }}</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:{{ c.chgColor }}">{{ c.chgPctStr }}</span>
+          </div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:12px; margin-top:2px; color:{{ c.chgColor }}">{{ c.chgEurStr }}</div>
+          <svg width="100%" height="38" viewBox="0 0 200 38" preserveAspectRatio="none" style="display:block; margin-top:8px" opacity="{{ c.opacity }}">
+            <line x1="0" y1="{{ c.zeroY }}" x2="200" y2="{{ c.zeroY }}" stroke="rgba(128,128,128,0.2)" stroke-width="1"></line>
+            <path d="{{ c.fill }}" fill="{{ c.fillColor }}"></path>
+            <path d="{{ c.line }}" fill="none" stroke="{{ c.stroke }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 390, &quot;height&quot;: 900}}">
+class Component extends DCLogic {
+  state = { ready: false };
+  componentDidMount() {
+    const check = () => {
+      if (window.PT_MOCK) this.setState({ ready: true });
+      else setTimeout(check, 60);
+    };
+    check();
+  }
+
+  renderVals() {
+    const M = window.PT_MOCK;
+    if (!M) return { cards: [], dayPlStr: '', dayPctStr: '', dayColor: '#047857' };
+    const posC = '#4ade80', negC = '#f87171';
+    const T = M.totals;
+
+    const cards = M.POSITIONS.map((p) => {
+      const intra = M.intraday[p.ticker];
+      const W = 200, H = 38, padY = 3;
+      const prev = intra.prevClose;
+      const pcts = intra.points.map((q) => ((q.close - prev) / prev) * 100);
+      const min = Math.min(0, ...pcts), max = Math.max(0, ...pcts);
+      const range = max - min || 0.1;
+      const total = intra.close - intra.open;
+      const xs = intra.points.map((q) => Math.min(W, Math.max(0, ((q.min - intra.open) / total) * W)));
+      const ys = pcts.map((v) => H - padY - ((v - min) / range) * (H - 2 * padY));
+      const line = xs.map((x, i) => (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + ys[i].toFixed(1)).join(' ');
+      const fill = line + ' L' + xs[xs.length - 1].toFixed(1) + ' ' + H + ' L' + xs[0].toFixed(1) + ' ' + H + ' Z';
+      const zeroY = (H - padY - ((-min) / range) * (H - 2 * padY)).toFixed(1);
+      const up = pcts[pcts.length - 1] >= 0;
+      const stroke = up ? posC : negC;
+      const open = intra.marketState === 'REGULAR';
+      return {
+        ticker: p.ticker, label: p.label,
+        badge: open ? 'Open' : 'Gesloten',
+        badgeBg: open ? 'rgba(74,222,128,0.15)' : 'rgba(100,116,139,0.15)',
+        badgeColor: open ? '#4ade80' : '#64748b',
+        priceStr: p.price.toFixed(2),
+        chgPctStr: (p.dayPlPct >= 0 ? '+' : '') + p.dayPlPct.toFixed(2) + '%',
+        chgEurStr: (p.dayPl >= 0 ? '+' : '-') + '€ ' + Math.round(Math.abs(p.dayPl)).toLocaleString('nl-BE'),
+        chgColor: p.dayPlPct >= 0 ? '#047857' : '#b91c1c',
+        line, fill, zeroY,
+        stroke,
+        fillColor: up ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)',
+        opacity: open ? '1' : '0.45',
+      };
+    });
+
+    return {
+      cards,
+      dayPlStr: (T.dayPl >= 0 ? '+' : '-') + '€ ' + Math.round(Math.abs(T.dayPl)).toLocaleString('nl-BE'),
+      dayPctStr: (T.dayPlPct >= 0 ? '+' : '') + T.dayPlPct.toFixed(2) + '%',
+      dayColor: T.dayPl >= 0 ? '#047857' : '#b91c1c',
+    };
+  }
+}
+
+</script>
+</body>
+</html>

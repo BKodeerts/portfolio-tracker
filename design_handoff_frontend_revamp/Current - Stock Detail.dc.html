@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="./mock.js"></script>
+  <style>
+    body { margin: 0; background: #fafaf8; }
+  </style>
+</helmet>
+<div data-screen-label="Current Stock Detail (mobile)" style="width:390px; min-height:844px; background:#fafaf8; color:#101216; font-family:Inter,ui-sans-serif,system-ui,sans-serif; letter-spacing:-0.005em; margin:0 auto">
+  <div style="padding:0 16px 90px">
+
+    <!-- ── Mobile topbar ── -->
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0 6px">
+      <div style="width:40px; height:40px; border-radius:50%; background:#f6f6f2; display:flex; align-items:center; justify-content:center; color:#101216; cursor:pointer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px">
+        <span style="width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; opacity:0.85; background:#6366f1">AS</span>
+        <span style="font-size:16px; font-weight:700">ASTS</span>
+      </div>
+      <div style="width:40px; height:40px; border-radius:50%; background:#f6f6f2; display:flex; align-items:center; justify-content:center; color:#101216; cursor:pointer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>
+      </div>
+    </div>
+
+    <!-- ── Hero: label, big EUR value (position!), P&L pill ── -->
+    <div style="padding:4px 0 12px">
+      <div style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#6a6f78; margin-bottom:6px">AST SPACEMOBILE</div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:36px; font-weight:700; letter-spacing:-0.02em; line-height:1.1; margin-bottom:8px">{{ heroValue }}</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+        <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:12px; font-weight:600; background:rgba(4,120,87,0.12); color:#047857">▲ {{ plPct }}</span>
+        <span style="font-size:13px; font-weight:500; color:#047857">{{ plTotal }} totaal</span>
+      </div>
+    </div>
+
+    <!-- ── Chart (full-bleed on mobile) ── -->
+    <div style="margin:0 -16px">
+      <sc-if value="{{ is1d }}" hint-placeholder-val="{{ false }}">
+        <svg width="390" height="240" viewBox="0 0 390 240" style="display:block">
+          <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="5">
+            <line x1="56" x2="374" y1="{{ g.y }}" y2="{{ g.y }}" stroke="rgba(0,0,0,0.06)" stroke-width="1"></line>
+            <text x="50" y="{{ g.labelY }}" text-anchor="end" font-size="10" fill="#8b929c" font-family="JetBrains Mono, monospace">{{ g.label }}</text>
+          </sc-for>
+          <line x1="56" x2="374" y1="{{ zeroY }}" y2="{{ zeroY }}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 4"></line>
+          <path d="{{ areaPath }}" fill="url(#sdGrad)"></path>
+          <path d="{{ linePath }}" fill="none" stroke="{{ lineColor }}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+          <sc-for list="{{ xTicks }}" as="x" hint-placeholder-count="4">
+            <text x="{{ x.x }}" y="232" text-anchor="middle" font-size="9" fill="#8b929c" font-family="JetBrains Mono, monospace">{{ x.label }}</text>
+          </sc-for>
+          <defs>
+            <linearGradient id="sdGrad" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="{{ lineColor }}" stop-opacity="0.2"></stop>
+              <stop offset="100%" stop-color="{{ lineColor }}" stop-opacity="0.02"></stop>
+            </linearGradient>
+          </defs>
+        </svg>
+      </sc-if>
+      <sc-if value="{{ isHist }}" hint-placeholder-val="{{ true }}">
+        <svg width="390" height="240" viewBox="0 0 390 240" style="display:block">
+          <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="5">
+            <line x1="56" x2="374" y1="{{ g.y }}" y2="{{ g.y }}" stroke="rgba(0,0,0,0.06)" stroke-width="1"></line>
+            <text x="50" y="{{ g.labelY }}" text-anchor="end" font-size="10" fill="#8b929c" font-family="JetBrains Mono, monospace">{{ g.label }}</text>
+          </sc-for>
+          <path d="{{ areaPath }}" fill="url(#sdGrad2)"></path>
+          <path d="{{ linePath }}" fill="none" stroke="{{ lineColor }}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+          <sc-for list="{{ xTicks }}" as="x" hint-placeholder-count="4">
+            <text x="{{ x.x }}" y="232" text-anchor="middle" font-size="9" fill="#8b929c" font-family="JetBrains Mono, monospace">{{ x.label }}</text>
+          </sc-for>
+          <defs>
+            <linearGradient id="sdGrad2" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="{{ lineColor }}" stop-opacity="0.2"></stop>
+              <stop offset="100%" stop-color="{{ lineColor }}" stop-opacity="0.02"></stop>
+            </linearGradient>
+          </defs>
+        </svg>
+      </sc-if>
+    </div>
+
+    <!-- ── Chart mode toggle (Koers / Waarde) ── -->
+    <div style="display:flex; gap:6px; margin-top:12px">
+      <div onClick="{{ setModeKoers }}" style="padding:5px 12px; font-size:11px; font-weight:600; border:1px solid {{ koersBorder }}; cursor:pointer; color:{{ koersColor }}; border-radius:999px; background:{{ koersBg }}">Koers</div>
+      <div onClick="{{ setModeWaarde }}" style="padding:5px 12px; font-size:11px; font-weight:600; border:1px solid {{ waardeBorder }}; cursor:pointer; color:{{ waardeColor }}; border-radius:999px; background:{{ waardeBg }}">Waarde</div>
+    </div>
+
+    <!-- ── Period selector ── -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin:12px 0; padding:4px; background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04)">
+      <sc-for list="{{ periods }}" as="p" hint-placeholder-count="6">
+        <div onClick="{{ p.select }}" style="flex:1; padding:7px 4px; font-size:12px; cursor:pointer; color:{{ p.color }}; border-radius:8px; text-align:center; background:{{ p.bg }}; font-weight:{{ p.weight }}">{{ p.label }}</div>
+      </sc-for>
+    </div>
+
+    <!-- ── 2×2 stat cards ── -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px">
+      <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04); padding:14px 16px">
+        <div style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#6a6f78; margin-bottom:6px">Aantal</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:700; line-height:1.1; margin-bottom:3px">120</div>
+        <div style="font-size:12px; color:#6a6f78">USD 53.42</div>
+      </div>
+      <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04); padding:14px 16px">
+        <div style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#6a6f78; margin-bottom:6px">Gem. kost</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:700; line-height:1.1; margin-bottom:3px">USD 26.35</div>
+        <div style="font-size:12px; color:#6a6f78">€ 2.892</div>
+      </div>
+      <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04); padding:14px 16px">
+        <div style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#6a6f78; margin-bottom:6px">Vandaag</div>
+        <div style="font-size:20px; font-weight:700; line-height:1.1; margin-bottom:3px; color:#047857">€ +168</div>
+        <div style="font-size:12px; color:#047857">+3.17%</div>
+      </div>
+      <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04); padding:14px 16px">
+        <div style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#6a6f78; margin-bottom:6px">P&amp;L %</div>
+        <div style="font-size:20px; font-weight:700; line-height:1.1; margin-bottom:3px; color:#047857">+103.0%</div>
+        <div style="font-size:12px; color:#047857">+€ 2.980</div>
+      </div>
+    </div>
+
+    <!-- ── Extra stats: dividends ── -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px">
+      <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04); padding:14px 16px">
+        <div style="font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#6a6f78; margin-bottom:6px">Dividenden</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:700; line-height:1.1; margin-bottom:3px">€ 14</div>
+        <div style="font-size:12px; color:#6a6f78">totaal ontvangen</div>
+      </div>
+    </div>
+
+    <!-- ── Transactions ── -->
+    <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04); overflow:hidden">
+      <div style="font-size:15px; font-weight:700; padding:14px 16px 12px; border-bottom:1px solid rgba(16,18,22,0.08)">Laatste transacties</div>
+      <sc-for list="{{ txs }}" as="tx" hint-placeholder-count="3">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:11px 16px; border-bottom:1px solid rgba(16,18,22,0.08)">
+          <div style="display:flex; flex-direction:column; gap:2px">
+            <div style="font-size:13px; font-weight:600">{{ tx.kind }}</div>
+            <div style="font-size:11px; color:#6a6f78">{{ tx.date }}</div>
+          </div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600">{{ tx.costStr }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 390, &quot;height&quot;: 900}}">
+class Component extends DCLogic {
+  state = { period: '3m', mode: 'koers', ready: false };
+
+  componentDidMount() {
+    const check = () => {
+      if (window.PT_MOCK) this.setState({ ready: true });
+      else setTimeout(check, 60);
+    };
+    check();
+  }
+
+  fmt(v) {
+    const n = Math.round(Math.abs(v)).toLocaleString('nl-BE');
+    return (v < 0 ? '-' : '') + '€ ' + n;
+  }
+  path(pts) {
+    return pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  }
+
+  // deterministic pseudo candles for ASTS
+  candles(n) {
+    let a = 7;
+    const rng = () => { a = (a * 16807) % 2147483647; return (a % 1000) / 1000; };
+    const out = [];
+    let price = 18;
+    for (let i = 0; i < n; i++) {
+      price = Math.max(6, price * (1 + (rng() - 0.47) * 0.09));
+      out.push(price);
+    }
+    // scale so it ends at 53.42
+    const k = 53.42 / out[out.length - 1];
+    return out.map((v) => v * k);
+  }
+
+  renderVals() {
+    const M = window.PT_MOCK;
+    const { period, mode } = this.state;
+    const PERIODS = [['1m','1M'],['3m','3M'],['6m','6M'],['ytd','YTD'],['1y','1J'],['total','Max']];
+    const L = 56, R = 374, T2 = 14, B = 216;
+
+    let linePath = '', areaPath = '', gridLines = [], xTicks = [], zeroY = 0;
+    const lineColor = mode === 'waarde' ? '#6366f1' : '#6366f1';
+
+    if (M) {
+      const counts = { '1m': 22, '3m': 64, '6m': 128, ytd: 128, '1y': 253, total: 500 };
+      const n = counts[period] || 64;
+      let vals;
+      if (mode === 'waarde') {
+        const rows = M.chartData.filter((r) => r.positions.ASTS && r.positions.ASTS.shares > 0);
+        const take = Math.max(2, Math.min(rows.length, Math.round(n / 5)));
+        vals = rows.slice(-take).map((r) => r.positions.ASTS.value);
+      } else {
+        vals = this.candles(n);
+      }
+      let lo = Math.min(...vals), hi = Math.max(...vals);
+      const pad = (hi - lo) * 0.08 || 1;
+      lo -= pad; hi += pad;
+      const sx = (i) => L + (i / (vals.length - 1)) * (R - L);
+      const sy = (v) => T2 + (1 - (v - lo) / (hi - lo)) * (B - T2);
+      const pts = vals.map((v, i) => [sx(i), sy(v)]);
+      linePath = this.path(pts);
+      areaPath = linePath + ' L' + R + ' ' + B + ' L' + L + ' ' + B + ' Z';
+      gridLines = [];
+      for (let i = 0; i <= 4; i++) {
+        const v = hi - (i / 4) * (hi - lo);
+        gridLines.push({ y: sy(v), labelY: sy(v) + 3, label: mode === 'waarde' ? '€' + (v / 1000).toFixed(1) + 'k' : '$' + v.toFixed(0) });
+      }
+      const months = { '1m': ['Jun', 'Jul'], '3m': ['Apr', 'Mei', 'Jun', 'Jul'], '6m': ['Jan', 'Mrt', 'Mei', 'Jul'], ytd: ['Jan', 'Mrt', 'Mei', 'Jul'], '1y': ['Jul 25', 'Nov', 'Mrt', 'Jul'], total: ['2023', '2024', '2025', '2026'] };
+      const ms = months[period] || months['3m'];
+      xTicks = ms.map((m, i) => ({ x: L + (i / (ms.length - 1)) * (R - L - 20) + 10, label: m }));
+    }
+
+    const on = { bg: '#eceae3', color: '#101216', border: 'transparent' };
+    const off = { bg: 'transparent', color: '#6a6f78', border: 'rgba(16,18,22,0.08)' };
+    const k = mode === 'koers' ? on : off;
+    const w = mode === 'waarde' ? on : off;
+
+    return {
+      heroValue: M ? this.fmt(5872) : '',
+      plPct: '103.03%',
+      plTotal: '+€ 2.980',
+      is1d: false,
+      isHist: true,
+      linePath, areaPath, gridLines, xTicks, zeroY, lineColor,
+      setModeKoers: () => this.setState({ mode: 'koers' }),
+      setModeWaarde: () => this.setState({ mode: 'waarde' }),
+      koersBg: k.bg, koersColor: k.color, koersBorder: k.border,
+      waardeBg: w.bg, waardeColor: w.color, waardeBorder: w.border,
+      periods: PERIODS.map(([key, label]) => ({
+        label,
+        select: () => this.setState({ period: key }),
+        bg: period === key ? '#eceae3' : 'transparent',
+        color: period === key ? '#101216' : '#6a6f78',
+        weight: period === key ? '700' : '500',
+      })),
+      txs: [
+        { kind: 'Koop · 10 aandelen', date: '2026-06-14', costStr: '€ 447' },
+        { kind: 'Dividend', date: '2026-04-02', costStr: '€ 14' },
+        { kind: 'Koop · 45 aandelen', date: '2025-11-20', costStr: '€ 986' },
+        { kind: 'Koop · 65 aandelen', date: '2025-03-08', costStr: '€ 1.459' },
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

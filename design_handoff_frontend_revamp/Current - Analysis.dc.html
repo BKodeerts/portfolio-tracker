@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="./mock.js"></script>
+  <style>
+    body { margin: 0; background: #fafaf8; }
+  </style>
+</helmet>
+<div data-screen-label="Current Analysis (mobile)" style="width:390px; min-height:844px; background:#fafaf8; color:#101216; font-family:Inter,ui-sans-serif,system-ui,sans-serif; letter-spacing:-0.005em; margin:0 auto">
+  <div style="padding:16px 16px 90px">
+
+    <div style="margin-bottom:20px">
+      <div style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#6a6f78; margin-bottom:4px">Analyse</div>
+      <div style="font-size:28px; font-weight:600; letter-spacing:-0.03em; line-height:1.05">Prestaties &amp; risico</div>
+    </div>
+
+    <!-- KPI 2×2 -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+        <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04); padding:16px 18px">
+          <div style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#6a6f78">{{ k.label }}</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:700; letter-spacing:-0.03em; line-height:1; margin:6px 0 4px; color:{{ k.color }}">{{ k.value }}</div>
+          <div style="font-size:12px; font-weight:500; color:#6a6f78">{{ k.sub }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- Rolling returns -->
+    <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04); margin-bottom:12px">
+      <div style="padding:14px 16px 10px">
+        <div style="font-size:14px; font-weight:600; line-height:1.3">Rolling returns</div>
+        <div style="font-size:12px; font-weight:500; color:#6a6f78; margin-top:1px">Portefeuille per periode</div>
+      </div>
+      <svg width="358" height="200" viewBox="0 0 358 200" style="display:block">
+        <sc-for list="{{ rrGrid }}" as="g" hint-placeholder-count="4">
+          <line x1="44" x2="346" y1="{{ g.y }}" y2="{{ g.y }}" stroke="rgba(0,0,0,0.05)" stroke-width="1"></line>
+          <text x="38" y="{{ g.labelY }}" text-anchor="end" font-size="10" fill="#8b929c" font-family="JetBrains Mono, monospace">{{ g.label }}</text>
+        </sc-for>
+        <sc-for list="{{ rrBars }}" as="b" hint-placeholder-count="6">
+          <rect x="{{ b.x }}" y="{{ b.y }}" width="34" height="{{ b.h }}" rx="3" fill="{{ b.color }}"></rect>
+          <text x="{{ b.cx }}" y="{{ b.labelY }}" text-anchor="middle" font-size="9" font-weight="600" fill="{{ b.color }}" font-family="JetBrains Mono, monospace">{{ b.valLabel }}</text>
+          <text x="{{ b.cx }}" y="192" text-anchor="middle" font-size="10" fill="#8b929c" font-family="Inter, sans-serif">{{ b.period }}</text>
+        </sc-for>
+      </svg>
+    </div>
+
+    <!-- Risk profile -->
+    <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04); margin-bottom:12px">
+      <div style="padding:14px 16px 10px">
+        <div style="font-size:14px; font-weight:600; line-height:1.3">Risico-profiel</div>
+      </div>
+      <div style="padding:4px 16px 8px">
+        <sc-for list="{{ riskBars }}" as="r" hint-placeholder-count="4">
+          <div style="display:grid; grid-template-columns:100px 1fr 52px; align-items:center; gap:10px; padding:7px 0">
+            <div style="font-size:11px; color:#6a6f78; white-space:nowrap">{{ r.label }}</div>
+            <div style="height:6px; border-radius:3px; background:#f6f6f2; overflow:hidden">
+              <div style="height:100%; border-radius:3px; width:{{ r.width }}; background:{{ r.color }}"></div>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; text-align:right; color:{{ r.color }}">{{ r.display }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin:2px 16px 0; padding:8px 0; border-top:1px solid rgba(16,18,22,0.08); display:flex; flex-direction:column">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0">
+          <span style="font-size:12px; font-weight:500; color:#6a6f78">Sortino</span>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600">1.92</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0">
+          <span style="font-size:12px; font-weight:500; color:#6a6f78">Calmar</span>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600">0.90</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0">
+          <span style="font-size:12px; font-weight:500; color:#6a6f78">Gerealiseerd</span>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:#047857">+€ 384</span>
+        </div>
+      </div>
+      <div style="margin:0 16px 14px; padding:10px 12px; background:#f6f6f2; border-radius:8px; font-size:12px; color:#6a6f78; line-height:1.5">
+        Hoog rendement, gemiddelde volatiliteit, Concentratierisico: 63% van portefeuille in 3 namen.
+      </div>
+    </div>
+
+    <!-- Allocation panels -->
+    <sc-for list="{{ allocPanels }}" as="panel" hint-placeholder-count="3">
+      <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04); padding:14px 16px 12px; margin-bottom:12px">
+        <div style="font-size:14px; font-weight:600; margin-bottom:10px">{{ panel.title }}</div>
+        <div style="height:7px; border-radius:999px; display:flex; overflow:hidden; gap:2px; margin-bottom:12px">
+          <sc-for list="{{ panel.items }}" as="item" hint-placeholder-count="3">
+            <div style="height:100%; min-width:2px; width:{{ item.width }}; background:{{ item.color }}"></div>
+          </sc-for>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px">
+          <sc-for list="{{ panel.items }}" as="item" hint-placeholder-count="3">
+            <div style="display:flex; align-items:center; gap:8px; font-size:12px">
+              <span style="width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; background:{{ item.color }}"></span>
+              <span style="flex:1; color:#6a6f78; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ item.name }}</span>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; min-width:40px; text-align:right">{{ item.pctStr }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+
+    <!-- Contribution -->
+    <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.08); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.04); overflow:hidden">
+      <div style="padding:14px 18px 12px; border-bottom:1px solid rgba(16,18,22,0.08)">
+        <div style="font-size:14px; font-weight:600">Bijdrage aan rendement</div>
+        <div style="font-size:12px; font-weight:500; color:#6a6f78; margin-top:2px">Welke posities dreven de performance</div>
+      </div>
+      <sc-for list="{{ contribs }}" as="c" hint-placeholder-count="6">
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 18px; border-bottom:1px solid rgba(16,18,22,0.08)">
+          <span style="width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; background:{{ c.color }}"></span>
+          <span style="font-size:12px; font-weight:700; width:40px; flex-shrink:0">{{ c.ticker }}</span>
+          <div style="flex:1; position:relative; height:26px; background:#f6f6f2; border-radius:5px; overflow:hidden; display:flex; align-items:center">
+            <div style="position:absolute; left:0; top:0; height:100%; border-radius:5px; width:{{ c.width }}; background:{{ c.fillColor }}"></div>
+            <span style="position:relative; z-index:1; padding:0 8px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; white-space:nowrap; color:{{ c.textColor }}">{{ c.amount }}</span>
+          </div>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; min-width:44px; text-align:right; color:{{ c.textColor }}">{{ c.pctStr }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 390, &quot;height&quot;: 900}}">
+class Component extends DCLogic {
+  state = { ready: false };
+  componentDidMount() {
+    const check = () => {
+      if (window.PT_MOCK) this.setState({ ready: true });
+      else setTimeout(check, 60);
+    };
+    check();
+  }
+
+  renderVals() {
+    const M = window.PT_MOCK;
+    if (!M) return { kpis: [], rrGrid: [], rrBars: [], riskBars: [], allocPanels: [], contribs: [] };
+
+    const posC = '#047857', negC = '#b91c1c';
+
+    // rolling returns bar geometry: svg 358x200, plot 44..346 x 14..170
+    const rr = M.rollingReturns;
+    const maxV = Math.max(...rr.map((r) => Math.abs(r.portfolio)), 5);
+    const T = 24, B = 170;
+    const zeroFrac = maxV / (maxV + Math.min(0, Math.min(...rr.map((r) => r.portfolio)) * -1 + 5));
+    // simpler: symmetric-ish scale from -10..50
+    const lo = -10, hi = 50;
+    const sy = (v) => T + (1 - (v - lo) / (hi - lo)) * (B - T);
+    const zeroYv = sy(0);
+    const slotW = (346 - 44) / rr.length;
+    const rrBars = rr.map((r, i) => {
+      const x = 44 + i * slotW + (slotW - 34) / 2;
+      const y = r.portfolio >= 0 ? sy(r.portfolio) : zeroYv;
+      const h = Math.abs(sy(r.portfolio) - zeroYv);
+      return {
+        x, y, h: Math.max(1, h), cx: x + 17,
+        labelY: r.portfolio >= 0 ? y - 5 : y + h + 11,
+        color: r.portfolio >= 0 ? posC : negC,
+        valLabel: (r.portfolio >= 0 ? '+' : '') + r.portfolio.toFixed(1) + '%',
+        period: r.period,
+      };
+    });
+    const rrGrid = [0, 20, 40].map((v) => ({ y: sy(v), labelY: sy(v) + 3, label: v + '%' }));
+
+    return {
+      kpis: [
+        { label: 'TWR SINDS 2023', value: '+45.1%', sub: 'Tijd-gewogen', color: posC },
+        { label: 'IRR (GELD-GEWOGEN)', value: '+21.7%', sub: 'Jaarlijks', color: posC },
+        { label: 'SHARPE', value: '1.34', sub: 'Rendement / risico', color: '#101216' },
+        { label: 'MAX DRAWDOWN', value: '-28.4%', sub: 'Worst stretch', color: negC },
+      ],
+      rrGrid, rrBars,
+      riskBars: [
+        { label: 'Volatiliteit (1J)', display: '+24.6%', width: '18.9%', color: negC },
+        { label: 'Beta', display: '1.18', width: '59.0%', color: '#6366f1' },
+        { label: 'Sharpe', display: '1.34', width: '44.7%', color: posC },
+        { label: 'Annual return', display: '+21.7%', width: '21.7%', color: posC },
+      ],
+      allocPanels: [
+        { title: 'Sector', items: [
+          { name: 'Industrials', pct: 47.2, color: 'oklch(62% 0.14 255)' },
+          { name: 'Communication', pct: 23.3, color: '#8b5cf6' },
+          { name: 'ETF', pct: 21.0, color: '#14b8a6' },
+          { name: 'Energy', pct: 8.5, color: '#f59e0b' },
+        ]},
+        { title: 'Regio', items: [
+          { name: 'US', pct: 61.2, color: 'oklch(62% 0.14 255)' },
+          { name: 'Global', pct: 21.0, color: '#8b5cf6' },
+          { name: 'Europe', pct: 17.8, color: '#14b8a6' },
+        ]},
+        { title: 'Munt', items: [
+          { name: 'USD', pct: 61.2, color: 'oklch(62% 0.14 255)' },
+          { name: 'EUR', pct: 38.8, color: '#8b5cf6' },
+        ]},
+      ].map((p) => ({ ...p, items: p.items.map((i) => ({ ...i, width: i.pct + '%', pctStr: i.pct.toFixed(1) + '%' })) })),
+      contribs: [...M.POSITIONS].sort((a, b) => b.pl - a.pl).map((p) => {
+        const maxAbs = Math.max(...M.POSITIONS.map((q) => Math.abs(q.pl)));
+        return {
+          ticker: p.ticker, color: M.COLORS[p.ticker],
+          width: ((Math.abs(p.pl) / maxAbs) * 78).toFixed(1) + '%',
+          fillColor: p.pl >= 0 ? 'rgba(16,185,129,0.20)' : 'rgba(239,68,68,0.20)',
+          textColor: p.pl >= 0 ? posC : negC,
+          amount: (p.pl >= 0 ? '+' : '-') + '€ ' + Math.round(Math.abs(p.pl)).toLocaleString('nl-BE'),
+          pctStr: (p.plPct >= 0 ? '+' : '') + p.plPct.toFixed(1) + '%',
+        };
+      }),
+    };
+  }
+}
+
+</script>
+</body>
+</html>
