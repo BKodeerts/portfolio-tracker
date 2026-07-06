@@ -149,18 +149,17 @@ function makeAdjShares(meta, priceMaps, splitFactors, fxMaps) {
   };
 }
 
+/** Net (split-adjusted) shares held per ticker. */
 function computeNetShares(meta, transactions, adjSharesFn) {
-  const netShares = {}, buyInvested = {};
+  const netShares = {};
   for (const ticker of Object.keys(meta)) {
-    let net = 0, invested = 0;
+    let net = 0;
     for (const tx of transactions.filter(t => t.ticker === ticker && !isDividend(t))) {
       net += adjSharesFn(tx, ticker);
-      if (tx.shares > 0) invested += tx.costEur;
     }
-    netShares[ticker]   = net;
-    buyInvested[ticker] = invested;
+    netShares[ticker] = net;
   }
-  return { netShares, buyInvested };
+  return { netShares };
 }
 
 // ── Dividend helpers ──────────────────────────────────────────────────────────

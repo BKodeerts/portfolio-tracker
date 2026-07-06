@@ -117,12 +117,12 @@
   const marketState = $derived(normalizeMarketState(yahoo, rawState));
   const isOpen      = $derived(marketState === 'REGULAR');
 
-  // Live day P&L in EUR from intraday ticks; falls back to server-computed dayPl.
+  // Live day P&L in EUR from intraday ticks; null (rendered as —) without them.
   const dayPl = $derived.by((): number | null => {
     if (pos && prevClose != null && lastTick != null && pos.shares > 0) {
       return toEurLiveOrFallback(currency, pos.shares * (lastTick - prevClose), intradayStore.liveRates);
     }
-    return pos?.dayPl ?? null;
+    return null;
   });
 
   /* ── Period state (persisted per page) ── */
@@ -362,7 +362,8 @@
           {/if}
         </div>
         <div class="stat">
-          <div class="stat-label">Invested</div>
+          <!-- FIFO cost of the shares still held — not total deposits -->
+          <div class="stat-label">Cost basis</div>
           <div class="stat-val mono"><PrivacyValue value={fmtEur(cost)} /></div>
         </div>
         <div class="stat">

@@ -140,11 +140,10 @@ describe('computeNetShares / buildMeta / findEarliestDate', () => {
     { date: '2024-04-01', ticker: 'AAA', yahoo: 'AAA.DE', currency: 'EUR', shares: 0, costEur: 5, type: 'dividend' },
   ];
 
-  it('nets buys and sells, counting only buys as invested', () => {
+  it('nets buys and sells, ignoring dividend rows', () => {
     const meta = buildMeta(transactions);
-    const { netShares, buyInvested } = computeNetShares(meta, transactions, noAdj);
+    const { netShares } = computeNetShares(meta, transactions, noAdj);
     expect(netShares.AAA).toBe(12);
-    expect(buyInvested.AAA).toBe(140);
   });
 
   it('buildMeta forces EUR currency for manually-priced tickers', () => {

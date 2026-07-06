@@ -220,7 +220,12 @@ export function getDay1Pl(): { pl: number; pct: number } | null {
   return { pl: diff, pct: (diff / prevCloseTotal) * 100 };
 }
 
-/** P&L over an already period-filtered chart-data slice. */
+/**
+ * P&L over an already period-filtered chart-data slice: the change in
+ * unrealized P&L (value − cost basis), so deposits/withdrawals don't count.
+ * The % is relative to the portfolio value at the period start — the same
+ * base the 1D delta uses (prev close), not the cost basis.
+ */
 export function getPeriodPl(filtered: ChartPoint[]): { pl: number; pct: number } | null {
   if (filtered.length < 2) return null;
   const first = filtered[0]!;
@@ -230,7 +235,7 @@ export function getPeriodPl(filtered: ChartPoint[]): { pl: number; pct: number }
   const fi = first.invested ?? 0;
   const li = last.invested ?? 0;
   const pl   = (lv - li) - (fv - fi);
-  const base = li > 0 ? li : fi;
+  const base = fv > 0 ? fv : li;
   return { pl, pct: base > 0 ? (pl / base) * 100 : 0 };
 }
 

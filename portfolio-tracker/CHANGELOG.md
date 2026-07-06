@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.8.4] — 2026-07-06
+
+### Calculation Fixes
+
+- **Rolling returns (1W/1M/3M/YTD/1Y) are now time-weighted** — deposits and withdrawals inside the window no longer count as portfolio performance. Previously a €1,000 deposit into a €10,000 portfolio showed up as "+10%" in the 1M tile. Benchmarks were already price returns, so portfolio vs benchmark is now a fair comparison on every tile.
+- **Risk metrics use flow-adjusted daily returns** — volatility, annualized return, Sharpe and beta no longer treat buy/sell days as price jumps; max drawdown is measured on the return index, so deposits can't mask a crash and withdrawals can't fake one. Annualized return is now TWR-consistent (was: CAGR of the contribution-inflated value series).
+- **Sortino ratio is now computed server-side** — the Analysis page row rendered "–" forever because the server never emitted it.
+- **HA/MQTT snapshot cost basis fixed** — `cost_basis`, unrealized P&L and P&L % sensors used gross buys (including shares already sold) instead of the FIFO cost basis of open shares, overstating cost after any sale. Now matches the dashboard's FIFO numbers.
+- **Dashboard period % uses the period-start value** — the hero delta % for 1M/3M/YTD/1Y/3Y divided by cost basis, roughly doubling the displayed move for a portfolio that has doubled. It now uses the same base convention as the 1D delta (previous close).
+- XIRR no longer assumes `transactions.json` is date-sorted; annual dividend totals clamp accidental negative entries the same way the dividend totals do.
+
+### Naming Fixes
+
+- Frontend `RiskMetrics` type now mirrors the server (`maxDrawdownPct`, `annualReturn`, `sortino`; dropped never-emitted `calmar`), removing the runtime field-name workaround on the Analysis page.
+- Analysis "Volatility" sub-label said "1Y, annualized" but the metric covers the full history — now "annualized, full history".
+- Stock page "Invested" stat renamed to "Cost basis" (it is the FIFO cost of the shares still held, not total deposits).
+- Day P&L placeholders: the dashboard no longer shows a fake "+€0 (+0.00%)" day delta while intraday data is still loading — the delta is hidden until real data arrives.
+
 ## [0.8.1] — 2026-07-03
 
 ### Bug Fixes

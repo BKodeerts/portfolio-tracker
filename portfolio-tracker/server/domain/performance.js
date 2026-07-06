@@ -8,30 +8,46 @@ const { isDividend } = require('./positions.js');
 const RISK_FREE_RATE = Number(process.env.RISK_FREE_RATE ?? 0.03);
 
 /**
- * Compute annualized risk metrics from chart history.
+ * Net external cash flow per date (EUR), TWR sign convention:
+ * buys are deposits (+), sells and dividends are withdrawals (−).
+ * Dividend cash never appears in chart values, so counting it as a
+ * withdrawal credits it to performance in the period it was paid.
  */
-function computeRiskMetrics(chartData, benchmarkData) {
+function netCashFlowByDate(transactions) {
+  const byDate = {};
+  for (const tx of transactions) {
+    const cf = tx.shares > 0 ? tx.costEur : -tx.costEur;
+    byDate[tx.date] = (byDate[tx.date] || 0) + cf;
+  }
+  return byDate;
+}
+
+/**
+ * Compute annualized risk metrics from chart history.
+ * Daily returns are flow-adjusted (deposits/withdrawals are not performance),
+ * so a buy no longer registers as a price jump in volatility or drawdown.
+ */
+function computeRiskMetrics(chartData, benchmarkData, transactions = []) {
   if (chartData.length < 30) return null;
 
-  // Daily portfolio returns
-  const portfolioReturns = [];
-  for (let i = 1; i < chartData.length; i++) {
-    const prev = chartData[i - 1].value;
-    const curr = chartData[i].value;
-    if (prev > 0) portfolioReturns.push((curr - prev) / prev);
-  }
-  if (portfolioReturns.length < 20) return null;
-
-  // Daily benchmark returns aligned to portfolio dates
+  const cfByDate = netCashFlowByDate(transactions);
   const benchMap = {};
   for (const b of benchmarkData) benchMap[b.date] = b.value;
 
+  // Daily flow-adjusted portfolio returns, benchmark returns aligned index-for-index
+  const portfolioReturns = [];
   const benchReturns = [];
   for (let i = 1; i < chartData.length; i++) {
+    const prev = chartData[i - 1].value;
+    const curr = chartData[i].value;
+    if (prev <= 0) continue;
+    const cf = cfByDate[chartData[i].date] || 0;
+    portfolioReturns.push((curr - cf - prev) / prev);
     const prevB = benchMap[chartData[i - 1].date];
     const currB = benchMap[chartData[i].date];
     benchReturns.push(prevB && currB && prevB > 0 ? (currB - prevB) / prevB : null);
   }
+  if (portfolioReturns.length < 20) return null;
 
   // Volatility (annualized std dev of daily returns)
   const n    = portfolioReturns.length;
@@ -39,12 +55,18 @@ function computeRiskMetrics(chartData, benchmarkData) {
   const variance = portfolioReturns.reduce((s, r) => s + (r - mean) ** 2, 0) / (n - 1);
   const volatility = Math.sqrt(variance * 252);
 
-  // Annualized return (CAGR)
-  const totalReturn  = chartData.at(-1).value / chartData[0].value;
-  const annualReturn = Math.pow(totalReturn, 252 / n) - 1;
+  // Annualized return: CAGR of the compounded flow-adjusted returns (TWR-consistent)
+  const totalReturn  = portfolioReturns.reduce((f, r) => f * (1 + r), 1);
+  const annualReturn = totalReturn > 0 ? Math.pow(totalReturn, 252 / n) - 1 : -1;
 
   // Sharpe ratio (configurable risk-free rate, default 3%)
   const sharpe = volatility > 0 ? (annualReturn - RISK_FREE_RATE) / volatility : null;
+
+  // Sortino ratio: like Sharpe, but only downside deviation counts as risk
+  const dailyRf      = RISK_FREE_RATE / 252;
+  const downsideVar  = portfolioReturns.reduce((s, r) => s + Math.min(0, r - dailyRf) ** 2, 0) / n;
+  const downsideDev  = Math.sqrt(downsideVar * 252);
+  const sortino      = downsideDev > 0 ? (annualReturn - RISK_FREE_RATE) / downsideDev : null;
 
   // Beta vs benchmark
   const aligned = portfolioReturns
@@ -59,27 +81,33 @@ function computeRiskMetrics(chartData, benchmarkData) {
     if (bVar > 0) beta = cov / bVar;
   }
 
-  // Max drawdown: largest peak-to-trough % decline in portfolio value
-  let maxDDPct = 0, runningPeak = chartData[0].value;
-  for (const row of chartData) {
-    if (row.value > runningPeak) runningPeak = row.value;
-    const dd = runningPeak > 0 ? (runningPeak - row.value) / runningPeak * 100 : 0;
+  // Max drawdown: largest peak-to-trough % decline of the flow-adjusted return
+  // index — deposits can't mask a crash and withdrawals can't fake one
+  let maxDDPct = 0, index = 1, peak = 1;
+  for (const r of portfolioReturns) {
+    index *= 1 + r;
+    if (index > peak) peak = index;
+    const dd = (peak - index) / peak * 100;
     if (dd > maxDDPct) maxDDPct = dd;
   }
 
   return {
     volatility:      Number.parseFloat((volatility * 100).toFixed(2)),
     annualReturn:    Number.parseFloat((annualReturn * 100).toFixed(2)),
-    sharpe:          sharpe != null ? Number.parseFloat(sharpe.toFixed(2)) : null,
-    beta:            beta   != null ? Number.parseFloat(beta.toFixed(2))   : null,
+    sharpe:          sharpe  != null ? Number.parseFloat(sharpe.toFixed(2))  : null,
+    sortino:         sortino != null ? Number.parseFloat(sortino.toFixed(2)) : null,
+    beta:            beta    != null ? Number.parseFloat(beta.toFixed(2))    : null,
     maxDrawdownPct:  Number.parseFloat(maxDDPct.toFixed(2)),
   };
 }
 
 /**
  * Compute rolling period returns for portfolio and benchmark.
+ * Portfolio returns are time-weighted (TWR over the period's chart slice),
+ * so deposits/withdrawals inside the window don't show up as performance —
+ * the same basis as the inception TWR and the benchmark price returns.
  */
-function computeRollingReturns(chartData, benchmarkData, sp500Data, twrPct = null) {
+function computeRollingReturns(chartData, benchmarkData, sp500Data, transactions = [], twrPct = null) {
   if (!chartData.length) return null;
 
   const latest   = chartData.at(-1);
@@ -91,22 +119,22 @@ function computeRollingReturns(chartData, benchmarkData, sp500Data, twrPct = nul
   const lastVwceDate  = benchmarkData.length ? benchmarkData.at(-1).date : null;
   const lastSp500Date = sp500Data.length     ? sp500Data.at(-1).date     : null;
 
-  function findStartRow(daysAgo) {
+  function findStartIdx(daysAgo) {
     const cutoff = new Date(today);
     cutoff.setDate(cutoff.getDate() - daysAgo);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
-    for (const row of chartData) {
-      if (row.date >= cutoffStr) return row;
+    for (let i = 0; i < chartData.length; i++) {
+      if (chartData[i].date >= cutoffStr) return i;
     }
-    return chartData[0];
+    return 0;
   }
 
-  function ytdRow() {
+  function ytdIdx() {
     const year = today.slice(0, 4);
-    for (const row of chartData) {
-      if (row.date >= `${year}-01-01`) return row;
+    for (let i = 0; i < chartData.length; i++) {
+      if (chartData[i].date >= `${year}-01-01`) return i;
     }
-    return chartData[0];
+    return 0;
   }
 
   const benchReturn = (map, lastDate, startRow) => {
@@ -114,25 +142,23 @@ function computeRollingReturns(chartData, benchmarkData, sp500Data, twrPct = nul
     return s && l ? Number.parseFloat(((l / s - 1) * 100).toFixed(2)) : null;
   };
 
-  function calcReturn(startRow) {
+  function calcReturn(startIdx) {
+    const startRow = chartData[startIdx];
     if (!startRow || startRow.date === latest.date) return null;
-    const portfolio = startRow.value > 0
-      ? Number.parseFloat(((latest.value / startRow.value - 1) * 100).toFixed(2))
-      : null;
     return {
-      portfolio,
+      portfolio: computeServerTWR(chartData.slice(startIdx), transactions),
       vwce:  benchReturn(vwceMap,  lastVwceDate,  startRow),
       sp500: benchReturn(sp500Map, lastSp500Date, startRow),
     };
   }
 
-  const inception0 = calcReturn(chartData[0]);
+  const inception0 = calcReturn(0);
   return {
-    '1w':        calcReturn(findStartRow(7)),
-    '1m':        calcReturn(findStartRow(30)),
-    '3m':        calcReturn(findStartRow(91)),
-    'ytd':       calcReturn(ytdRow()),
-    '1y':        calcReturn(findStartRow(365)),
+    '1w':        calcReturn(findStartIdx(7)),
+    '1m':        calcReturn(findStartIdx(30)),
+    '3m':        calcReturn(findStartIdx(91)),
+    'ytd':       calcReturn(ytdIdx()),
+    '1y':        calcReturn(findStartIdx(365)),
     'inception': { portfolio: twrPct, vwce: inception0?.vwce ?? null, sp500: inception0?.sp500 ?? null },
   };
 }
@@ -150,7 +176,9 @@ function computeAnnualPl(txsByTicker, adjSharesFn) {
     for (const tx of txs) {
       if (!isDividend(tx)) continue;
       const y = tx.date.slice(0, 4);
-      dividendsByYear[y] = (dividendsByYear[y] || 0) + tx.costEur;
+      // costEur must be positive for a dividend; guard against accidental
+      // negative entries (same clamp as computeDividends)
+      dividendsByYear[y] = (dividendsByYear[y] || 0) + Math.max(0, tx.costEur);
     }
     // Realized P&L per year via FIFO
     const sorted = [...txs].filter(tx => !isDividend(tx)).sort((a, b) => a.date.localeCompare(b.date));
@@ -198,7 +226,8 @@ function computeXIRR(transactions, currentValue) {
   flows.push({ amount: currentValue, t: Date.now() });
   if (flows.length < 2) return null;
 
-  const t0 = flows[0].t;
+  // Anchor year fractions at the earliest flow — transactions.json is not guaranteed sorted
+  const t0 = flows.reduce((min, f) => Math.min(min, f.t), Infinity);
   const cfs = flows.map(f => ({ amount: f.amount, years: (f.t - t0) / (365.25 * 86400000) }));
 
   const npv  = r => cfs.reduce((s, cf) => s + cf.amount / Math.pow(1 + r, cf.years), 0);
@@ -228,25 +257,22 @@ function computeXIRR(transactions, currentValue) {
 }
 
 /**
- * Time-weighted return (mirrors the client-side analyse.js logic).
- * Returns final TWR as a percentage.
+ * Time-weighted return over a chart-data slice: chains sub-period returns
+ * split at external cash flows (buys = deposits, sells/dividends = withdrawals).
+ * Returns final TWR as a percentage, or null for fewer than 2 points.
  */
 function computeServerTWR(chartData, transactions) {
   if (chartData.length < 2) return null;
 
-  const txByDate = {};
-  for (const tx of transactions) {
-    (txByDate[tx.date] = txByDate[tx.date] || []).push(tx);
-  }
+  const cfByDate = netCashFlowByDate(transactions);
 
   let twrFactor = 1.0;
   let subStart  = chartData[0].value;
 
   for (let i = 1; i < chartData.length; i++) {
-    const row       = chartData[i];
-    const txsToday  = txByDate[row.date];
-    if (txsToday?.length) {
-      const netCF        = txsToday.reduce((s, tx) => s + (tx.shares > 0 ? tx.costEur : -tx.costEur), 0);
+    const row   = chartData[i];
+    const netCF = cfByDate[row.date];
+    if (netCF !== undefined) {
       const valueBeforeCF = row.value - netCF;
       if (subStart > 0) twrFactor *= valueBeforeCF / subStart;
       subStart = row.value;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildChartData, buildBenchmarkData } from '../../server/domain/series.js';
+import { buildChartData, buildBenchmarkData, buildSnapshotPositions } from '../../server/domain/series.js';
 
 const noAdj = (tx) => tx.shares;
 
@@ -77,5 +77,22 @@ describe('buildBenchmarkData', () => {
 
   it('returns empty array when the symbol has no prices', () => {
     expect(buildBenchmarkData({}, [{ date: '2024-01-02', value: 1 }], 'NOPE')).toEqual([]);
+  });
+});
+
+describe('buildSnapshotPositions', () => {
+  it('computes unrealized P&L from the FIFO cost basis of open shares', () => {
+    // Bought 10 @ €10 (€100), sold 5 → open basis is €50, not the €100 gross buys
+    const meta      = { AAA: { yahoo: 'AAA.DE', currency: 'EUR', label: 'AAA' } };
+    const prices    = { 'AAA.DE': 12 };
+    const netShares = { AAA: 5 };
+    const costBasis = { AAA: 50 };
+    const { totalValue, totalCost, positions } = buildSnapshotPositions(
+      ['AAA'], meta, prices, netShares, costBasis, {},
+    );
+    expect(totalValue).toBe(60);
+    expect(totalCost).toBe(50);
+    expect(positions[0].pl).toBe(10);
+    expect(positions[0].plPct).toBeCloseTo(20, 10);
   });
 });

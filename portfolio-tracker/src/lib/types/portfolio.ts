@@ -34,18 +34,24 @@ export interface Position {
   value: number;        // current value in EUR
   pl: number;           // unrealised P&L in EUR
   plPct: number;        // unrealised P&L %
+  /** Not emitted by the current server — live day P&L comes from the intraday store. */
   dayPl?: number;
+  /** Not emitted by the current server — live day % comes from the intraday store. */
   dayPlPct?: number;
   isin?: string;
 }
 
+/** Mirrors computeRiskMetrics in server/domain/performance.js. */
 export interface RiskMetrics {
+  /** Annualized std dev of daily flow-adjusted returns, %. */
+  volatility: number | null;
+  /** Annualized (TWR-consistent) return, %. */
+  annualReturn: number | null;
   sharpe: number | null;
   sortino: number | null;
-  maxDrawdown: number | null;
-  volatility: number | null;
   beta: number | null;
-  calmar: number | null;
+  /** Largest peak-to-trough decline of the return index, positive %. */
+  maxDrawdownPct: number | null;
 }
 
 export interface RollingReturnEntry {
