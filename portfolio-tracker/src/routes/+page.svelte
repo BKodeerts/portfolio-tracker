@@ -1,6 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { browser } from '$app/environment';
+  import { MediaQuery } from 'svelte/reactivity';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
   import { themeStore } from '$lib/stores/theme.svelte';
@@ -11,12 +12,14 @@
   import AllocationBar from '$lib/components/shared/AllocationBar.svelte';
   import ActivityList from '$lib/components/shared/ActivityList.svelte';
   import { buildPortfolioIntradaySession } from '$lib/derived/intraday';
-  import { getLiveData, getDay1Pl, getPeriodPl, buildCards } from '$lib/derived/dashboard';
+  import { getLiveData, getDay1Pl, getPeriodPl, buildCards, buildTickerSpark } from '$lib/derived/dashboard';
   import { fmtEur, fmtEurSigned, fmtNative, fmtPct } from '$lib/utils/fmt';
   import { PERIOD_OPTIONS, periodDeltaLabel, filterChartData, type Period } from '$lib/utils/period';
   import { getColor } from '$lib/utils/color';
-  import { sessionBounds } from '$lib/market';
   import type { Position } from '$lib/types/portfolio';
+
+  // ── Responsive (design breakpoint: 900px) ───────────────────────────────────
+  const desktop = new MediaQuery('(min-width: 900px)');
 
   // ── Period selection (persisted) ───────────────────────────────────────────
   const PERIOD_KEY = 'pt-dashboard-period';
@@ -54,8 +57,21 @@
   const staticTotal = $derived(portfolioStore.positions.reduce((s, p) => s + p.value, 0));
   const totalValue = $derived(liveData?.value ?? staticTotal);
 
+  // ── Chart / market clock ────────────────────────────────────────────────────
+  const session = $derived(period === '1d' ? buildPortfolioIntradaySession() : null);
+  /** Before the first exchange opens: empty chart, zero delta, dimmed captions. */
+  const preOpen    = $derived(session != null && session.nowMin < session.dayStart);
+  /** After the last exchange closes: full-day series, no "now" dot. */
+  const afterClose = $derived(session != null && session.nowMin > session.dayEnd);
+
+  const fmtMin = (m: number) =>
+    `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const firstOpenLabel = $derived(fmtMin(session?.dayStart ?? 9 * 60));
+
   const heroDelta = $derived.by((): { pl: number; pct: number } | null => {
     if (period === '1d') {
+      // Markets haven't opened: nothing traded today, never show FX drift.
+      if (preOpen) return { pl: 0, pct: 0 };
       const live = getDay1Pl();
       if (live) return live;
       // Fallback to server-computed day P&L while intraday/FX is unavailable.
@@ -65,9 +81,6 @@
     }
     return getPeriodPl(filterChartData(portfolioStore.chartData, period));
   });
-
-  // ── Chart ───────────────────────────────────────────────────────────────────
-  const session = $derived(period === '1d' ? buildPortfolioIntradaySession() : null);
 
   const INTRADAY_TICKS = [9, 12, 15, 18, 21].map((h) => ({
     x: h * 60,
@@ -96,16 +109,6 @@
 
   // ── Holdings ────────────────────────────────────────────────────────────────
   const holdings = $derived([...portfolioStore.positions].sort((a, b) => b.value - a.value));
-
-  /** Per-ticker sparkline session bounds in unix seconds (Yahoo trading periods, exchange fallback). */
-  function sparkSession(yahoo: string): { start: number; end: number } | null {
-    const intra = intradayStore.data[yahoo];
-    if (!intra) return null;
-    const regular = intra.tradingPeriods?.regular;
-    if (regular) return { start: regular.start, end: regular.end };
-    const b = sessionBounds(yahoo, intra.date || new Date().toISOString().slice(0, 10));
-    return b ? { start: b.open, end: b.close } : null;
-  }
 
   /** "120 shares" / "3.5 shares" — trailing zeros trimmed on fractional counts. */
   function fmtShares(shares: number): string {
@@ -145,7 +148,7 @@
 
 <div class="page">
 
-  <!-- ── Top bar row ── -->
+  <!-- ── Top bar row (mobile only — desktop uses the global top nav) ── -->
   <div class="topbar">
     <div class="topbar-title">Portfolio</div>
     <div class="topbar-status mono">
@@ -163,28 +166,31 @@
           {fmtEurSigned(heroDelta.pl)} ({fmtPct(heroDelta.pct)})
         </span>
       {/if}
-      <span class="hero-label">{periodDeltaLabel(period)}</span>
+      <span class="hero-label">{period === '1d' && preOpen ? 'today · markets closed' : periodDeltaLabel(period)}</span>
     </div>
   </div>
 
-  <!-- ── Chart (full-bleed) ── -->
+  <!-- ── Chart (full-bleed mobile, full container width desktop) ── -->
   <div class="chart-bleed">
     {#if period === '1d'}
       <PeriodChart
         mode="intraday"
-        height={200}
+        height={desktop.current ? 260 : 200}
+        padX={desktop.current ? 24 : 20}
         formatY={fmtEur}
         points={session?.points ?? []}
         prevClose={session?.prevCloseTotal}
         sessionStart={session?.dayStart}
         sessionEnd={session?.dayEnd}
         xTicks={INTRADAY_TICKS}
-        emptyLabel="Markets open at 09:00"
+        emptyLabel="Markets open at {firstOpenLabel}"
+        showNow={!afterClose}
       />
     {:else}
       <PeriodChart
         mode="history"
-        height={200}
+        height={desktop.current ? 260 : 200}
+        padX={desktop.current ? 24 : 20}
         formatY={fmtEur}
         data={historyData}
         invested={historyInvested}
@@ -196,77 +202,101 @@
   <!-- ── Period pills ── -->
   <div class="pills-row">
     <PeriodPills options={PERIOD_OPTIONS} selected={period} onselect={selectPeriod} />
+    {#if period === '1d'}
+      <div class="pills-caption">
+        {preOpen
+          ? `Markets open at ${firstOpenLabel} CET`
+          : `Since first market open, ${firstOpenLabel} CET · dot = latest`}
+      </div>
+    {/if}
   </div>
-  {#if period === '1d'}
-    <div class="pills-caption">Since first market open, 09:00 CET · dot = latest</div>
-  {/if}
 
-  <!-- ── Holdings ── -->
-  {#if holdings.length > 0}
-    <div class="section-header">
-      <div class="section-title">Holdings</div>
-      <div class="section-hint">market price · your value</div>
+  <!-- ── Columns: holdings + sidebar (single column on mobile) ── -->
+  <div class="columns">
+
+    <!-- ── Holdings ── -->
+    <div class="col-main">
+      {#if holdings.length > 0}
+        <div class="section-header">
+          <div class="section-title">Holdings</div>
+          <div class="section-hint">market price · your value</div>
+        </div>
+
+        {#each holdings as pos (pos.ticker)}
+          {@const yahoo = pos.yahoo ?? pos.ticker}
+          {@const spark = buildTickerSpark(yahoo)}
+          {@const isPre = spark?.phase === 'pre'}
+          {@const dayPct = dayPctOf(pos)}
+          <a class="h-row" href={resolve('/stock/[ticker]', { ticker: pos.ticker })}>
+            <div class="h-id">
+              <div class="h-tick">
+                <span class="h-dot" style="background:{getColor(pos.ticker)}"></span>
+                <span class="h-name">{pos.ticker}</span>
+              </div>
+              <div class="h-shares">{fmtShares(pos.shares)}</div>
+            </div>
+            <div class="h-spark">
+              {#if spark}
+                <IntradaySparkline
+                  points={spark.points}
+                  prevClose={spark.prevClose}
+                  sessionStart={spark.sessionStart}
+                  sessionEnd={spark.sessionEnd}
+                  phase={spark.phase}
+                  ghostPoints={spark.ghostPoints}
+                  ghostStart={spark.ghostStart}
+                  ghostEnd={spark.ghostEnd}
+                  hint={spark.hint}
+                  height={30}
+                />
+              {/if}
+            </div>
+            <div class="h-nums">
+              <div class="h-pair">
+                <span class="h-price mono">{marketPriceStr(pos)}</span>
+                <!-- Pre-open: no day-% — never show a currency-driven fake move -->
+                <span class="h-pct mono" class:muted={!isPre} class:faint={isPre}>
+                  {!isPre && dayPct != null ? fmtPct(dayPct) : '—'}
+                </span>
+              </div>
+              <div class="h-pair">
+                <span class="h-value mono"><PrivacyValue value={fmtEur(pos.value)} /></span>
+                <span class="h-pct mono" class:pos={pos.plPct >= 0} class:neg={pos.plPct < 0}>{fmtPct(pos.plPct)}</span>
+              </div>
+            </div>
+          </a>
+        {/each}
+      {/if}
     </div>
 
-    {#each holdings as pos (pos.ticker)}
-      {@const yahoo = pos.yahoo ?? pos.ticker}
-      {@const intra = intradayStore.data[yahoo]}
-      {@const spark = sparkSession(yahoo)}
-      {@const dayPct = dayPctOf(pos)}
-      <a class="h-row" href={resolve('/stock/[ticker]', { ticker: pos.ticker })}>
-        <div class="h-id">
-          <div class="h-tick">
-            <span class="h-dot" style="background:{getColor(pos.ticker)}"></span>
-            <span class="h-name">{pos.ticker}</span>
+    <!-- ── Sidebar: allocation + activity ── -->
+    <div class="col-side">
+      {#if allocItems.length > 0}
+        <div class="side-block">
+          <div class="section-header alloc-header">
+            <div class="section-title">Allocation</div>
+            <div class="section-hint"><PrivacyValue value={fmtEur(portfolioStore.totalInvested)} /> invested</div>
           </div>
-          <div class="h-shares">{fmtShares(pos.shares)}</div>
+          <AllocationBar items={allocItems} legend="chips" />
         </div>
-        <div class="h-spark">
-          {#if intra?.previousClose && spark}
-            <IntradaySparkline
-              points={intra.points ?? []}
-              prevClose={intra.previousClose}
-              sessionStart={spark.start}
-              sessionEnd={spark.end}
-              height={30}
-            />
-          {/if}
-        </div>
-        <div class="h-nums">
-          <div class="h-pair">
-            <span class="h-price mono">{marketPriceStr(pos)}</span>
-            <span class="h-pct mono muted">{dayPct != null ? fmtPct(dayPct) : '—'}</span>
-          </div>
-          <div class="h-pair">
-            <span class="h-value mono"><PrivacyValue value={fmtEur(pos.value)} /></span>
-            <span class="h-pct mono" class:pos={pos.plPct >= 0} class:neg={pos.plPct < 0}>{fmtPct(pos.plPct)}</span>
-          </div>
-        </div>
-      </a>
-    {/each}
-  {/if}
+      {/if}
 
-  <!-- ── Allocation ── -->
-  {#if allocItems.length > 0}
-    <div class="section-header alloc-header">
-      <div class="section-title">Allocation</div>
-      <div class="section-hint"><PrivacyValue value={fmtEur(portfolioStore.totalInvested)} /> invested</div>
+      <div class="side-block">
+        <div class="section-header activity-header">
+          <div class="section-title">Activity</div>
+          <a class="section-link" href={resolve('/transactions')}>All →</a>
+        </div>
+        {#if recentTx.length > 0}
+          <div class="activity-wrap" class:privacy={themeStore.privacyMode}>
+            <ActivityList items={recentTx} />
+          </div>
+        {:else}
+          <div class="activity-empty">No transactions yet</div>
+        {/if}
+      </div>
     </div>
-    <AllocationBar items={allocItems} legend="chips" />
-  {/if}
 
-  <!-- ── Activity ── -->
-  <div class="section-header activity-header">
-    <div class="section-title">Activity</div>
-    <a class="section-link" href={resolve('/transactions')}>All →</a>
   </div>
-  {#if recentTx.length > 0}
-    <div class="activity-wrap" class:privacy={themeStore.privacyMode}>
-      <ActivityList items={recentTx} />
-    </div>
-  {:else}
-    <div class="activity-empty">No transactions yet</div>
-  {/if}
 
 </div>
 
@@ -340,7 +370,24 @@
   .pills-caption {
     font-size: 11px;
     color: var(--fg-faint);
-    padding: 2px 2px 0;
+    padding: 6px 2px 0;
+  }
+
+  /* ── Columns ── */
+  .columns {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 26px 56px;
+    margin-top: 26px;
+  }
+  .col-main { flex: 2 1 520px; min-width: 0; }
+  .col-side {
+    flex: 1 1 300px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
   }
 
   /* ── Section headers ── */
@@ -348,7 +395,7 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    margin: 26px 0 4px;
+    margin: 0 0 4px;
   }
   .section-title {
     font-size: 13px;
@@ -424,6 +471,7 @@
     min-width: 52px;
   }
   .h-pct.muted { color: var(--fg-secondary); }
+  .h-pct.faint { color: var(--spark-dim); }
   .h-value {
     font-size: 12.5px;
     font-weight: 700;
@@ -439,5 +487,19 @@
     padding: 12px 0;
     font-size: 11px;
     color: var(--fg-faint);
+  }
+
+  /* ── Desktop (≥900px) ── */
+  @media (min-width: 900px) {
+    .page {
+      max-width: 1160px;
+      padding: 18px 24px 96px;
+    }
+    /* Global top nav replaces the page's own top bar */
+    .topbar { display: none; }
+    .hero { margin-top: 0; }
+    .hero-value { font-size: 42px; }
+    .chart-bleed { margin: 10px -24px 0; }
+    .pills-row { max-width: 440px; }
   }
 </style>

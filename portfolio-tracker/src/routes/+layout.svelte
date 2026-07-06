@@ -6,6 +6,7 @@
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
   import { themeStore } from '$lib/stores/theme.svelte';
+  import { anyMarketOpen } from '$lib/derived/dashboard';
   import Nav from '$lib/components/Nav.svelte';
 
   interface Props { children: import('svelte').Snippet }
@@ -41,27 +42,24 @@
   const isPortfolio    = $derived(isAt('/'));
   const isAnalysis     = $derived(isAt('/analysis'));
   const isTransactions = $derived(isAt('/transactions'));
+
+  const marketsOpen = $derived(anyMarketOpen());
 </script>
 
 <header class="top-bar">
   <div class="top-bar-inner">
-    <!-- Logo -->
-    <div class="top-logo">
-      <div class="top-logo-mark">P</div>
-      <span class="top-logo-name">Portfolio</span>
-    </div>
+    <!-- Wordmark -->
+    <div class="top-wordmark">Portfolio</div>
 
     <!-- Navigation tabs -->
     <Nav />
 
     <!-- Right controls -->
     <div class="top-bar-right">
-      {#if intradayStore.liveEurUsd}
-        <div class="fx-badge">
-          <span class="fx-dot"></span>
-          EUR/USD {intradayStore.liveEurUsd.toFixed(3)}
-        </div>
-      {/if}
+      <div class="live-chip">
+        <span class="live-chip-dot" class:open={marketsOpen}></span>
+        <span>{marketsOpen ? 'LIVE' : 'CLOSED'}{#if intradayStore.liveEurUsd}&nbsp;· EUR/USD {intradayStore.liveEurUsd.toFixed(3)}{/if}</span>
+      </div>
 
       <button
         class="icon-toggle"
@@ -171,7 +169,7 @@
   }
   .mtab.active { color: var(--fg); font-weight: 700; }
 
-  @media (max-width: 640px) {
+  @media (max-width: 899.98px) {
     .mobile-tab-bar { display: flex; }
   }
 </style>

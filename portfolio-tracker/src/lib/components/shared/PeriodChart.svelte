@@ -1,8 +1,8 @@
 <script lang="ts">
   /**
-   * Hero SVG chart (dashboard 390×200, stock detail 390×190).
-   * Fixed 390-wide viewBox scaled to container width — text scales with it,
-   * matching the design prototypes.
+   * Hero SVG chart (dashboard, stock detail).
+   * The SVG is sized to the measured container width — geometry recomputes
+   * on resize instead of stretching a fixed viewBox, so text keeps its size.
    *
    * - mode 'history':  daily/weekly closes with optional dashed invested line.
    * - mode 'intraday': session-bounded line vs a dashed prev-close baseline,
@@ -29,18 +29,24 @@
     sessionEnd?: number;
     /** Caption shown centered when intraday `points` is empty. */
     emptyLabel?: string;
+    /** Inner horizontal padding in px (desktop dashboard: 24). */
+    padX?: number;
+    /** Hide the pulsing "now" dot (after the last market close). */
+    showNow?: boolean;
   }
   const {
     mode, height = 200, formatY, xTicks = [],
     data = [], invested = [],
     points = [], prevClose, sessionStart, sessionEnd, emptyLabel,
+    padX = 20, showNow = true,
   }: Props = $props();
 
   const uid = $props.id();
 
-  const VW = 390;
-  const L = 20;
-  const R = 370;
+  let containerW = $state(0);
+  const VW = $derived(containerW > 0 ? containerW : 390);
+  const L = $derived(padX);
+  const R = $derived(VW - padX);
   const T = 12;
   const B = $derived(height - 22);
 
@@ -62,6 +68,8 @@
 
   const geom = $derived.by((): Geom | null => {
     const bottom = B;
+    // Transient layouts can measure a degenerate width — draw nothing.
+    if (R - L < 10) return null;
     if (mode === 'history') {
       if (data.length < 2) return null;
       const vals = data.map((d) => d.value);
@@ -132,7 +140,8 @@
   });
 </script>
 
-<svg width="100%" viewBox="0 0 {VW} {height}" style="display:block">
+<div class="chart-box" bind:clientWidth={containerW}>
+<svg width="100%" height={height} viewBox="0 0 {VW} {height}" style="display:block">
   {#if geom}
     <defs>
       <linearGradient id="pchart-{uid}" x1="0" x2="0" y1="0" y2="1">
@@ -140,7 +149,7 @@
         <stop offset="100%" style="stop-color:{geom.lineColor}" stop-opacity="0" />
       </linearGradient>
     </defs>
-    {#each geom.grid as g (g.y)}
+    {#each geom.grid as g}
       <line x1={L} x2={R} y1={g.y} y2={g.y} stroke="var(--chart-gridline)" stroke-width="1" />
       <text class="axis" x={R - 2} y={g.labelY} text-anchor="end">{g.label}</text>
     {/each}
@@ -157,11 +166,11 @@
     {#if geom.lineD}
       <path d={geom.lineD} fill="none" stroke={geom.lineColor} stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
     {/if}
-    {#if geom.now}
+    {#if geom.now && showNow}
       <circle class="now-halo" cx={geom.now.x} cy={geom.now.y} r="7" fill={geom.lineColor} opacity="0.18" />
       <circle cx={geom.now.x} cy={geom.now.y} r="3.5" fill={geom.lineColor} />
     {/if}
-    {#each geom.ticks as t (t.x)}
+    {#each geom.ticks as t}
       <text class="axis" x={t.x} y={height - 4} text-anchor="middle">{t.label}</text>
     {/each}
     {#if geom.empty && emptyLabel}
@@ -169,8 +178,10 @@
     {/if}
   {/if}
 </svg>
+</div>
 
 <style>
+  .chart-box { min-width: 0; }
   .axis {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 9px;
