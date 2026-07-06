@@ -31,13 +31,17 @@ const DAY_SECS = 86400;
 
 /** Offset (seconds) to add to a unix ts to get Europe/Brussels wall-clock time. */
 function brusselsOffsetSecs(at: Date): number {
+  // Truncate to whole seconds first — Intl formats whole seconds only, so
+  // leftover milliseconds would skew the offset by up to 1s (e.g. a 09:00
+  // session open rendering as 08:59).
+  const wholeSecs = Math.floor(at.getTime() / 1000) * 1000;
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Europe/Brussels', hour12: false, year: 'numeric', month: '2-digit',
     day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
-  }).formatToParts(at);
+  }).formatToParts(new Date(wholeSecs));
   const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
   const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'), get('second'));
-  return Math.round((asUtc - at.getTime()) / 1000);
+  return Math.round((asUtc - wholeSecs) / 1000);
 }
 
 export function buildPortfolioIntradaySession(): PortfolioIntradaySession | null {

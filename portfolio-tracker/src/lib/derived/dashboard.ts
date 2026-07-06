@@ -1,8 +1,9 @@
 import { portfolioStore } from '$lib/stores/portfolio.svelte';
 import { intradayStore } from '$lib/stores/intraday.svelte';
-import { getTradingMins, isExchangeOpen, normalizeMarketState } from '$lib/market';
+import { getTradingMins, isExchangeOpen, normalizeMarketState, sessionBounds, fmtSessionTime } from '$lib/market';
 import { toEurLive, liveRateFor } from '$lib/fx';
 import type { ChartPoint } from '$lib/types/portfolio';
+import type { IntradayData, IntradayPoint } from '$lib/types/candle';
 
 /**
  * Dashboard derived state. Plain functions over the reactive stores —
@@ -76,6 +77,108 @@ export function buildCards(): SparkCard[] {
     const marketState = normalizeMarketState(yahoo, rawState || (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
     return { ticker, yahoo, label, shares, prevClose, price, changePct, changeEur, marketState };
   });
+}
+
+/** True when any tracked exchange is in its regular session (nav status chip). */
+export function anyMarketOpen(): boolean {
+  return buildCards().some((c) => c.marketState === 'REGULAR');
+}
+
+/** Ticker sparkline phase: its own exchange session only, never FX drift. */
+export type SparkPhase = 'pre' | 'live' | 'post';
+
+export interface TickerSpark {
+  phase: SparkPhase;
+  /** Session line: today's points (live/post) or yesterday's full session (pre). */
+  points: IntradayPoint[];
+  prevClose: number;
+  /** Bounds (unix secs) of the session the points belong to. */
+  sessionStart: number;
+  sessionEnd: number;
+  /** Pre phase only: today's pre-market points for the dotted ghost tail. */
+  ghostPoints: IntradayPoint[];
+  ghostStart: number | null;
+  ghostEnd: number | null;
+  /** Caption under the sparkline ("prev session · opens 15:30" / "closed 22:00"). */
+  hint: string | null;
+}
+
+/**
+ * Bounds of the session the drawn points actually belong to. Yahoo's
+ * `tradingPeriods.regular` describes the *current* session — during pre-market
+ * that is today's, while `points` still hold yesterday's session — so only
+ * trust it when the points fall inside it; otherwise derive bounds from the
+ * points' own date via the exchange defs.
+ */
+function drawnSessionBounds(yahoo: string, intra: IntradayData): { start: number; end: number } | null {
+  const pts = intra.points ?? [];
+  const regular = intra.tradingPeriods?.regular;
+  if (regular && pts.length > 0) {
+    const HOUR = 3600;
+    if (pts[0]!.ts >= regular.start - HOUR && pts[pts.length - 1]!.ts <= regular.end + HOUR) {
+      return { start: regular.start, end: regular.end };
+    }
+  }
+  const b = sessionBounds(yahoo, intra.date || new Date().toISOString().slice(0, 10));
+  return b ? { start: b.open, end: b.close } : null;
+}
+
+/**
+ * State-driven sparkline inputs for a holdings row (design: a ticker's
+ * sparkline reflects its own exchange session only, with explicit
+ * pre-open / live / closed states). Null when there's nothing to draw.
+ */
+export function buildTickerSpark(yahoo: string): TickerSpark | null {
+  const intra = intradayStore.data[yahoo];
+  const prevClose = intra?.previousClose;
+  const points = intra?.points ?? [];
+  if (!intra || !prevClose || points.length < 2) return null;
+
+  const session = drawnSessionBounds(yahoo, intra);
+  if (!session || session.end <= session.start) return null;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const rawState = intra.marketState ?? '';
+  const state = normalizeMarketState(yahoo, rawState || (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
+
+  let phase: SparkPhase;
+  if (state === 'REGULAR') phase = 'live';
+  else if (state === 'PRE') phase = 'pre';
+  else if (state === 'POST') phase = 'post';
+  // CLOSED: today's session already drawn → post; older session → pre-open.
+  else phase = intra.date === today ? 'post' : 'pre';
+
+  if (phase !== 'pre') {
+    return {
+      phase, points, prevClose,
+      sessionStart: session.start, sessionEnd: session.end,
+      ghostPoints: [], ghostStart: null, ghostEnd: null,
+      hint: phase === 'post' ? `closed ${fmtSessionTime(session.end)}` : null,
+    };
+  }
+
+  // Pre-open: dim yesterday's session; today's pre-market becomes a ghost tail.
+  const periods = intra.tradingPeriods;
+  let ghostPoints: IntradayPoint[] = [];
+  let ghostStart: number | null = null;
+  let ghostEnd: number | null = null;
+  if (periods?.pre && periods.regular && periods.regular.start > periods.pre.start) {
+    const pre = periods.pre;
+    const tail = (intra.allPoints ?? []).filter((p) => p.ts >= pre.start && p.ts < periods.regular!.start);
+    if (tail.length >= 2) {
+      ghostPoints = tail;
+      ghostStart = pre.start;
+      ghostEnd = periods.regular.start;
+    }
+  }
+
+  const nextOpenTs = periods?.regular?.start ?? sessionBounds(yahoo, today)?.open ?? null;
+  return {
+    phase, points, prevClose,
+    sessionStart: session.start, sessionEnd: session.end,
+    ghostPoints, ghostStart, ghostEnd,
+    hint: nextOpenTs != null ? `prev session · opens ${fmtSessionTime(nextOpenTs)}` : 'prev session',
+  };
 }
 
 /** Top winner / top loser by day % (only if actually positive / negative). */

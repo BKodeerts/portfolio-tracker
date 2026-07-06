@@ -49,7 +49,7 @@
     color: var(--fg-muted);
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 899.98px) {
     .app-nav { display: none; }
   }
 </style>

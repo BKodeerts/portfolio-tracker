@@ -43,54 +43,33 @@ body {
 .tint-pos-strong { background: var(--c-pos-bg-strong); color: var(--c-pos); }
 .tint-neg-strong { background: var(--c-neg-bg-strong); color: var(--c-neg); }
 
-/* ── Sticky top bar ── */
-.top-bar {
-  position: sticky; top: 0; z-index: 100;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--border);
-}
+/* ── Top nav (desktop ≥900px; mobile uses the bottom tab bar) ── */
+.top-bar { background: transparent; }
 .top-bar-inner {
-  max-width: 1240px; margin: 0 auto;
-  padding: 14px 24px;
-  display: flex; align-items: center; gap: 20px;
+  max-width: 1160px; margin: 0 auto;
+  padding: 18px 24px 0;
+  display: flex; align-items: center; gap: 28px;
 }
 
-/* ── Logo ── */
-.top-logo {
-  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
-}
-.top-logo-mark {
-  width: 28px; height: 28px; border-radius: 8px;
-  background: var(--fg); color: var(--bg);
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 14px; letter-spacing: -0.05em;
+/* ── Wordmark ── */
+.top-wordmark {
+  font-weight: 700; font-size: 15px; letter-spacing: -0.02em;
   flex-shrink: 0;
 }
-.top-logo-name {
-  font-weight: 600; font-size: 14px; letter-spacing: -0.01em;
-}
 
-/* ── Nav (segmented tabs) ── */
-.app-nav {
-  display: flex; gap: 1px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 10px; padding: 2px;
-  margin-left: 4px;
-}
+/* ── Nav (pill tabs) ── */
+.app-nav { display: flex; gap: 4px; }
 .nav-btn {
-  padding: 6px 13px; border-radius: 8px; border: none;
-  background: transparent; color: var(--fg-muted); font-size: 11px; font-weight: 600;
+  padding: 6px 12px; border-radius: 8px; border: none;
+  background: transparent; color: var(--fg-faint); font-size: 12.5px; font-weight: 500;
   cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap;
   display: inline-flex; align-items: center; gap: 5px;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.01em; text-decoration: none;
 }
 .nav-btn:hover { color: var(--fg); }
 .nav-btn.active {
-  background: var(--surface); color: var(--fg);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  background: var(--pill-selected-bg); color: var(--fg); font-weight: 700;
 }
-[data-theme='dark'] .nav-btn.active { background: var(--surface-3); }
 .nav-icon { flex-shrink: 0; opacity: 0.6; }
 .nav-btn:hover .nav-icon { opacity: 0.8; }
 .nav-btn.active .nav-icon { opacity: 1; }
@@ -110,17 +89,19 @@ body {
 .icon-toggle:hover { color: var(--fg); background: var(--surface-3); }
 .icon-toggle.on    { color: var(--fg); background: var(--surface-3); }
 
-/* ── FX live badge ── */
-.fx-badge {
+/* ── Live status chip (dot green when any tracked exchange is open) ── */
+.live-chip {
   display: inline-flex; align-items: center; gap: 6px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 999px; padding: 4px 10px;
-  font-size: 10px; font-weight: 600; color: var(--fg-muted);
+  font-size: 10px; font-weight: 600; color: var(--fg-faint);
   font-family: 'JetBrains Mono', monospace;
+  font-feature-settings: 'tnum', 'zero'; letter-spacing: -0.02em;
+  white-space: nowrap;
 }
-.fx-dot {
-  width: 6px; height: 6px; border-radius: 50%; background: var(--c-pos);
+.live-chip-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--fg-faint);
+  flex-shrink: 0;
 }
+.live-chip-dot.open { background: var(--c-pos); }
 
 /* ── Loading / Error states ── */
 .loading {
@@ -516,6 +497,12 @@ body.privacy .pos-table tfoot td:nth-child(n+2):not(:last-child) {
 .display-controls { display: flex; flex-direction: row; gap: 2px; flex-shrink: 0; align-items: center; }
 
 /* ── Responsive ── */
+/* Chrome breakpoint (design: 900px) — below it pages render their own top
+   bars and the fixed bottom tab bar handles navigation */
+@media (max-width: 899.98px) {
+  .top-bar { display: none; }
+}
+
 @media (min-width: 641px) {
   .summary-bar-inner { display: flex; align-items: flex-start; }
   .summary-hero { display: contents; }
@@ -530,9 +517,6 @@ body.privacy .pos-table tfoot td:nth-child(n+2):not(:last-child) {
 @media (max-width: 640px) {
   .mobile-only           { display: initial !important; }
   .desktop-only          { display: none !important; }
-  /* Pages render their own top bar on mobile (revamp design); global chrome is desktop-only */
-  .top-bar               { display: none; }
-  .top-bar-inner         { padding: 10px 16px; }
   .summary-hero          { margin-bottom: 8px; align-items: flex-start; }
   .summary-hero-value    { font-size: 22px; }
   .summary-today-value   { font-size: 14px; }
@@ -582,5 +566,4 @@ body.privacy .pos-table tfoot td:nth-child(n+2):not(:last-child) {
   .stock-detail-controls .period-pills::-webkit-scrollbar { display: none; }
   .bd-total-value { font-size: 22px; }
   .bd-label       { font-size: 18px; }
-  .top-logo-name  { display: none; }
 }

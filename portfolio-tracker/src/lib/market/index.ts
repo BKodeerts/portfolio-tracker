@@ -85,3 +85,10 @@ export function sessionBounds(yahooSymbol: string, dateStr: string): { open: num
     close: unixAtLocal(def.close[0], def.close[1]),
   };
 }
+
+/** Unix seconds → "HH:MM" wall-clock in Europe/Brussels (sparkline hint captions). */
+export function fmtSessionTime(ts: number): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Brussels', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(ts * 1000));
+}
