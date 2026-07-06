@@ -1,5 +1,7 @@
 # Refactor Plan — Portfolio Tracker
 
+> **Status: completed (shipped as v0.8.0).** This document is kept as a historical record of the refactor and the reasoning behind the current architecture. The "current-state audit" below describes the codebase as it was *before* the refactor — do not treat it as a description of today's code. See §6 for the few remaining follow-ups; see `CLAUDE.md` for the current architecture.
+
 **Goal:** a functional, at-a-glance portfolio page (total value, day move, per-position status in one screen) with a deep-dive view per position — built on a single, trustworthy calculation pipeline instead of the current mix of server-computed and client-recomputed numbers.
 
 **Branch strategy:** each phase below is a separate PR on top of the previous one. No phase mixes "move code" with "change behaviour".
@@ -136,7 +138,12 @@ price + regular/extended split, position stats (shares, avg cost in native ccy *
 - **Yahoo API fragility:** untouched by this plan (`server/yahoo.js` + cache stay as-is); domain extraction injects candle data, which also makes tests independent of Yahoo.
 
 ## 6. Status
-Phases 0, 1, 2, 3, 4 (decomposition part), 5 and 6 (CI) are implemented on this branch. Remaining follow-ups: fold analysis/intraday tabs into dashboard/deep-dive (4/5 tail), move stock/analysis chart builders onto `charts/base.ts`, revisit the TWR-dividend and benchmark-FX-fallback oddities noted in Phase 1, and smoke-test the Docker/HA build.
+All phases (0–6) are implemented and shipped (v0.8.x): domain extraction with a vitest suite, shared `fx-defs.json`, typed API contract, dashboard decomposition, deep dive on server data, and CI (tests + check + lint + build on every PR). The separate intraday tab has been removed — live intraday lives in the dashboard and the deep dive.
+
+Remaining follow-ups:
+- Move the stock/analysis page chart builders onto `src/lib/charts/base.ts` (dashboard already uses it).
+- Evaluate folding the analysis tab's rolling-returns/risk blocks into the dashboard or deep dive.
+- Revisit the TWR-dividend and benchmark-FX-fallback oddities noted in Phase 1.
 
 ## 7. Effort estimate
 Phases 0–1: ~1–2 days · Phase 2: ~1 day · Phase 3: ~1 day · Phase 4: ~2 days · Phase 5: ~1 day · Phase 6: ~1 day. Each phase leaves the app shippable.
