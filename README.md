@@ -4,14 +4,14 @@ Self-hosted stock portfolio tracker with Yahoo Finance data, live intraday chart
 
 ## Features
 
-- **Portfolio tab** — total portfolio value as a line chart + per-position charts (€ and %)
-- **Analyse tab** — allocation donut, cost vs. value, drawdown chart, benchmark vs. VWCE, annual P&L breakdown, CSV export
-- **Intraday tab** — live intraday chart per position with market-hours awareness and stale-data indicator
-- **Transactions tab** — full transaction history
-- **Import tab** — DeGiro CSV upload with client-side parsing and ISIN mapping
+- **Portfolio tab** — at-a-glance dashboard: total value, day move, live intraday hero chart, movers strip, and per-position rows with sparklines and market-state badges
+- **Position deep dive** — click any position for its full history: price/value chart, shares, average cost in native currency, cost basis, dividends, realized P&L, and transactions
+- **Analysis tab** — allocation donut, cost vs. value, drawdown chart, benchmark vs. VWCE, annual P&L breakdown, CSV export
+- **Activity tab** — full transaction history
+- **Import tab** — DeGiro CSV/XLSX upload with client-side parsing and ISIN mapping
 - **Settings tab** — base currency, watchlist, intraday toggle, push interval, privacy mode
-- **Multi-currency** — EUR, USD, GBP, CLP and more; FX rates via Yahoo Finance
-- **Disk cache** — historical data cached for 4h, daily quotes for 1h
+- **Multi-currency** — EUR, USD, GBP/GBX, CHF, SEK, DKK, NOK, CLP and more; FX rates via Yahoo Finance
+- **Disk cache** — historical candles cached for 24h, daily quotes for 15min, intraday for 5min
 - **Home Assistant** — optional MQTT discovery with portfolio sensors
 
 ## Installation
@@ -19,6 +19,23 @@ Self-hosted stock portfolio tracker with Yahoo Finance data, live intraday chart
 ### Home Assistant Add-on
 
 Add this repository in Home Assistant → Add-on Store, install the add-on and start it.
+
+### Docker
+
+```bash
+docker-compose up --build   # from the repo root, serves on port 3069
+```
+
+## Development
+
+```bash
+cd portfolio-tracker
+npm install
+npm run dev:server   # Express API on port 3069
+npm run dev          # Vite dev server, proxies /api to :3069
+```
+
+Quality checks: `npm test` (vitest), `npm run check` (svelte-check), `npm run lint` (eslint). All of these plus the build run in CI on every pull request.
 
 ## Transactions
 
@@ -43,7 +60,7 @@ Transactions are stored in `data/transactions.json`. You can manage them via the
 - `yahoo` — Yahoo Finance symbol (may differ, e.g. `VWCE.DE`)
 - `currency` — trading currency of the stock (not the export currency)
 - `costEur` — absolute value of the DeGiro "Totaal EUR" column
-- `shares` — negative for sales
+- `shares` — negative for sales, `0` for dividends
 
 ## Settings
 
@@ -66,9 +83,9 @@ The add-on supports optional MQTT integration. Enable it in the add-on **Configu
 
 ## Technical details
 
-- **Server**: Express.js (Node 20+)
-- **Frontend**: Vanilla JS + Chart.js
-- **Cache**: JSON files in `./cache/`
+- **Server**: Express.js (Node 20+), CommonJS; pure money math (FIFO cost basis, splits, TWR/XIRR, FX) in `server/domain/` with a vitest suite
+- **Frontend**: SvelteKit 5 (runes) + TypeScript + ECharts, built as a static bundle
+- **Cache**: JSON files in `./cache/` (24h historical / 15min quotes / 5min intraday)
 - **Data**: JSON files in `./data/`
 - **Port**: 3069 (configurable via `PORT` env var)
-- **Yahoo Finance**: `query1.finance.yahoo.com` v8 API, 1.2s delay between requests
+- **Yahoo Finance**: `query1.finance.yahoo.com` v8 API, 100ms delay between requests with retry/backoff
