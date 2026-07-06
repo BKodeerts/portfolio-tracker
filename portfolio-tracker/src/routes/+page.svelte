@@ -72,12 +72,8 @@
     if (period === '1d') {
       // Markets haven't opened: nothing traded today, never show FX drift.
       if (preOpen) return { pl: 0, pct: 0 };
-      const live = getDay1Pl();
-      if (live) return live;
-      // Fallback to server-computed day P&L while intraday/FX is unavailable.
-      const pl = portfolioStore.positions.reduce((s, p) => s + (p.dayPl ?? 0), 0);
-      const base = totalValue - pl;
-      return base > 0 ? { pl, pct: (pl / base) * 100 } : null;
+      // No intraday/FX data yet: hide the delta instead of implying a flat day.
+      return getDay1Pl();
     }
     return getPeriodPl(filterChartData(portfolioStore.chartData, period));
   });
@@ -126,7 +122,7 @@
   }
 
   function dayPctOf(pos: Position): number | null {
-    return cardMap.get(pos.ticker)?.changePct ?? pos.dayPlPct ?? null;
+    return cardMap.get(pos.ticker)?.changePct ?? null;
   }
 
   // ── Allocation ──────────────────────────────────────────────────────────────

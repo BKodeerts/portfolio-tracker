@@ -430,9 +430,9 @@ async function computeFullPortfolio() {
   const watchlistData = watchlistSymbols?.length ? await fetchWatchlistPrices(watchlistSymbols) : [];
 
   // Analytics
-  const riskMetrics    = computeRiskMetrics(chartData, benchmarkData);
+  const riskMetrics    = computeRiskMetrics(chartData, benchmarkData, transactions);
   const twrPct         = computeServerTWR(chartData, transactions);
-  const rollingReturns = computeRollingReturns(chartData, benchmarkData, sp500Data, twrPct);
+  const rollingReturns = computeRollingReturns(chartData, benchmarkData, sp500Data, transactions, twrPct);
   const irrPct         = computeXIRR(transactions, totalValue);
 
   // Persist analytics + inception data for HA scheduler
@@ -500,14 +500,22 @@ async function computeCurrentSnapshot(options = {}) {
   const splitFactors = detectSplitFactors(meta, transactions, priceMaps, fxMaps);
   const adjSharesFn  = makeAdjShares(meta, priceMaps, splitFactors, fxMaps);
 
-  const { netShares, buyInvested } = computeNetShares(meta, transactions, adjSharesFn);
+  const { netShares } = computeNetShares(meta, transactions, adjSharesFn);
   const currentTickers = Object.keys(netShares).filter(t => netShares[t] > 0.0001);
   if (!currentTickers.length) return null;
 
   const prices = await getLivePrices(yahooSymbols, manualPrices);
 
+  const txByTicker = {};
+  for (const tx of transactions) {
+    (txByTicker[tx.ticker] = txByTicker[tx.ticker] || []).push(tx);
+  }
+  // FIFO cost basis of open shares per ticker (same basis as the full portfolio)
+  const costBasis = Object.fromEntries(currentTickers.map(ticker =>
+    [ticker, fifoCostBasis(txByTicker[ticker] || [], ticker, '9999-12-31', adjSharesFn)]));
+
   const { totalValue, totalCost, positions } = buildSnapshotPositions(
-    currentTickers, meta, prices, netShares, buyInvested, liveRates,
+    currentTickers, meta, prices, netShares, costBasis, liveRates,
   );
 
   if (!positions.length) return null;
@@ -519,10 +527,6 @@ async function computeCurrentSnapshot(options = {}) {
   const dailyPl = totalValue - prevValue;
 
   // Realized P&L (no prices needed, just transaction arithmetic)
-  const txByTicker = {};
-  for (const tx of transactions) {
-    (txByTicker[tx.ticker] = txByTicker[tx.ticker] || []).push(tx);
-  }
   const { total: realizedPl } = computeRealizedPl(txByTicker, adjSharesFn);
 
   // Currency exposure

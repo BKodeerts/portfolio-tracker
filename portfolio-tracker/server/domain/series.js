@@ -90,7 +90,12 @@ function valueAtDate(currentTickers, meta, priceMaps, netShares, liveRates, date
   return total;
 }
 
-function buildSnapshotPositions(currentTickers, meta, prices, netShares, buyInvested, liveRates) {
+/**
+ * costBasis: FIFO EUR cost basis of the open shares per ticker, so
+ * pl is unrealized P&L — value minus what the shares still held cost
+ * (not gross buys, which would double-count shares already sold).
+ */
+function buildSnapshotPositions(currentTickers, meta, prices, netShares, costBasis, liveRates) {
   let totalValue = 0, totalCost = 0;
   const positions = [];
   for (const ticker of currentTickers) {
@@ -98,7 +103,7 @@ function buildSnapshotPositions(currentTickers, meta, prices, netShares, buyInve
     const price = prices[m.yahoo];
     if (!price) continue;
     const value = toEurAtRate(m.currency, netShares[ticker] * price, liveRates);
-    const cost  = buyInvested[ticker] || 0;
+    const cost  = costBasis[ticker] || 0;
     totalValue += value;
     totalCost  += cost;
     positions.push({

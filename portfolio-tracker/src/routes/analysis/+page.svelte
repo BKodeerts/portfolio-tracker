@@ -7,7 +7,6 @@
   import PeriodPills from '$lib/components/shared/PeriodPills.svelte';
   import AllocationBar from '$lib/components/shared/AllocationBar.svelte';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
-  import type { RiskMetrics } from '$lib/types/portfolio';
 
   // ── Performance ──────────────────────────────────────────────────────────────
 
@@ -63,15 +62,12 @@
 
   // ── Risk ─────────────────────────────────────────────────────────────────────
 
-  // The server emits `maxDrawdownPct` (positive % decline); the hand-written
-  // type still says `maxDrawdown`. Accept both, render as a negative %.
-  type RmRuntime = Partial<RiskMetrics> & { maxDrawdownPct?: number | null };
-  const rm = $derived(portfolioStore.riskMetrics as RmRuntime | null);
+  const rm = $derived(portfolioStore.riskMetrics);
 
   const riskRows = $derived(() => {
-    const dd = rm?.maxDrawdown ?? rm?.maxDrawdownPct ?? null;
+    const dd = rm?.maxDrawdownPct ?? null;
     return [
-      { label: 'Volatility',   sub: '1Y, annualized',           value: rm?.volatility != null ? fmtPct1(rm.volatility) : null, neg: false },
+      { label: 'Volatility',   sub: 'annualized, full history', value: rm?.volatility != null ? fmtPct1(rm.volatility) : null, neg: false },
       { label: 'Max drawdown', sub: 'worst peak-to-trough',     value: dd != null ? fmtPct1(-Math.abs(dd)) : null,             neg: true },
       { label: 'Sharpe',       sub: 'return per unit of risk',  value: rm?.sharpe != null ? rm.sharpe.toFixed(2) : null,       neg: false },
       { label: 'Sortino',      sub: 'downside risk only',       value: rm?.sortino != null ? rm.sortino.toFixed(2) : null,     neg: false },
