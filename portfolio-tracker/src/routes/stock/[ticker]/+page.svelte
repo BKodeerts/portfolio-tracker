@@ -3,8 +3,10 @@
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
   import { browser } from '$app/environment';
+  import { MediaQuery } from 'svelte/reactivity';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
+  import { buildTickerSpark, type SparkPhase } from '$lib/derived/dashboard';
   import { fetchCandles } from '$lib/api/candles';
   import { fmtEur, fmtEurSigned, fmtNative, fmtNativeSigned, fmtPct, fmtPct1 } from '$lib/utils/fmt';
   import { PERIOD_OPTIONS, periodCutoff } from '$lib/utils/period';
@@ -98,29 +100,46 @@
 
   const iData     = $derived(intradayStore.data[yahoo] as IntradayData | null | undefined);
   const iPts      = $derived(iData?.points ?? []);
-  const allPts    = $derived(iData?.allPoints ?? iPts);
   const prevClose = $derived(iData?.previousClose ?? null);
 
-  // THE market price: last intraday tick ?? prev close ?? last daily candle close.
-  const lastTick  = $derived(allPts[allPts.length - 1]?.close ?? null);
-  const livePrice = $derived(lastTick ?? prevClose ?? candles[candles.length - 1]?.close ?? null);
+  const rawState    = $derived(iData?.marketState ?? (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
+  const marketState = $derived(normalizeMarketState(yahoo, rawState));
 
-  // Day change in native currency vs prev close (only when we have real ticks).
+  // Same state-driven render path as the dashboard sparklines: pre / live / post
+  // per this ticker's own exchange session (incl. the pre-open ghost tail).
+  const spark = $derived(buildTickerSpark(yahoo));
+  const phase = $derived.by((): SparkPhase => {
+    if (spark) return spark.phase;
+    if (marketState === 'REGULAR') return 'live';
+    if (marketState === 'PRE') return 'pre';
+    return 'post';
+  });
+
+  // Last regular-session tick of the drawn session (never extended hours).
+  const sessionLast = $derived(iPts[iPts.length - 1]?.close ?? null);
+
+  // THE market price: prev close before the open, at/latest session price
+  // otherwise; last daily candle close as the final fallback.
+  const livePrice = $derived(
+    phase === 'pre'
+      ? prevClose ?? candles[candles.length - 1]?.close ?? null
+      : sessionLast ?? prevClose ?? candles[candles.length - 1]?.close ?? null,
+  );
+
+  // Day change in native currency vs prev close — never shown pre-open.
   const dayChangeAbs = $derived(
-    lastTick != null && prevClose != null ? lastTick - prevClose : null,
+    phase !== 'pre' && sessionLast != null && prevClose != null ? sessionLast - prevClose : null,
   );
   const dayChangePct = $derived(
     dayChangeAbs != null && prevClose ? (dayChangeAbs / prevClose) * 100 : null,
   );
 
-  const rawState    = $derived(iData?.marketState ?? (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
-  const marketState = $derived(normalizeMarketState(yahoo, rawState));
-  const isOpen      = $derived(marketState === 'REGULAR');
-
-  // Live day P&L in EUR from intraday ticks; null (rendered as —) without them.
+  // Live day P&L in EUR from intraday ticks; null (rendered as —) pre-open
+  // and without data — never a currency-driven number before the open.
   const dayPl = $derived.by((): number | null => {
-    if (pos && prevClose != null && lastTick != null && pos.shares > 0) {
-      return toEurLiveOrFallback(currency, pos.shares * (lastTick - prevClose), intradayStore.liveRates);
+    if (phase === 'pre') return null;
+    if (pos && prevClose != null && sessionLast != null && pos.shares > 0) {
+      return toEurLiveOrFallback(currency, pos.shares * (sessionLast - prevClose), intradayStore.liveRates);
     }
     return null;
   });
@@ -184,6 +203,32 @@
     for (let m = start; m <= end; m += step) ticks.push({ x: m, label: fmtMin(m) });
     return ticks;
   });
+
+  // Pre-open ghost tail (today's pre-market ticks) in minutes-of-day.
+  const ghostPoints = $derived(
+    (spark?.ghostPoints ?? []).map((p) => ({ min: brusselsMinuteOfDay(p.ts), value: p.close })),
+  );
+  const ghostStart = $derived(spark?.ghostStart != null ? brusselsMinuteOfDay(spark.ghostStart) : null);
+  const ghostEnd   = $derived(spark?.ghostEnd   != null ? brusselsMinuteOfDay(spark.ghostEnd)   : null);
+
+  /* ── Market-state labels (chip, hero caption) ── */
+
+  const openLabel  = $derived(fmtMin(intraSession.start));
+  const closeLabel = $derived(fmtMin(intraSession.end));
+  const chipLabel  = $derived(
+    phase === 'live' ? 'OPEN' : phase === 'pre' ? `OPENS ${openLabel}` : 'CLOSED',
+  );
+  const heroCaption = $derived(
+    phase === 'pre'
+      ? `Prev close · market opens ${openLabel} CET`
+      : phase === 'live'
+        ? 'Market price · today'
+        : `At close, ${closeLabel} CET`,
+  );
+
+  /* ── Responsive (design breakpoint: 900px) ── */
+
+  const desktop = new MediaQuery('(min-width: 900px)');
 
   /* ── History chart geometry ── */
 
@@ -266,9 +311,9 @@
         <div class="topbar-ticker">{ticker}</div>
         <div class="topbar-sub">{meta.label ?? ticker} · {exchangeLabel(yahoo)}</div>
       </div>
-      <div class="market-chip mono" class:open={isOpen}>
+      <div class="market-chip mono" class:open={phase === 'live'}>
         <span class="market-dot"></span>
-        {isOpen ? 'OPEN' : 'CLOSED'}
+        {chipLabel}
       </div>
     </div>
 
@@ -280,13 +325,15 @@
         {:else}
           <div class="hero-price mono">—</div>
         {/if}
-        {#if dayChangeAbs != null && dayChangePct != null}
+        {#if phase === 'pre'}
+          <div class="hero-change mono pre-dash">—</div>
+        {:else if dayChangeAbs != null && dayChangePct != null}
           <div class="hero-change mono" class:pos={dayChangeAbs >= 0} class:neg={dayChangeAbs < 0}>
             {fmtNativeSigned(dayChangeAbs, currency)} ({fmtPct(dayChangePct)})
           </div>
         {/if}
       </div>
-      <div class="hero-caption">Market price · today</div>
+      <div class="hero-caption">{heroCaption}</div>
     </div>
 
     <!-- ── Chart (full-bleed, market price only) ── -->
@@ -295,14 +342,21 @@
         {#if prevClose != null}
           <PeriodChart
             mode="intraday"
-            height={190}
+            height={desktop.current ? 260 : 190}
+            padX={desktop.current ? 24 : 20}
             formatY={formatPrice}
             points={intraPoints}
             {prevClose}
             sessionStart={intraSession.start}
             sessionEnd={intraSession.end}
-            xTicks={intraTicks}
-            emptyLabel="Market opens at {fmtMin(intraSession.start)}"
+            xTicks={phase === 'pre' ? [] : intraTicks}
+            dimmed={phase === 'pre'}
+            ghostPoints={phase === 'pre' ? ghostPoints : []}
+            {ghostStart}
+            {ghostEnd}
+            topCaption={phase === 'pre' ? `Previous session · opens ${openLabel}` : null}
+            showNow={phase === 'live'}
+            emptyLabel="Market opens at {openLabel}"
           />
         {:else}
           <div class="chart-placeholder">No intraday data</div>
@@ -310,7 +364,8 @@
       {:else if historyData.length >= 2}
         <PeriodChart
           mode="history"
-          height={190}
+          height={desktop.current ? 260 : 190}
+          padX={desktop.current ? 24 : 20}
           formatY={formatPrice}
           data={historyData}
           xTicks={historyTicks}
@@ -324,6 +379,9 @@
     <div class="pills-row">
       <PeriodPills options={PERIOD_OPTIONS} selected={period} onselect={selectPeriod} />
     </div>
+
+    <!-- ── Columns: position card + history (stacked on mobile) ── -->
+    <div class="columns">
 
     <!-- ── Your position ── -->
     <div class="pos-card">
@@ -358,7 +416,7 @@
               <PrivacyValue value={fmtEurSigned(dayPl)} />
             </div>
           {:else}
-            <div class="stat-val mono muted">—</div>
+            <div class="stat-val mono pre-dash">—</div>
           {/if}
         </div>
         <div class="stat">
@@ -384,6 +442,8 @@
         <ActivityList items={historyItems} showTicker={false} />
       </div>
     {/if}
+
+    </div>
   </div>
 {/if}
 
@@ -400,7 +460,7 @@
   }
   .pos { color: var(--c-pos); }
   .neg { color: var(--c-neg); }
-  .muted { color: var(--fg-faint); }
+  .pre-dash { color: var(--spark-dim); }
 
   /* ── Top bar ── */
   .topbar {
@@ -473,9 +533,19 @@
   }
   .pills-row { margin-top: 8px; }
 
+  /* ── Columns: position card + history ── */
+  .columns {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 26px 56px;
+    margin-top: 24px;
+  }
+
   /* ── Your position card ── */
   .pos-card {
-    margin-top: 24px;
+    flex: 1 1 340px;
+    min-width: 0;
     background: var(--surface);
     border: 1px solid var(--card-border);
     border-radius: var(--card-radius);
@@ -517,8 +587,20 @@
   .stat-sub { font-size: 10px; color: var(--fg-faint); margin-top: 1px; }
 
   /* ── Your history ── */
-  .history { margin-top: 26px; }
+  .history { flex: 1 1 340px; min-width: 0; }
   .history-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+
+  /* ── Desktop (≥900px) — drill-in page: no top nav, back-button header stays ── */
+  @media (min-width: 900px) {
+    .page {
+      max-width: 1160px;
+      padding: 14px 24px 60px;
+    }
+    .hero-price { font-size: 42px; }
+    .chart-bleed { margin: 8px -24px 0; }
+    .chart-placeholder { height: 260px; }
+    .pills-row { max-width: 440px; }
+  }
 
   /* ── Unknown ticker ── */
   .empty-state {

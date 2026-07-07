@@ -134,9 +134,28 @@
   });
 </script>
 
+{#snippet rollingReturns()}
+  <h2 class="sect-title" style="margin-bottom:8px">Rolling returns</h2>
+  <div class="rr-grid">
+    {#each rollingTiles() as t (t.label)}
+      {#if t.value != null}
+        <div class="rr-tile" class:tint-pos={t.value >= 0} class:tint-neg={t.value < 0}>
+          <div class="rr-val mono {t.value >= 0 ? 'c-pos' : 'c-neg'}">{fmtPct1(t.value)}</div>
+          <div class="rr-period">{t.label}</div>
+        </div>
+      {:else}
+        <div class="rr-tile tint-null">
+          <div class="rr-val mono null-val">–</div>
+          <div class="rr-period">{t.label}</div>
+        </div>
+      {/if}
+    {/each}
+  </div>
+{/snippet}
+
 <div class="analysis-page">
 
-  <!-- ── Header ── -->
+  <!-- ── Header (mobile only — desktop uses the global top nav) ── -->
   <div class="head-row">
     <h1 class="page-title">Analysis</h1>
     <a href={resolve('/settings')} class="gear-btn" title="Settings" aria-label="Settings">
@@ -149,94 +168,89 @@
 
   {#if portfolioStore.loaded && portfolioStore.positions.length > 0}
 
-    <!-- ── Performance ── -->
-    <section class="perf-grid">
-      <div>
-        <div class="kpi-label">Total return (TWR)</div>
-        <div class="kpi-value mono {twr != null ? (twr >= 0 ? 'c-pos' : 'c-neg') : 'null-val'}">
-          <PrivacyValue value={twr != null ? fmtPct1(twr) : '–'} />
-        </div>
-        <div class="kpi-sub">{twrSub()}</div>
-      </div>
-      <div>
-        <div class="kpi-label">Annualized (IRR)</div>
-        <div class="kpi-value mono {irr != null ? (irr >= 0 ? 'c-pos' : 'c-neg') : 'null-val'}">
-          <PrivacyValue value={irr != null ? fmtPct1(irr) : '–'} />
-        </div>
-        <div class="kpi-sub">money-weighted</div>
-      </div>
-    </section>
-
-    <!-- ── Return by position ── -->
-    <section>
-      <div class="sect-head">
-        <h2 class="sect-title">Return by position</h2>
-        <span class="sect-hint">% since purchase</span>
-      </div>
-      {#each returnBars() as b (b.ticker)}
-        <div class="ret-row">
-          <div class="ret-id">
-            <span class="tdot" style="background:{b.color}"></span>
-            <span class="ret-ticker">{b.ticker}</span>
+    <!-- ── Performance row: TWR/IRR pair + rolling returns (desktop) ── -->
+    <div class="perf-row">
+      <section class="perf-grid">
+        <div>
+          <div class="kpi-label">Total return (TWR)</div>
+          <div class="kpi-value mono {twr != null ? (twr >= 0 ? 'c-pos' : 'c-neg') : 'null-val'}">
+            <PrivacyValue value={twr != null ? fmtPct1(twr) : '–'} />
           </div>
-          <div class="ret-track">
-            <div class="ret-zero" style="left:{b.zeroLeft}%"></div>
-            <div class="ret-bar {b.pos ? 'pos' : 'neg'}" style="left:{b.barLeft}%; width:{b.barWidth}%"></div>
-          </div>
-          <div class="ret-pct mono {b.pos ? 'c-pos' : 'c-neg'}">{b.pctStr}</div>
+          <div class="kpi-sub">{twrSub()}</div>
         </div>
-      {/each}
-    </section>
+        <div>
+          <div class="kpi-label">Annualized (IRR)</div>
+          <div class="kpi-value mono {irr != null ? (irr >= 0 ? 'c-pos' : 'c-neg') : 'null-val'}">
+            <PrivacyValue value={irr != null ? fmtPct1(irr) : '–'} />
+          </div>
+          <div class="kpi-sub">money-weighted</div>
+        </div>
+      </section>
+      <div class="rr-desktop">{@render rollingReturns()}</div>
+    </div>
 
-    <!-- ── Rolling returns ── -->
-    <section>
-      <h2 class="sect-title" style="margin-bottom:8px">Rolling returns</h2>
-      <div class="rr-grid">
-        {#each rollingTiles() as t (t.label)}
-          {#if t.value != null}
-            <div class="rr-tile" class:tint-pos={t.value >= 0} class:tint-neg={t.value < 0}>
-              <div class="rr-val mono {t.value >= 0 ? 'c-pos' : 'c-neg'}">{fmtPct1(t.value)}</div>
-              <div class="rr-period">{t.label}</div>
+    <!-- ── Columns: positions + risk left, allocation right (single column on mobile) ── -->
+    <div class="columns">
+
+      <div class="col-main">
+        <!-- ── Return by position ── -->
+        <section>
+          <div class="sect-head">
+            <h2 class="sect-title">Return by position</h2>
+            <span class="sect-hint">% since purchase</span>
+          </div>
+          {#each returnBars() as b (b.ticker)}
+            <div class="ret-row">
+              <div class="ret-id">
+                <span class="tdot" style="background:{b.color}"></span>
+                <span class="ret-ticker">{b.ticker}</span>
+              </div>
+              <div class="ret-track">
+                <div class="ret-zero" style="left:{b.zeroLeft}%"></div>
+                <div class="ret-bar {b.pos ? 'pos' : 'neg'}" style="left:{b.barLeft}%; width:{b.barWidth}%"></div>
+              </div>
+              <div class="ret-pct mono {b.pos ? 'c-pos' : 'c-neg'}">{b.pctStr}</div>
             </div>
-          {:else}
-            <div class="rr-tile tint-null">
-              <div class="rr-val mono null-val">–</div>
-              <div class="rr-period">{t.label}</div>
+          {/each}
+        </section>
+
+        <!-- ── Rolling returns (mobile position — handoff 1 order) ── -->
+        <section class="rr-mobile">{@render rollingReturns()}</section>
+
+        <!-- ── Risk ── -->
+        <section class="risk-sect">
+          <h2 class="sect-title" style="margin-bottom:2px">Risk</h2>
+          {#each riskRows() as r (r.label)}
+            <div class="risk-row">
+              <div>
+                <div class="risk-label">{r.label}</div>
+                <div class="risk-sub">{r.sub}</div>
+              </div>
+              <div class="risk-val mono" class:c-neg={r.neg && r.value != null} class:null-val={r.value == null}>
+                {r.value ?? '–'}
+              </div>
+            </div>
+          {/each}
+          {#if concentrationPct() != null}
+            <div class="conc-note">
+              Concentration: {concentrationPct()}% of the portfolio sits in 3 names.
             </div>
           {/if}
-        {/each}
+        </section>
       </div>
-    </section>
 
-    <!-- ── Risk ── -->
-    <section>
-      <h2 class="sect-title" style="margin-bottom:2px">Risk</h2>
-      {#each riskRows() as r (r.label)}
-        <div class="risk-row">
-          <div>
-            <div class="risk-label">{r.label}</div>
-            <div class="risk-sub">{r.sub}</div>
+      <div class="col-side">
+        <!-- ── Allocation ── -->
+        <section>
+          <div class="sect-head center" style="margin-bottom:10px">
+            <h2 class="sect-title">Allocation</h2>
+            <PeriodPills options={DIM_OPTIONS} selected={dim} onselect={setDim} size="small" />
           </div>
-          <div class="risk-val mono" class:c-neg={r.neg && r.value != null} class:null-val={r.value == null}>
-            {r.value ?? '–'}
-          </div>
-        </div>
-      {/each}
-      {#if concentrationPct() != null}
-        <div class="conc-note">
-          Concentration: {concentrationPct()}% of the portfolio sits in 3 names.
-        </div>
-      {/if}
-    </section>
-
-    <!-- ── Allocation ── -->
-    <section>
-      <div class="sect-head center" style="margin-bottom:10px">
-        <h2 class="sect-title">Allocation</h2>
-        <PeriodPills options={DIM_OPTIONS} selected={dim} onselect={setDim} size="small" />
+          <AllocationBar items={allocItems()} legend="rows" />
+        </section>
       </div>
-      <AllocationBar items={allocItems()} legend="rows" />
-    </section>
+
+    </div>
 
   {:else if portfolioStore.loaded}
     <div class="empty-msg">Add transactions to see the analysis.</div>
@@ -251,8 +265,20 @@
     margin: 0 auto;
     background: var(--bg);
   }
-  .analysis-page section { margin-bottom: 24px; }
-  .analysis-page section:last-child { margin-bottom: 0; }
+
+  /* ── Performance row / columns (flex only ≥900px; block flow on mobile) ── */
+  .perf-row { margin-bottom: 24px; }
+  .rr-desktop { display: none; }
+  .columns {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 24px 56px;
+  }
+  .col-main { flex: 2 1 480px; min-width: 0; }
+  .col-side { flex: 1 1 300px; min-width: 0; }
+  .rr-mobile { margin-top: 24px; }
+  .risk-sect { margin-top: 24px; }
 
   .mono {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -421,5 +447,32 @@
     text-align: center;
     font-size: 13px;
     color: var(--fg-muted);
+  }
+
+  /* ── Desktop (≥900px) ── */
+  @media (min-width: 900px) {
+    .analysis-page {
+      max-width: 1160px;
+      padding: 18px 24px 96px;
+    }
+    /* Global top nav replaces the page's own title row */
+    .head-row { display: none; }
+
+    /* Performance row: TWR/IRR pair left, rolling returns right */
+    .perf-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 24px 56px;
+      margin-bottom: 30px;
+    }
+    .perf-grid { flex: 0 1 340px; min-width: 260px; }
+    .rr-desktop { display: block; flex: 1 1 420px; min-width: 300px; }
+    .rr-mobile { display: none; }
+    .kpi-value { font-size: 30px; }
+
+    /* Position bars gain real width — slightly taller rows */
+    .ret-row { padding: 8px 0; }
+    .risk-sect { margin-top: 28px; }
   }
 </style>

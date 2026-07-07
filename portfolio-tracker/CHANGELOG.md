@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.0] — 2026-07-07
+
+### Stock Detail v2 & Analysis v2 — responsive desktop layouts (design handoff 3)
+
+- **Stock Detail desktop (≥900px)**: 1160px container with the back-button header (no top nav — it's a drill-in page), 42px price hero, 260px full-width chart that recomputes on resize, period pills capped at 440px, and the position card + history side by side below the pills.
+- **Stock Detail market-hours states**: the header chip, price hero, 1D chart and "Today" cell now follow the ticker's own exchange session — pre-open shows the prev close with a dimmed previous-session chart and a dotted extended-hours ghost tail (chip `OPENS HH:MM`); live shows the growing session line with the pulsing now-dot (chip `OPEN`); after close the full session renders without a now-dot (chip `CLOSED`, caption "At close, HH:MM CET"). Reuses the dashboard sparkline phase logic; non-1D periods are unaffected.
+- The hero price and day change now come from regular-session ticks only — extended-hours ticks no longer leak into the displayed price or the position card's "Today" P&L.
+- **Analysis desktop (≥900px)**: top nav with Analysis active (no live-status chip on this screen), performance row with 30px TWR/IRR numbers and rolling returns beside them, and a two-column section — return-by-position bars at full width with Risk below on the left, Allocation on the right. Mobile keeps the handoff-1 layout and order exactly.
+
 ## [0.8.4] — 2026-07-06
 
 ### Calculation Fixes

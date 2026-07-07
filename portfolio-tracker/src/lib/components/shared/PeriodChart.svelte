@@ -6,7 +6,9 @@
    *
    * - mode 'history':  daily/weekly closes with optional dashed invested line.
    * - mode 'intraday': session-bounded line vs a dashed prev-close baseline,
-   *   drawn only up to the latest point, with a pulsing "now" dot.
+   *   drawn only up to the latest point, with a pulsing "now" dot. Pre-open
+   *   (`dimmed`) renders the previous session grey without fill, with the
+   *   extended-hours ghost tail dotted in the last ~15% of the width.
    */
   interface XTick {
     /** Position in the data x-domain (history: data x; intraday: minute-of-day). */
@@ -33,12 +35,22 @@
     padX?: number;
     /** Hide the pulsing "now" dot (after the last market close). */
     showNow?: boolean;
+    /** Pre-open: dim the line (no gradient fill, no now-dot). */
+    dimmed?: boolean;
+    /** Pre-open ghost tail (extended-hours data) in minutes-of-day. */
+    ghostPoints?: { min: number; value: number }[];
+    /** Ghost tail x-window (pre-market start → regular open), minutes-of-day. */
+    ghostStart?: number | null;
+    ghostEnd?: number | null;
+    /** Caption centered near the top of the plot ("Previous session · opens 15:30"). */
+    topCaption?: string | null;
   }
   const {
     mode, height = 200, formatY, xTicks = [],
     data = [], invested = [],
     points = [], prevClose, sessionStart, sessionEnd, emptyLabel,
     padX = 20, showNow = true,
+    dimmed = false, ghostPoints = [], ghostStart = null, ghostEnd = null, topCaption = null,
   }: Props = $props();
 
   const uid = $props.id();
@@ -56,6 +68,7 @@
     lineD: string;
     areaD: string;
     investedD: string;
+    ghostD: string;
     lineColor: string;
     baselineY: number | null;
     now: { x: number; y: number } | null;
@@ -96,6 +109,7 @@
         lineD,
         areaD: `${lineD} L${last[0].toFixed(1)} ${bottom} L${first[0].toFixed(1)} ${bottom} Z`,
         investedD: invs.length >= 2 ? pathD(invested.map((d) => [sx(d.x), sy(d.value)])) : '',
+        ghostD: '',
         lineColor: vals[vals.length - 1]! >= vals[0]! ? 'var(--c-pos)' : 'var(--c-neg)',
         baselineY: null,
         now: null,
@@ -105,12 +119,19 @@
 
     // intraday mode
     if (prevClose == null || sessionStart == null || sessionEnd == null || sessionEnd <= sessionStart) return null;
+    // Pre-open: the session line occupies the first ~85% of the width and the
+    // extended-hours ghost tail the rest.
+    const ghost = dimmed && ghostPoints.length >= 2
+      && ghostStart != null && ghostEnd != null && ghostEnd > ghostStart
+      ? ghostPoints : [];
+    const mainR = ghost.length ? L + (R - L) * 0.85 : R;
     const vals = points.map((p) => p.value);
-    let lo = Math.min(prevClose, ...vals);
-    let hi = Math.max(prevClose, ...vals);
+    const gVals = ghost.map((p) => p.value);
+    let lo = Math.min(prevClose, ...vals, ...gVals);
+    let hi = Math.max(prevClose, ...vals, ...gVals);
     const pad = (hi - lo) * 0.15 || Math.abs(prevClose) * 0.005 || 1;
     lo -= pad; hi += pad;
-    const sx = (m: number) => L + ((m - sessionStart) / (sessionEnd - sessionStart)) * (R - L);
+    const sx = (m: number) => L + ((m - sessionStart) / (sessionEnd - sessionStart)) * (mainR - L);
     const sy = (v: number) => T + (1 - (v - lo) / (hi - lo)) * (bottom - T);
     const grid = [0, 0.5, 1].map((f) => {
       const v = hi - f * (hi - lo);
@@ -119,7 +140,7 @@
     const ticks = xTicks.map((t) => ({ x: sx(t.x), label: t.label }));
     if (points.length < 2) {
       return {
-        grid, ticks, lineD: '', areaD: '', investedD: '',
+        grid, ticks, lineD: '', areaD: '', investedD: '', ghostD: '',
         lineColor: 'var(--c-pos)', baselineY: sy(prevClose), now: null, empty: true,
       };
     }
@@ -127,14 +148,23 @@
     const lineD = pathD(pts);
     const last = pts[pts.length - 1]!;
     const first = pts[0]!;
+    let ghostD = '';
+    if (ghost.length) {
+      const gSpan = ghostEnd! - ghostStart!;
+      const gx = (m: number) => mainR + Math.min(1, Math.max(0, (m - ghostStart!) / gSpan)) * (R - mainR);
+      ghostD = pathD(ghost.map((p) => [gx(p.min), sy(p.value)]));
+    }
     return {
       grid, ticks,
       lineD,
-      areaD: `${lineD} L${last[0].toFixed(1)} ${bottom} L${first[0].toFixed(1)} ${bottom} Z`,
+      areaD: dimmed ? '' : `${lineD} L${last[0].toFixed(1)} ${bottom} L${first[0].toFixed(1)} ${bottom} Z`,
       investedD: '',
-      lineColor: vals[vals.length - 1]! >= prevClose ? 'var(--c-pos)' : 'var(--c-neg)',
+      ghostD,
+      lineColor: dimmed
+        ? 'var(--spark-dim)'
+        : vals[vals.length - 1]! >= prevClose ? 'var(--c-pos)' : 'var(--c-neg)',
       baselineY: sy(prevClose),
-      now: { x: last[0], y: last[1] },
+      now: dimmed ? null : { x: last[0], y: last[1] },
       empty: false,
     };
   });
@@ -164,7 +194,13 @@
       <path d={geom.areaD} fill="url(#pchart-{uid})" />
     {/if}
     {#if geom.lineD}
-      <path d={geom.lineD} fill="none" stroke={geom.lineColor} stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+      <path d={geom.lineD} fill="none" stroke={geom.lineColor} stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity={dimmed ? 0.85 : 1} />
+    {/if}
+    {#if geom.ghostD}
+      <path d={geom.ghostD} fill="none" stroke="var(--spark-ghost)" stroke-width="1.5" stroke-dasharray="2 4" stroke-linecap="round" />
+    {/if}
+    {#if topCaption}
+      <text class="top-caption" x={(L + R) / 2} y={T + 12} text-anchor="middle">{topCaption}</text>
     {/if}
     {#if geom.now && showNow}
       <circle class="now-halo" cx={geom.now.x} cy={geom.now.y} r="7" fill={geom.lineColor} opacity="0.18" />
@@ -190,6 +226,11 @@
   .empty-label {
     font-family: inherit;
     font-size: 11px;
+    fill: var(--fg-faint);
+  }
+  .top-caption {
+    font-family: inherit;
+    font-size: 10px;
     fill: var(--fg-faint);
   }
   .now-halo {

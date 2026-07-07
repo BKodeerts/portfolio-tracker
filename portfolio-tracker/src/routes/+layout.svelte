@@ -43,9 +43,15 @@
   const isAnalysis     = $derived(isAt('/analysis'));
   const isTransactions = $derived(isAt('/transactions'));
 
+  // Stock detail is a drill-in page: no top nav, its own back-button header.
+  // (Prefix built via a sentinel param — empty params throw at runtime.)
+  const stockPrefix   = $derived(resolve('/stock/[ticker]', { ticker: '_' }).slice(0, -1));
+  const isStockDetail = $derived(page.url.pathname.startsWith(stockPrefix));
+
   const marketsOpen = $derived(anyMarketOpen());
 </script>
 
+{#if !isStockDetail}
 <header class="top-bar">
   <div class="top-bar-inner">
     <!-- Wordmark -->
@@ -56,10 +62,13 @@
 
     <!-- Right controls -->
     <div class="top-bar-right">
-      <div class="live-chip">
-        <span class="live-chip-dot" class:open={marketsOpen}></span>
-        <span>{marketsOpen ? 'LIVE' : 'CLOSED'}{#if intradayStore.liveEurUsd}&nbsp;· EUR/USD {intradayStore.liveEurUsd.toFixed(3)}{/if}</span>
-      </div>
+      <!-- No live-status chip on the Analysis screen (design handoff 3) -->
+      {#if !isAnalysis}
+        <div class="live-chip">
+          <span class="live-chip-dot" class:open={marketsOpen}></span>
+          <span>{marketsOpen ? 'LIVE' : 'CLOSED'}{#if intradayStore.liveEurUsd}&nbsp;· EUR/USD {intradayStore.liveEurUsd.toFixed(3)}{/if}</span>
+        </div>
+      {/if}
 
       <button
         class="icon-toggle"
@@ -108,6 +117,7 @@
   </div>
 
 </header>
+{/if}
 
 <!-- Mobile bottom tab bar — must be outside <header> to escape backdrop-filter stacking context -->
 <nav class="mobile-tab-bar" aria-label="Navigation">
