@@ -68,14 +68,14 @@
     `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   const firstOpenLabel = $derived(fmtMin(session?.dayStart ?? 9 * 60));
 
-  const heroDelta = $derived.by((): { pl: number; pct: number } | null => {
+  const heroDelta = $derived.by((): { pl: number; pct: number | null } | null => {
     if (period === '1d') {
       // Markets haven't opened: nothing traded today, never show FX drift.
       if (preOpen) return { pl: 0, pct: 0 };
       // No intraday/FX data yet: hide the delta instead of implying a flat day.
       return getDay1Pl();
     }
-    return getPeriodPl(filterChartData(portfolioStore.chartData, period));
+    return getPeriodPl(filterChartData(portfolioStore.chartData, period), period);
   });
 
   const INTRADAY_TICKS = [9, 12, 15, 18, 21].map((h) => ({
@@ -159,7 +159,7 @@
     <div class="hero-delta-row">
       {#if heroDelta}
         <span class="hero-delta mono" class:pos={heroDelta.pl >= 0} class:neg={heroDelta.pl < 0}>
-          {fmtEurSigned(heroDelta.pl)} ({fmtPct(heroDelta.pct)})
+          {fmtEurSigned(heroDelta.pl)}{#if heroDelta.pct != null}&nbsp;({fmtPct(heroDelta.pct)}){/if}
         </span>
       {/if}
       <span class="hero-label">{period === '1d' && preOpen ? 'today · markets closed' : periodDeltaLabel(period)}</span>

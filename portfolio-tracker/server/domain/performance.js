@@ -159,6 +159,7 @@ function computeRollingReturns(chartData, benchmarkData, sp500Data, transactions
     '3m':        calcReturn(findStartIdx(91)),
     'ytd':       calcReturn(ytdIdx()),
     '1y':        calcReturn(findStartIdx(365)),
+    '3y':        calcReturn(findStartIdx(365 * 3)),
     'inception': { portfolio: twrPct, vwce: inception0?.vwce ?? null, sp500: inception0?.sp500 ?? null },
   };
 }

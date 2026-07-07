@@ -4,6 +4,7 @@ import { getTradingMins, isExchangeOpen, normalizeMarketState, sessionBounds, fm
 import { toEurLive, liveRateFor } from '$lib/fx';
 import type { ChartPoint } from '$lib/types/portfolio';
 import type { IntradayData, IntradayPoint } from '$lib/types/candle';
+import type { LegacyPeriod } from '$lib/utils/period';
 
 /**
  * Dashboard derived state. Plain functions over the reactive stores —
@@ -220,13 +221,21 @@ export function getDay1Pl(): { pl: number; pct: number } | null {
   return { pl: diff, pct: (diff / prevCloseTotal) * 100 };
 }
 
+/** Dashboard period pill → server rollingReturns key ('total' = inception TWR). */
+const TWR_KEY: Partial<Record<LegacyPeriod, string>> = {
+  '1m': '1m', '3m': '3m', 'ytd': 'ytd', '1y': '1y', '3y': '3y', 'total': 'inception',
+};
+
 /**
- * P&L over an already period-filtered chart-data slice: the change in
- * unrealized P&L (value − cost basis), so deposits/withdrawals don't count.
- * The % is relative to the portfolio value at the period start — the same
- * base the 1D delta uses (prev close), not the cost basis.
+ * P&L over an already period-filtered chart-data slice. The EUR amount is
+ * the change in unrealized P&L (value − cost basis), so deposits/withdrawals
+ * don't count. The % is the server-computed time-weighted return for the
+ * period (rollingReturns): dividing the EUR amount by the period-start value
+ * explodes on long windows where the portfolio started near zero (Max),
+ * because every later deposit dwarfs that base. pct is null when the server
+ * has no TWR for the period.
  */
-export function getPeriodPl(filtered: ChartPoint[]): { pl: number; pct: number } | null {
+export function getPeriodPl(filtered: ChartPoint[], period: LegacyPeriod): { pl: number; pct: number | null } | null {
   if (filtered.length < 2) return null;
   const first = filtered[0]!;
   const last  = filtered[filtered.length - 1]!;
@@ -234,9 +243,10 @@ export function getPeriodPl(filtered: ChartPoint[]): { pl: number; pct: number }
   const lv = last.value ?? 0;
   const fi = first.invested ?? 0;
   const li = last.invested ?? 0;
-  const pl   = (lv - li) - (fv - fi);
-  const base = fv > 0 ? fv : li;
-  return { pl, pct: base > 0 ? (pl / base) * 100 : 0 };
+  const pl  = (lv - li) - (fv - fi);
+  const key = TWR_KEY[period];
+  const pct = key ? portfolioStore.rollingReturns[key]?.portfolio ?? null : null;
+  return { pl, pct };
 }
 
 /** Last-n weekly portfolio values for a ticker (mini trend sparkline). */
