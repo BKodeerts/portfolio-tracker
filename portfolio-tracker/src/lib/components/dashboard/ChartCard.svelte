@@ -33,7 +33,7 @@
   );
 
   const chartOption   = $derived(period === '1d' ? build1DOption(view) : buildOption(filtered, view, period, visibleTickers));
-  const periodPlValue = $derived(period === '1d' ? getDay1Pl() : getPeriodPl(filtered));
+  const periodPlValue = $derived(period === '1d' ? getDay1Pl() : getPeriodPl(filtered, period));
   const periodLabel   = $derived(PERIODS.find((p) => p.key === period)?.label ?? '');
 </script>
 
@@ -42,7 +42,9 @@
     <div class="headline-pl {(periodPlValue?.pl ?? 0) >= 0 ? 'c-pos' : 'c-neg'}" style:visibility={periodPlValue ? 'visible' : 'hidden'}>
       {#if periodPlValue}
         <PrivacyValue value={`${periodPlValue.pl >= 0 ? '+' : ''}${fmt(periodPlValue.pl)}`} />
-        <span class="headline-pct">{fmtPct(periodPlValue.pct)}</span>
+        {#if periodPlValue.pct != null}
+          <span class="headline-pct">{fmtPct(periodPlValue.pct)}</span>
+        {/if}
       {:else}&nbsp;{/if}
     </div>
     <div class="headline-caption">{periodLabel}</div>

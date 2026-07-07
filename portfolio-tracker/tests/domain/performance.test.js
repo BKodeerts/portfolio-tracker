@@ -166,4 +166,15 @@ describe('computeRollingReturns', () => {
     expect(rr['1m'].portfolio).toBeCloseTo(10, 6);
     expect(rr.inception.portfolio).toBe(10); // passed-through full-history TWR
   });
+
+  it('emits a flow-adjusted 3y window (dashboard 3Y pill)', () => {
+    // 4 years flat at €1000, then a €1000 deposit late in the 3y window
+    const chartData = makeChartData(1500, (i) => (i < 1400 ? 1000 : 2000));
+    const transactions = [
+      { date: dateAt(0),    ticker: 'AAA', shares: 10, costEur: 1000 },
+      { date: dateAt(1400), ticker: 'AAA', shares: 10, costEur: 1000 },
+    ];
+    const rr = computeRollingReturns(chartData, [], [], transactions, 0);
+    expect(rr['3y'].portfolio).toBeCloseTo(0, 6);
+  });
 });

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1] — 2026-07-07
+
+### Calculation Fixes
+
+- **Dashboard period % is now the time-weighted return (TWR)** — the hero delta % for 1M/3M/YTD/1Y/3Y/Max now uses the same server-computed rolling TWR as the Analysis tiles. Previously it divided the period's P&L by the portfolio value at the period start, which exploded on Max: the start value is the tiny day-one portfolio, so every deposit since then made the % absurd. The EUR amount next to it is unchanged (change in unrealized P&L — deposits still don't count).
+- **Server rolling returns gained a `3y` window** so the dashboard's 3Y pill has a real TWR. When no TWR exists for a period yet (e.g. not enough history), the % is hidden instead of showing a misleading number.
+
 ## [0.9.0] — 2026-07-07
 
 ### Stock Detail v2 & Analysis v2 — responsive desktop layouts (design handoff 3)
