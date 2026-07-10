@@ -5,6 +5,7 @@ import {
   computeAnnualPl,
   computeRiskMetrics,
   computeRollingReturns,
+  computeReturnIndex,
 } from '../../server/domain/performance.js';
 
 const noAdj = (tx) => tx.shares;
@@ -70,6 +71,53 @@ describe('computeServerTWR', () => {
 
   it('returns null for fewer than 2 points', () => {
     expect(computeServerTWR([{ date: '2024-01-02', value: 100 }], [])).toBeNull();
+  });
+});
+
+describe('computeReturnIndex', () => {
+  const chartData = [
+    { date: '2024-01-02', value: 1000 },
+    { date: '2024-02-01', value: 2100 }, // €1000 deposited this day; grew 10% before the deposit
+    { date: '2024-03-01', value: 2310 }, // +10% after the deposit
+  ];
+  const transactions = [
+    { date: '2024-01-02', ticker: 'AAA', shares: 10, costEur: 1000 },
+    { date: '2024-02-01', ticker: 'AAA', shares: 10, costEur: 1000 },
+  ];
+
+  it('deposits never move the index; per-row values track price return only', () => {
+    expect(computeReturnIndex(chartData, transactions)).toEqual([100, 110, 121]);
+  });
+
+  it('final value matches computeServerTWR over the same slice', () => {
+    const idx = computeReturnIndex(chartData, transactions);
+    const twr = computeServerTWR(chartData, transactions);
+    expect((idx.at(-1) / 100 - 1) * 100).toBeCloseTo(twr, 6);
+  });
+
+  it('a deposit-only portfolio with flat prices stays at 100', () => {
+    const flat = [
+      { date: '2024-01-02', value: 1000 },
+      { date: '2024-02-01', value: 3000 }, // €2000 deposited, no growth
+      { date: '2024-03-01', value: 3000 },
+    ];
+    const txs = [
+      { date: '2024-01-02', ticker: 'AAA', shares: 10, costEur: 1000 },
+      { date: '2024-02-01', ticker: 'AAA', shares: 20, costEur: 2000 },
+    ];
+    expect(computeReturnIndex(flat, txs)).toEqual([100, 100, 100]);
+  });
+
+  it('a withdrawal (sale) never moves the index', () => {
+    const data = [
+      { date: '2024-01-02', value: 1000 },
+      { date: '2024-02-01', value: 500 }, // €500 withdrawn, no price move
+    ];
+    const txs = [
+      { date: '2024-01-02', ticker: 'AAA', shares: 10, costEur: 1000 },
+      { date: '2024-02-01', ticker: 'AAA', shares: -5, costEur: 500 },
+    ];
+    expect(computeReturnIndex(data, txs)).toEqual([100, 100]);
   });
 });
 

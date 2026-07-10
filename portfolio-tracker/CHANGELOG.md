@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.1] — 2026-07-10
+
+### Fixed
+
+- **Main chart % mode uses TWR again**: the € | % toggle re-based raw portfolio value against the window's first value, so every deposit counted as return — on Max the tiny day-one base inflated the line into absurd percentages (e.g. 51000% instead of the actual ~269%). The server now emits a flow-adjusted return index per chart row (`returnIndex`, base 100 at inception, same math as the TWR/rolling-return tiles) and the chart re-bases that index to the selected window, so deposits and withdrawals never move the % line and the Max endpoint matches the inception TWR.
+
 ## [0.10.0] — 2026-07-10
 
 ### Dashboard v3 — holdings cards, watchlist, chart features (design handoff 4)

@@ -11,6 +11,12 @@ export interface ChartPoint {
   value: number;
   /** Total FIFO cost basis in EUR. */
   invested: number;
+  /**
+   * Flow-adjusted return index (base 100 at inception), server-computed
+   * (computeReturnIndex): deposits/withdrawals never move it, so re-basing
+   * two rows gives the TWR between them.
+   */
+  returnIndex: number;
   positions: Record<string, ChartPositionSlice>;
 }
 

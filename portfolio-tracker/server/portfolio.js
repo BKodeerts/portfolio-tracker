@@ -33,6 +33,7 @@ const {
   computeAnnualPl,
   computeXIRR,
   computeServerTWR,
+  computeReturnIndex,
 } = require('./domain/performance.js');
 const {
   BENCHMARK_SYM,
@@ -320,6 +321,8 @@ async function computeFullPortfolio() {
 
   let chartData = buildChartData(meta, transactions, priceMaps, fxMaps, sortedDates, adjSharesFn);
   chartData = await appendTodaySnapshot(chartData, meta, transactions, fxMaps, adjSharesFn);
+  const returnIndexSeries = computeReturnIndex(chartData, transactions);
+  chartData.forEach((row, i) => { row.returnIndex = returnIndexSeries[i]; });
 
   const benchmarkData  = buildBenchmarkData(priceMaps, chartData, BENCHMARK_SYM);
   const sp500Data      = buildBenchmarkData(priceMaps, chartData, SP500_SYM, fxMap);
