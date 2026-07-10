@@ -135,12 +135,16 @@
   const historyFiltered = $derived(period === '1d' ? [] : filterChartData(portfolioStore.chartData, period));
   const historyFirst    = $derived(historyFiltered[0]?.value ?? 0);
   const historyData     = $derived(historyFiltered.map((p) => ({ x: new Date(p.date).getTime(), value: p.value })));
+  // % mode re-bases the server's flow-adjusted return index (TWR), never raw
+  // value: dividing values by the window-start value counts every deposit as
+  // return and explodes on long windows where the portfolio started small.
+  const historyFirstRi  = $derived(historyFiltered[0]?.returnIndex ?? 0);
   const historyDisplay  = $derived.by(() => {
     if (!isPct) return historyData;
-    if (historyFirst <= 0) return [];
+    if (historyFirstRi <= 0) return [];
     return historyFiltered.map((p) => ({
       x: new Date(p.date).getTime(),
-      value: (p.value / historyFirst - 1) * 100,
+      value: (p.returnIndex / historyFirstRi - 1) * 100,
     }));
   });
   // Invested overlay + gain fill are € mode only (in %, benchmark comparison is the point).
@@ -215,7 +219,7 @@
     const lines: ChartTipLine[] = [];
     lines.push({
       text: isPct
-        ? historyFirst > 0 ? fmtPct1((row.value / historyFirst - 1) * 100) : '—'
+        ? historyFirstRi > 0 ? fmtPct1((row.returnIndex / historyFirstRi - 1) * 100) : '—'
         : fmtEur(row.value),
       tone: 'main',
     });

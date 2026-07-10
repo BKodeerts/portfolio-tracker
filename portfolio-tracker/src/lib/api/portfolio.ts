@@ -20,8 +20,8 @@ function assertPortfolioShape(p: unknown): asserts p is PortfolioResponse {
   if (!Array.isArray(obj['chartData'])) throw new Error('/api/portfolio: chartData is not an array');
   const row = (obj['chartData'] as unknown[])[0] as Record<string, unknown> | undefined;
   if (row !== undefined) {
-    if (typeof row['date'] !== 'string' || typeof row['value'] !== 'number' || typeof row['invested'] !== 'number') {
-      throw new Error('/api/portfolio: chartData row missing date/value/invested');
+    if (typeof row['date'] !== 'string' || typeof row['value'] !== 'number' || typeof row['invested'] !== 'number' || typeof row['returnIndex'] !== 'number') {
+      throw new Error('/api/portfolio: chartData row missing date/value/invested/returnIndex');
     }
     if (row['positions'] == null || typeof row['positions'] !== 'object' || Array.isArray(row['positions'])) {
       throw new Error('/api/portfolio: chartData row missing "positions" object — server/client contract mismatch');

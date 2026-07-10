@@ -288,6 +288,29 @@ function computeServerTWR(chartData, transactions) {
   return Number.parseFloat(finalTwr.toFixed(2));
 }
 
+/**
+ * Per-row flow-adjusted return index over chart data, base 100 at the first
+ * row. Chains the same daily flow-adjusted returns as computeServerTWR, so
+ * the final value equals the inception TWR: deposits and withdrawals never
+ * move the index. Returns an array aligned index-for-index with chartData.
+ */
+function computeReturnIndex(chartData, transactions) {
+  const cfByDate = netCashFlowByDate(transactions);
+  const out = [];
+  let index = 100;
+  for (let i = 0; i < chartData.length; i++) {
+    if (i > 0) {
+      const prev = chartData[i - 1].value;
+      if (prev > 0) {
+        const cf = cfByDate[chartData[i].date] || 0;
+        index *= (chartData[i].value - cf) / prev;
+      }
+    }
+    out.push(Number.parseFloat(index.toFixed(4)));
+  }
+  return out;
+}
+
 module.exports = {
   RISK_FREE_RATE,
   computeRiskMetrics,
@@ -295,4 +318,5 @@ module.exports = {
   computeAnnualPl,
   computeXIRR,
   computeServerTWR,
+  computeReturnIndex,
 };
