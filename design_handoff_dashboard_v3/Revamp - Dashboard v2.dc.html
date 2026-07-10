@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="./mock.js"></script>
+  <style>
+    body { margin: 0; background: #fafaf8; }
+  </style>
+</helmet>
+<div data-screen-label="Revamp Dashboard v2 (responsive)" style="width:100%; min-height:100vh; background:#fafaf8; color:#101216; font-family:Inter,ui-sans-serif,system-ui,sans-serif; letter-spacing:-0.005em; position:relative">
+
+  <!-- ── Desktop top nav ── -->
+  <sc-if value="{{ isDesk }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex; align-items:center; gap:28px; max-width:1160px; margin:0 auto; padding:18px 24px 0">
+      <div style="font-size:15px; font-weight:700; letter-spacing:-0.02em">Portfolio</div>
+      <div style="display:flex; gap:4px">
+        <div style="font-size:12.5px; font-weight:700; color:#101216; padding:6px 12px; border-radius:8px; background:#eceae3; cursor:pointer">Portfolio</div>
+        <div style="font-size:12.5px; font-weight:500; color:#8b929c; padding:6px 12px; border-radius:8px; cursor:pointer" style-hover="color:#101216">Analysis</div>
+        <div style="font-size:12.5px; font-weight:500; color:#8b929c; padding:6px 12px; border-radius:8px; cursor:pointer" style-hover="color:#101216">Activity</div>
+      </div>
+      <div style="margin-left:auto; display:flex; align-items:center; gap:6px; font-size:10px; font-weight:600; color:#8b929c; font-family:'JetBrains Mono',monospace">
+        <span style="width:6px; height:6px; border-radius:50%; background:{{ liveDotColor }}"></span>
+        {{ liveLabel }}
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ── Mobile top bar ── -->
+  <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px 0">
+      <div style="font-size:15px; font-weight:700; letter-spacing:-0.02em">Portfolio</div>
+      <div style="display:flex; align-items:center; gap:6px; font-size:10px; font-weight:600; color:#8b929c; font-family:'JetBrains Mono',monospace">
+        <span style="width:6px; height:6px; border-radius:50%; background:{{ liveDotColor }}"></span>
+        {{ liveLabel }}
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="max-width:1160px; margin:0 auto; padding:18px 0 96px">
+
+    <!-- ── Hero ── -->
+    <div style="margin:0 {{ pagePad }} 6px">
+      <div style="font-family:'JetBrains Mono',monospace; font-size:{{ heroSize }}; font-weight:700; letter-spacing:-0.02em; line-height:1.05">{{ totalValueStr }}</div>
+      <div style="display:flex; align-items:center; gap:14px; margin-top:8px; font-size:13px">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:{{ heroColor }}">{{ heroDelta }}</span>
+        <span style="color:#8b929c">{{ heroLabel }}</span>
+      </div>
+    </div>
+
+    <!-- ── Chart ── -->
+    <div style="margin:10px 0 0; position:relative">
+      <svg width="{{ chartW }}" height="{{ chartH }}" viewBox="{{ chartVB }}" style="display:block; touch-action:pan-y" onMouseMove="{{ chartMove }}" onMouseLeave="{{ chartLeave }}" onTouchStart="{{ chartMove }}" onTouchMove="{{ chartMove }}">
+        <sc-for list="{{ bands }}" as="s" hint-placeholder-count="3">
+          <rect x="{{ s.x }}" y="{{ s.y }}" width="{{ s.w }}" height="{{ s.h }}" fill="{{ s.fill }}"></rect>
+          <text x="{{ s.labelX }}" y="{{ s.labelY }}" text-anchor="middle" font-size="8" fill="#c6cad1" font-family="Inter, sans-serif" letter-spacing="0.08em">{{ s.label }}</text>
+        </sc-for>
+        <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="3">
+          <line x1="{{ gridX1 }}" x2="{{ gridX2 }}" y1="{{ g.y }}" y2="{{ g.y }}" stroke="rgba(16,18,22,0.05)" stroke-width="1"></line>
+          <text x="{{ gridLabelX }}" y="{{ g.labelY }}" text-anchor="end" font-size="9" fill="#b3b8c0" font-family="JetBrains Mono, monospace">{{ g.label }}</text>
+        </sc-for>
+        <sc-if value="{{ showBaseline }}" hint-placeholder-val="{{ false }}">
+          <line x1="{{ gridX1 }}" x2="{{ gridX2 }}" y1="{{ baselineY }}" y2="{{ baselineY }}" stroke="#b3b8c0" stroke-width="1" stroke-dasharray="3 4"></line>
+          <text x="{{ baselineTextX }}" y="{{ baselineLabelY }}" font-size="9" fill="#b3b8c0" font-family="JetBrains Mono, monospace">prev close</text>
+        </sc-if>
+        <sc-if value="{{ showEmptyMsg }}" hint-placeholder-val="{{ false }}">
+          <text x="{{ emptyMsgX }}" y="{{ emptyMsgY }}" text-anchor="middle" font-size="11" fill="#8b929c" font-family="Inter, sans-serif">Markets open at 09:00</text>
+        </sc-if>
+        <sc-for list="{{ gainSegs }}" as="gs" hint-placeholder-count="2">
+          <path d="{{ gs.d }}" fill="{{ gs.fill }}"></path>
+        </sc-for>
+        <sc-if value="{{ showInvested }}" hint-placeholder-val="{{ false }}">
+          <path d="{{ investedPath }}" fill="none" stroke="#c9cdd3" stroke-width="1.3" stroke-dasharray="4 4"></path>
+        </sc-if>
+        <path d="{{ areaPath }}" fill="url(#rvGrad2)"></path>
+        <sc-if value="{{ showBenchLine }}" hint-placeholder-val="{{ false }}">
+          <path d="{{ benchPath }}" fill="none" stroke="#6366f1" stroke-width="1.5" opacity="0.85" stroke-linejoin="round"></path>
+        </sc-if>
+        <path d="{{ linePath }}" fill="none" stroke="{{ lineColor }}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+        <sc-for list="{{ markers }}" as="m" hint-placeholder-count="2">
+          <circle cx="{{ m.cx }}" cy="{{ m.cy }}" r="3" fill="{{ m.fill }}" stroke="#fafaf8" stroke-width="1.5"></circle>
+        </sc-for>
+        <sc-for list="{{ hiLos }}" as="h" hint-placeholder-count="2">
+          <circle cx="{{ h.cx }}" cy="{{ h.cy }}" r="2" fill="#101216"></circle>
+          <text x="{{ h.x }}" y="{{ h.y }}" text-anchor="middle" font-size="9" fill="#6a6f78" font-family="JetBrains Mono, monospace">{{ h.label }}</text>
+        </sc-for>
+        <sc-if value="{{ hoverOn }}" hint-placeholder-val="{{ false }}">
+          <line x1="{{ hoverX }}" x2="{{ hoverX }}" y1="{{ crossTop }}" y2="{{ crossBot }}" stroke="rgba(16,18,22,0.25)" stroke-width="1" stroke-dasharray="2 3"></line>
+          <circle cx="{{ hoverX }}" cy="{{ hoverY }}" r="3.5" fill="{{ lineColor }}" stroke="#fafaf8" stroke-width="1.5"></circle>
+        </sc-if>
+        <sc-if value="{{ showNow }}" hint-placeholder-val="{{ false }}">
+          <circle cx="{{ nowX }}" cy="{{ nowY }}" r="3.5" fill="{{ lineColor }}"></circle>
+          <circle cx="{{ nowX }}" cy="{{ nowY }}" r="7" fill="{{ lineColor }}" opacity="0.18"></circle>
+        </sc-if>
+        <sc-for list="{{ xTicks }}" as="x" hint-placeholder-count="4">
+          <text x="{{ x.x }}" y="{{ xTickY }}" text-anchor="middle" font-size="9" fill="#b3b8c0" font-family="JetBrains Mono, monospace">{{ x.label }}</text>
+        </sc-for>
+        <defs>
+          <linearGradient id="rvGrad2" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="{{ lineColor }}" stop-opacity="0.16"></stop>
+            <stop offset="100%" stop-color="{{ lineColor }}" stop-opacity="0"></stop>
+          </linearGradient>
+        </defs>
+      </svg>
+      <sc-if value="{{ hoverOn }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; top:10px; left:{{ tipLeft }}; width:190px; background:rgba(255,255,255,0.97); border:1px solid rgba(16,18,22,0.09); border-radius:10px; box-shadow:0 4px 14px rgba(16,18,22,0.08); padding:9px 11px; pointer-events:none; z-index:20; box-sizing:border-box">
+          <div style="font-size:10px; font-weight:600; color:#8b929c; font-family:'JetBrains Mono',monospace">{{ tipTitle }}</div>
+          <sc-for list="{{ tipLines }}" as="tl" hint-placeholder-count="2">
+            <div style="font-family:'JetBrains Mono',monospace; font-size:{{ tl.size }}; font-weight:{{ tl.weight }}; color:{{ tl.color }}; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ tl.text }}</div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+
+    <!-- ── Period pills + chart controls ── -->
+    <div style="margin:8px {{ pagePad }} 4px">
+      <div style="display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; justify-content:space-between">
+        <div style="display:flex; justify-content:space-between; gap:2px; flex:1 1 300px; max-width:440px">
+          <sc-for list="{{ periods }}" as="p" hint-placeholder-count="7">
+            <div onClick="{{ p.select }}" style="flex:1; height:30px; min-width:44px; display:flex; align-items:center; justify-content:center; font-size:12px; border-radius:8px; cursor:pointer; font-weight:{{ p.weight }}; color:{{ p.color }}; background:{{ p.bg }}">{{ p.label }}</div>
+          </sc-for>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center">
+          <div style="display:flex; border:1px solid rgba(16,18,22,0.12); border-radius:8px; overflow:hidden">
+            <div onClick="{{ setEur }}" style="padding:5px 11px; font-size:11px; cursor:pointer; font-weight:{{ eurWt }}; color:{{ eurC }}; background:{{ eurBg }}">€</div>
+            <div onClick="{{ setPct }}" style="padding:5px 11px; font-size:11px; cursor:pointer; font-weight:{{ pctWt }}; color:{{ pctC }}; background:{{ pctBg }}">%</div>
+          </div>
+          <div onClick="{{ toggleBench }}" style="display:flex; align-items:center; gap:6px; padding:5px 11px; font-size:11px; border:1px solid rgba(16,18,22,0.12); border-radius:8px; cursor:pointer; font-weight:{{ benchWt }}; color:{{ benchC }}; background:{{ benchBg }}; opacity:{{ benchOp }}; user-select:none">
+            <span style="width:10px; height:2px; border-radius:2px; background:#6366f1"></span> vs S&amp;P 500
+          </div>
+        </div>
+      </div>
+      <sc-if value="{{ is1d }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:11px; color:#8b929c; padding:6px 2px 0">{{ helper1d }}</div>
+      </sc-if>
+    </div>
+
+    <!-- ── Columns: holdings + sidebar (wraps to single column on narrow) ── -->
+    <div style="display:flex; flex-wrap:wrap; gap:8px 56px; padding:0 {{ pagePad }}; margin-top:26px; align-items:flex-start">
+
+      <!-- Holdings -->
+      <div style="flex:2 1 520px; min-width:0">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin:0 0 4px">
+          <div style="font-size:13px; font-weight:600; letter-spacing:0.01em">Holdings</div>
+          <div onClick="{{ toggleDayMode }}" style="font-size:11px; color:#8b929c; cursor:pointer; user-select:none" style-hover="color:#101216">today · {{ dayModeLabel }} ⇄</div>
+        </div>
+        <sc-if value="{{ cardsMode }}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-top:8px">
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+              <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.07); border-radius:14px; padding:12px 14px; cursor:pointer; box-shadow:0 1px 2px rgba(16,18,22,0.03)" style-hover="border-color:rgba(16,18,22,0.18)">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+                  <div style="display:flex; align-items:center; gap:6px; min-width:0">
+                    <span style="width:6px; height:6px; border-radius:2px; flex-shrink:0; background:{{ r.color }}"></span>
+                    <span style="font-size:13px; font-weight:700">{{ r.ticker }}</span>
+                  </div>
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#8b929c; white-space:nowrap">{{ r.priceStr }}</span>
+                </div>
+                <div style="margin:10px 0 8px">
+                  <svg width="100%" height="34" viewBox="0 0 120 30" preserveAspectRatio="none" style="display:block; opacity:{{ r.sparkOpacity }}">
+                    <line x1="0" x2="120" y1="{{ r.zeroY }}" y2="{{ r.zeroY }}" stroke="rgba(16,18,22,0.07)" stroke-width="1"></line>
+                    <path d="{{ r.sparkLine }}" fill="none" stroke="{{ r.sparkColor }}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                    <sc-if value="{{ r.hasGhost }}" hint-placeholder-val="{{ false }}">
+                      <path d="{{ r.ghostLine }}" fill="none" stroke="#9aa0aa" stroke-width="1.2" stroke-dasharray="2 3" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+                    </sc-if>
+                  </svg>
+                  <sc-if value="{{ r.hasHint }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:9.5px; color:#b3b8c0; text-align:center; margin-top:2px; white-space:nowrap; overflow:hidden">{{ r.hint }}</div>
+                  </sc-if>
+                </div>
+                <div onClick="{{ toggleDayMode }}" style="display:flex; align-items:baseline; justify-content:space-between; gap:8px">
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#8b929c; white-space:nowrap">{{ r.valueStr }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; white-space:nowrap; color:{{ r.dayColor }}">{{ r.dayStr }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ rowsMode }}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+          <div style="display:grid; grid-template-columns:1fr minmax(60px,110px) 1fr; gap:16px; align-items:center; padding:13px 0; border-bottom:1px solid rgba(16,18,22,0.06); cursor:pointer" style-hover="background:rgba(16,18,22,0.02)">
+            <div style="min-width:0">
+              <div style="display:flex; align-items:center; gap:6px">
+                <span style="width:6px; height:6px; border-radius:2px; flex-shrink:0; background:{{ r.color }}"></span>
+                <span style="font-size:13px; font-weight:700">{{ r.ticker }}</span>
+              </div>
+              <div style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#8b929c; margin-top:3px; white-space:nowrap">{{ r.priceStr }} · {{ r.sharesStr }}</div>
+            </div>
+            <div style="min-width:0">
+              <svg width="100%" height="30" viewBox="0 0 120 30" preserveAspectRatio="none" style="display:block; opacity:{{ r.sparkOpacity }}">
+                <line x1="0" x2="120" y1="{{ r.zeroY }}" y2="{{ r.zeroY }}" stroke="rgba(16,18,22,0.07)" stroke-width="1"></line>
+                <path d="{{ r.sparkLine }}" fill="none" stroke="{{ r.sparkColor }}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                <sc-if value="{{ r.hasGhost }}" hint-placeholder-val="{{ false }}">
+                  <path d="{{ r.ghostLine }}" fill="none" stroke="#9aa0aa" stroke-width="1.2" stroke-dasharray="2 3" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+                </sc-if>
+              </svg>
+              <sc-if value="{{ r.hasHint }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:9.5px; color:#b3b8c0; text-align:center; margin-top:1px; white-space:nowrap; overflow:hidden">{{ r.hint }}</div>
+              </sc-if>
+            </div>
+            <div onClick="{{ toggleDayMode }}" style="text-align:right; cursor:pointer; min-width:84px">
+              <div style="font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:{{ r.dayColor }}">{{ r.dayStr }}</div>
+              <div style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#8b929c; margin-top:3px">{{ r.valueStr }}</div>
+            </div>
+          </div>
+        </sc-for>
+        </sc-if>
+
+        <!-- Watchlist -->
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin:28px 0 4px">
+          <div style="font-size:13px; font-weight:600; letter-spacing:0.01em">Watchlist</div>
+          <div style="font-size:11px; color:#8b929c">not held</div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-top:8px">
+          <sc-for list="{{ watchRows }}" as="r" hint-placeholder-count="3">
+            <div style="background:transparent; border:1px dashed rgba(16,18,22,0.14); border-radius:14px; padding:12px 14px; cursor:pointer" style-hover="border-color:rgba(16,18,22,0.30)">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+                <div style="display:flex; align-items:center; gap:6px; min-width:0">
+                  <span style="width:6px; height:6px; border-radius:50%; border:1.5px solid {{ r.color }}; flex-shrink:0; box-sizing:border-box"></span>
+                  <span style="font-size:13px; font-weight:700">{{ r.ticker }}</span>
+                </div>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#8b929c; white-space:nowrap">{{ r.priceStr }}</span>
+              </div>
+              <div style="margin:10px 0 8px">
+                <svg width="100%" height="34" viewBox="0 0 120 30" preserveAspectRatio="none" style="display:block; opacity:{{ r.sparkOpacity }}">
+                  <line x1="0" x2="120" y1="{{ r.zeroY }}" y2="{{ r.zeroY }}" stroke="rgba(16,18,22,0.07)" stroke-width="1"></line>
+                  <path d="{{ r.sparkLine }}" fill="none" stroke="{{ r.sparkColor }}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+                  <sc-if value="{{ r.hasGhost }}" hint-placeholder-val="{{ false }}">
+                    <path d="{{ r.ghostLine }}" fill="none" stroke="#9aa0aa" stroke-width="1.2" stroke-dasharray="2 3" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+                  </sc-if>
+                </svg>
+                <sc-if value="{{ r.hasHint }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:9.5px; color:#b3b8c0; text-align:center; margin-top:2px; white-space:nowrap; overflow:hidden">{{ r.hint }}</div>
+                </sc-if>
+              </div>
+              <div onClick="{{ toggleDayMode }}" style="display:flex; align-items:baseline; justify-content:space-between; gap:8px">
+                <span style="font-size:10.5px; color:#8b929c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ r.labelStr }}</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; white-space:nowrap; color:{{ r.dayColor }}">{{ r.dayStr }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- Sidebar: allocation + activity -->
+      <div style="flex:1 1 300px; min-width:0; display:flex; flex-direction:column; gap:26px; padding-top:{{ sideTopPad }}">
+        <div>
+          <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px">
+            <div style="font-size:13px; font-weight:600">Allocation</div>
+            <div style="font-size:11px; color:#8b929c">{{ investedStr }} invested</div>
+          </div>
+          <div style="height:8px; border-radius:999px; display:flex; overflow:hidden; gap:2px">
+            <sc-for list="{{ alloc }}" as="a" hint-placeholder-count="6">
+              <div style="height:100%; width:{{ a.width }}; background:{{ a.color }}"></div>
+            </sc-for>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:10px">
+            <sc-for list="{{ alloc }}" as="a" hint-placeholder-count="6">
+              <div style="display:flex; align-items:center; gap:5px; font-size:11px; color:#6a6f78">
+                <span style="width:6px; height:6px; border-radius:2px; background:{{ a.color }}"></span>
+                {{ a.ticker }} <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:#3c414a">{{ a.pctStr }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div>
+          <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:2px">
+            <div style="font-size:13px; font-weight:600">Activity</div>
+            <div style="font-size:11px; color:#8b929c; cursor:pointer">All →</div>
+          </div>
+          <sc-for list="{{ txs }}" as="tx" hint-placeholder-count="3">
+            <div style="display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid rgba(16,18,22,0.06)">
+              <span style="font-size:10px; font-weight:700; width:34px; text-align:center; padding:3px 0; border-radius:5px; background:{{ tx.kindBg }}; color:{{ tx.kindColor }}">{{ tx.kind }}</span>
+              <span style="font-size:12.5px; font-weight:600">{{ tx.ticker }}</span>
+              <span style="font-size:11px; color:#8b929c">{{ tx.detail }}</span>
+              <span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600">{{ tx.costStr }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Mobile bottom tab bar ── -->
+  <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ true }}">
+    <div style="position:fixed; bottom:0; left:0; right:0; background:rgba(250,250,248,0.92); backdrop-filter:blur(20px); border-top:1px solid rgba(16,18,22,0.07); padding:8px 12px 24px; z-index:200; display:flex; justify-content:space-around">
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 16px; color:#101216; font-size:10px; font-weight:700">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M7 14l4-5 3 3 5-7"></path></svg>
+        <span>Portfolio</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 16px; color:#8b929c; font-size:10px; font-weight:500">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v9l6.4 4"></path></svg>
+        <span>Analysis</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 16px; color:#8b929c; font-size:10px; font-weight:500">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg>
+        <span>Activity</span>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1280, &quot;height&quot;: 900}, &quot;simTime&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;17:20 — EU &amp; US open&quot;, &quot;options&quot;: [&quot;07:30 — all closed&quot;, &quot;10:00 — EU open, US pre-market&quot;, &quot;17:20 — EU &amp; US open&quot;, &quot;22:30 — after close&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Market simulation&quot;}, &quot;holdingsLayout&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;cards&quot;, &quot;options&quot;: [&quot;cards&quot;, &quot;rows&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Layout&quot;}}">
+class Component extends DCLogic {
+  state = { period: '1d', dayMode: 'pct', yMode: 'eur', showBench: false, hoverI: null, ready: false, vw: typeof window !== 'undefined' ? window.innerWidth : 1200 };
+
+  chartMove = (e) => {
+    const c = this._chart;
+    if (!c || !c.xs.length) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < c.xs.length; i++) {
+      const d = Math.abs(c.xs[i] - cx);
+      if (d < bd) { bd = d; best = i; }
+    }
+    if (this.state.hoverI !== best) this.setState({ hoverI: best });
+  };
+  chartLeave = () => this.setState({ hoverI: null });
+
+  mkLine(text, color, big) {
+    return { text, color, size: big ? '14px' : '11px', weight: big ? '700' : '600' };
+  }
+
+  benchSeries(n, start) {
+    const r = this.rng('benchmark');
+    const out = [start];
+    let v = start;
+    for (let i = 1; i < n; i++) { v = v * (1 + 0.0026 + (r() - 0.5) * 0.018); out.push(v); }
+    return out;
+  }
+
+  // filled polygons between value & invested lines, split by sign
+  diffSegs(xs, vals, invs, sy) {
+    const segs = [];
+    let cur = null;
+    const flush = () => {
+      if (cur && cur.top.length > 1) {
+        const d = 'M' + cur.top.map((p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L') +
+          ' L' + cur.bot.slice().reverse().map((p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L') + ' Z';
+        segs.push({ d, fill: cur.sign >= 0 ? 'rgba(4,120,87,0.09)' : 'rgba(185,28,28,0.09)' });
+      }
+      cur = null;
+    };
+    for (let i = 0; i < xs.length; i++) {
+      const diff = vals[i] - invs[i];
+      const sign = diff >= 0 ? 1 : -1;
+      const pv = [xs[i], sy(vals[i])], pi = [xs[i], sy(invs[i])];
+      if (!cur) { cur = { sign, top: [pv], bot: [pi] }; continue; }
+      if (sign === cur.sign) { cur.top.push(pv); cur.bot.push(pi); continue; }
+      const d0 = vals[i - 1] - invs[i - 1], d1 = diff;
+      const t = d0 / (d0 - d1 || 1);
+      const xI = xs[i - 1] + (xs[i] - xs[i - 1]) * t;
+      const vI = vals[i - 1] + (vals[i] - vals[i - 1]) * t;
+      const pc = [xI, sy(vI)];
+      cur.top.push(pc); cur.bot.push(pc); flush();
+      cur = { sign, top: [pc, pv], bot: [pc, pi] };
+    }
+    flush();
+    return segs;
+  }
+
+  componentDidMount() {
+    const check = () => {
+      if (window.PT_MOCK) this.setState({ ready: true });
+      else setTimeout(check, 60);
+    };
+    check();
+    this._onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this._onResize);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._onResize);
+  }
+
+  // seeded RNG (string seed)
+  rng(seedStr) {
+    let a = 0;
+    for (let i = 0; i < seedStr.length; i++) a = (a * 31 + seedStr.charCodeAt(i)) | 0;
+    return function () {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // random walk from startP to endP over [from,to] minutes, step 5
+  synth(from, to, startP, endP, seedStr, vol) {
+    const r = this.rng(seedStr);
+    const pts = [];
+    let price = startP;
+    for (let m = from; m <= to; m += 5) {
+      const t = (m - from) / (to - from || 1);
+      const target = startP + (endP - startP) * t;
+      price = price + (target - price) * 0.3 + (r() - 0.5) * startP * (vol || 0.005);
+      pts.push({ min: m, close: Math.round(price * 100) / 100 });
+    }
+    if (pts.length) pts[pts.length - 1].close = endP;
+    return pts;
+  }
+
+  fmt(v) {
+    const n = Math.round(Math.abs(v)).toLocaleString('en-US');
+    return (v < 0 ? '-' : '') + '€' + n;
+  }
+  signed(v) {
+    return (v >= 0 ? '+' : '-') + '€' + Math.round(Math.abs(v)).toLocaleString('en-US');
+  }
+  path(pts) {
+    return pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  }
+  fmtMin(m) {
+    return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  }
+
+  simNow() {
+    const raw = (this.props.simTime ?? '17:20').slice(0, 5);
+    const [h, mm] = raw.split(':').map(Number);
+    return h * 60 + mm;
+  }
+
+  // per-ticker sparkline + row state
+  sparkFor(p, M, simNow) {
+    const intra = M.intraday[p.ticker];
+    const open = intra.open, close = intra.close;
+    const W = 120, H = 30, padY = 3;
+    const posC = '#047857', negC = '#b91c1c';
+    let pts, mode; // 'pre' | 'live' | 'closed'
+    let ghostPts = [];
+
+    if (simNow < open) {
+      mode = 'pre';
+      // yesterday's full session, ending at prevClose
+      const r0 = this.rng(p.ticker + 'ystart');
+      const yStart = p.prevClose * (1 + (r0() - 0.5) * 0.04);
+      pts = this.synth(open, close, yStart, p.prevClose, p.ticker + 'prev', 0.005);
+      // pre-market ghost drift (dotted tail)
+      const r1 = this.rng(p.ticker + 'pm');
+      const pmEnd = p.prevClose * (1 + (r1() - 0.5) * 0.015);
+      ghostPts = this.synth(0, 60, p.prevClose, pmEnd, p.ticker + 'pmw', 0.002);
+    } else if (simNow <= close) {
+      mode = 'live';
+      pts = intra.points.filter((q) => q.min <= simNow);
+      const lastMock = intra.points[intra.points.length - 1];
+      if (simNow > lastMock.min) {
+        pts = pts.concat(this.synth(lastMock.min + 5, simNow, lastMock.close, p.price, p.ticker + 'ext', 0.004));
+      }
+      if (!pts.length) pts = [{ min: open, close: p.prevClose }];
+    } else {
+      mode = 'closed';
+      pts = intra.points.slice();
+      const lastMock = pts[pts.length - 1];
+      if (lastMock.min < close) {
+        pts = pts.concat(this.synth(lastMock.min + 5, close, lastMock.close, p.price, p.ticker + 'eod', 0.004));
+      }
+    }
+
+    // y-scale: % vs prevClose (for 'pre', vs yesterday's own reference = prevClose too)
+    const ref = p.prevClose;
+    const mainW = mode === 'pre' ? 100 : W; // leave room for ghost tail
+    const pcts = pts.map((q) => ((q.close - ref) / ref) * 100);
+    const gPcts = ghostPts.map((q) => ((q.close - ref) / ref) * 100);
+    const all = pcts.concat(gPcts);
+    const mn = Math.min(0, ...all), mx = Math.max(0, ...all);
+    const range = mx - mn || 0.1;
+    const sy = (v) => H - padY - ((v - mn) / range) * (H - 2 * padY);
+    const span = close - open;
+    const sx = (m) => ((m - open) / span) * mainW;
+    const line = pts.map((q, i) => (i === 0 ? 'M' : 'L') + sx(q.min).toFixed(1) + ' ' + sy(pcts[i]).toFixed(1)).join(' ');
+    let ghost = '';
+    if (ghostPts.length) {
+      const gsx = (m) => mainW + (m / 60) * (W - mainW);
+      ghost = ghostPts.map((q, i) => (i === 0 ? 'M' : 'L') + gsx(q.min).toFixed(1) + ' ' + sy(gPcts[i]).toFixed(1)).join(' ');
+    }
+
+    const up = p.dayPlPct >= 0;
+    const fmtNative = (v) =>
+      p.currency === 'GBX' ? v.toFixed(2) + 'p'
+      : (p.currency === 'USD' ? '$' : '€') + v.toFixed(2);
+    const base = {
+      sparkLine: line,
+      ghostLine: ghost,
+      hasGhost: ghostPts.length > 0,
+      zeroY: sy(0).toFixed(1),
+    };
+    if (mode === 'pre') {
+      const yStart = pts[0].close;
+      const pd = p.prevClose - yStart;
+      const prevUp = pd >= 0;
+      const prevStr = this.state.dayMode === 'pct'
+        ? (prevUp ? '+' : '') + ((pd / yStart) * 100).toFixed(2) + '%'
+        : (prevUp ? '+' : '-') + fmtNative(Math.abs(pd)).replace('-', '');
+      return {
+        ...base,
+        pre: true,
+        sparkColor: '#b3b8c0', sparkOpacity: '0.75',
+        hasHint: true, hint: 'prev session · opens ' + this.fmtMin(open),
+        priceStr: fmtNative(p.prevClose),
+        dayStr: prevStr,
+        dayColor: prevUp ? 'rgba(4,120,87,0.55)' : 'rgba(185,28,28,0.55)',
+      };
+    }
+    const dayStr = this.state.dayMode === 'pct'
+      ? (up ? '+' : '') + p.dayPlPct.toFixed(2) + '%'
+      : this.signed(p.dayPl);
+    return {
+      ...base,
+      pre: false,
+      sparkColor: up ? '#047857' : '#b91c1c', sparkOpacity: '1',
+      hasHint: mode === 'closed', hint: mode === 'closed' ? 'closed ' + this.fmtMin(close) : '',
+      priceStr: fmtNative(p.price),
+      dayStr, dayColor: up ? '#047857' : '#b91c1c',
+    };
+  }
+
+  renderVals() {
+    const M = window.PT_MOCK;
+    const { period, vw, yMode, showBench, hoverI } = this.state;
+    const isPct = yMode === 'pct';
+    this._chart = { xs: [], ys: [], infos: [] };
+    const isDesk = vw >= 900;
+    const posC = '#047857', negC = '#b91c1c';
+    const PERIODS = [['1d','1D'],['1m','1M'],['3m','3M'],['ytd','YTD'],['1y','1Y'],['3y','3Y'],['total','Max']];
+    const simNow = this.simNow();
+
+    const chartW = isDesk ? Math.min(1160, vw - 48) : vw;
+    const chartH = isDesk ? 260 : 200;
+    const L = isDesk ? 24 : 20, R = chartW - (isDesk ? 24 : 20), T2 = 12, B = chartH - 22;
+
+    const layout = {
+      isDesk, isMobile: !isDesk,
+      pagePad: isDesk ? '24px' : '20px',
+      heroSize: isDesk ? '42px' : '34px',
+      cardsMode: (this.props.holdingsLayout ?? 'cards') === 'cards',
+      rowsMode: (this.props.holdingsLayout ?? 'cards') !== 'cards',
+      toggleDayMode: () => this.setState((s) => ({ dayMode: s.dayMode === 'pct' ? 'eur' : 'pct' })),
+      dayModeLabel: this.state.dayMode === 'pct' ? '%' : '€',
+      sideTopPad: isDesk ? '0px' : '0px',
+      chartW, chartH, chartVB: '0 0 ' + chartW + ' ' + chartH,
+      gridX1: L, gridX2: R, gridLabelX: R - 2,
+      baselineTextX: L + 2, emptyMsgX: (L + R) / 2, emptyMsgY: (T2 + B) / 2,
+      xTickY: chartH - 4,
+      crossTop: T2, crossBot: B,
+      chartMove: this.chartMove, chartLeave: this.chartLeave,
+      setEur: () => this.setState({ yMode: 'eur' }),
+      setPct: () => this.setState({ yMode: 'pct' }),
+      toggleBench: () => this.setState((s) => ({ showBench: !s.showBench })),
+      eurBg: !isPct ? '#eceae3' : 'transparent', eurC: !isPct ? '#101216' : '#8b929c', eurWt: !isPct ? '700' : '500',
+      pctBg: isPct ? '#eceae3' : 'transparent', pctC: isPct ? '#101216' : '#8b929c', pctWt: isPct ? '700' : '500',
+      benchBg: showBench ? '#eceae3' : 'transparent', benchC: showBench ? '#101216' : '#8b929c',
+      benchWt: showBench ? '700' : '500', benchOp: period === '1d' ? '0.4' : '1',
+    };
+
+    if (!M) {
+      return {
+        ...layout,
+        totalValueStr: '', heroDelta: '', heroLabel: '', heroColor: posC,
+        liveDotColor: '#b3b8c0', liveLabel: '',
+        gridLines: [], xTicks: [], periods: [], rows: [], watchRows: [], alloc: [], txs: [],
+        linePath: '', areaPath: '', investedPath: '', lineColor: posC,
+        showBaseline: false, baselineY: 0, baselineLabelY: 0, showInvested: false,
+        showEmptyMsg: false, showNow: false, nowX: 0, nowY: 0, is1d: true,
+        helper1d: '', investedStr: '',
+        bands: [], gainSegs: [], markers: [], hiLos: [], benchPath: '', showBenchLine: false,
+        hoverOn: false, hoverX: 0, hoverY: 0, tipLeft: '0px', tipTitle: '', tipLines: [],
+      };
+    }
+
+    const T = M.totals;
+    // market state across tickers
+    const sessions = Object.values(M.intraday);
+    const anyOpen = sessions.some((s) => simNow >= s.open && simNow <= s.close);
+    const firstOpen = Math.min(...sessions.map((s) => s.open));
+    const lastClose = Math.max(...sessions.map((s) => s.close));
+    const preOpen = simNow < firstOpen;
+    const afterClose = simNow > lastClose;
+
+    let geo;
+    if (period === '1d') {
+      const prevV = T.value - T.dayPl;
+      const minX = firstOpen, maxX = lastClose;
+      const sx = (m) => L + ((m - minX) / (maxX - minX)) * (R - L);
+      const bands = [
+        { a: 540, b: 930, label: 'EU' }, { a: 930, b: 1050, label: 'EU + US' }, { a: 1050, b: 1320, label: 'US' },
+      ].map((s, i) => ({
+        x: sx(s.a), w: sx(s.b) - sx(s.a), y: T2, h: B - T2,
+        labelX: (sx(s.a) + sx(s.b)) / 2, labelY: T2 + 9, label: s.label,
+        fill: i === 1 ? 'rgba(16,18,22,0.045)' : 'rgba(16,18,22,0.018)',
+      }));
+      const fmtY1 = (v) => isPct ? (v >= 0 ? '+' : '') + v.toFixed(2) + '%' : '€' + (v / 1000).toFixed(1) + 'k';
+      if (preOpen) {
+        const midY = (T2 + B) / 2;
+        geo = {
+          linePath: '', areaPath: '', investedPath: '', benchPath: '', showBenchLine: false,
+          bands, gainSegs: [], markers: [], hiLos: [],
+          gridLines: [], xTicks: [9, 12, 15, 18, 21].map((h) => ({ x: sx(h * 60), label: String(h).padStart(2, '0') + ':00' })),
+          lineColor: posC,
+          showBaseline: true, baselineY: midY, baselineLabelY: midY - 5,
+          showInvested: false, showNow: false, nowX: 0, nowY: 0,
+          showEmptyMsg: true,
+        };
+      } else {
+        let series = M.portfolioIntraday.filter((p) => p.min <= simNow);
+        const lastMock = M.portfolioIntraday[M.portfolioIntraday.length - 1];
+        const end = Math.min(simNow, lastClose);
+        if (end > lastMock.min) {
+          series = series.concat(
+            this.synth(lastMock.min + 5, end, lastMock.value, T.value, 'pfext', 0.0012).map((q) => ({ min: q.min, value: q.close }))
+          );
+        }
+        const dv = series.map((p) => isPct ? ((p.value - prevV) / prevV) * 100 : p.value);
+        const ref0 = isPct ? 0 : prevV;
+        let lo = Math.min(ref0, ...dv);
+        let hi = Math.max(ref0, ...dv);
+        const pad = (hi - lo) * 0.15 || (isPct ? 0.05 : 1);
+        lo -= pad; hi += pad;
+        const sy = (v) => T2 + (1 - (v - lo) / (hi - lo)) * (B - T2);
+        const pts = series.map((p, i) => [sx(p.min), sy(dv[i])]);
+        const line = this.path(pts);
+        const last = pts[pts.length - 1];
+        const area = line + ' L' + last[0].toFixed(1) + ' ' + B + ' L' + pts[0][0].toFixed(1) + ' ' + B + ' Z';
+        let iMin = 0, iMax = 0;
+        dv.forEach((v, i) => { if (v < dv[iMin]) iMin = i; if (v > dv[iMax]) iMax = i; });
+        const clampX = (x) => Math.max(L + 26, Math.min(R - 26, x));
+        const hiLos = iMax !== iMin ? [
+          { cx: pts[iMax][0], cy: pts[iMax][1], x: clampX(pts[iMax][0]), y: pts[iMax][1] - 7, label: isPct ? fmtY1(dv[iMax]) : this.fmt(series[iMax].value) },
+          { cx: pts[iMin][0], cy: pts[iMin][1], x: clampX(pts[iMin][0]), y: pts[iMin][1] + 13, label: isPct ? fmtY1(dv[iMin]) : this.fmt(series[iMin].value) },
+        ] : [];
+        this._chart = {
+          xs: pts.map((p) => p[0]), ys: pts.map((p) => p[1]),
+          infos: series.map((p, i) => ({
+            title: this.fmtMin(p.min),
+            lines: [
+              this.mkLine(isPct ? fmtY1(dv[i]) : this.fmt(p.value), '#101216', true),
+              this.mkLine(this.signed(p.value - prevV) + ' (' + (p.value >= prevV ? '+' : '') + (((p.value - prevV) / prevV) * 100).toFixed(2) + '%)', p.value >= prevV ? posC : negC),
+            ],
+          })),
+        };
+        geo = {
+          linePath: line, areaPath: area, investedPath: '', benchPath: '', showBenchLine: false,
+          bands, gainSegs: [], markers: [], hiLos,
+          gridLines: [0, 0.5, 1].map((f) => {
+            const v = hi - f * (hi - lo);
+            return { y: sy(v), labelY: sy(v) - 4, label: fmtY1(v) };
+          }),
+          xTicks: [9, 12, 15, 18, 21].map((h) => ({ x: sx(h * 60), label: String(h).padStart(2, '0') + ':00' })),
+          lineColor: T.dayPl >= 0 ? posC : negC,
+          showBaseline: true, baselineY: sy(ref0), baselineLabelY: sy(ref0) - 5,
+          showInvested: false, showNow: !afterClose, nowX: last[0], nowY: last[1],
+          showEmptyMsg: false,
+        };
+      }
+    } else {
+      const cutoffs = { '1m': 4, '3m': 13, ytd: 26, '1y': 52, '3y': 156, total: 999 };
+      const rows = M.chartData.slice(-Math.min((cutoffs[period] || 999) + 1, M.chartData.length));
+      const vals = rows.map((r) => r.value);
+      const invs = rows.map((r) => r.invested);
+      const bRaw = this._benchFull || (this._benchFull = this.benchSeries(M.chartData.length, 1));
+      const bWin = bRaw.slice(-rows.length);
+      const bench = bWin.map((v) => (v / bWin[0]) * vals[0]);
+      const fmtPct = (v) => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+      const dVals = vals.map((v) => (isPct ? (v / vals[0] - 1) * 100 : v));
+      const dBench = bench.map((v) => (isPct ? (v / bench[0] - 1) * 100 : v));
+      const showInv = !isPct;
+      const pool = [...dVals, ...(showInv ? invs : []), ...(showBench ? dBench : [])];
+      let lo = Math.min(...pool), hi = Math.max(...pool);
+      const pad = (hi - lo) * 0.1 || 1;
+      lo -= pad; hi += pad;
+      const sx = (i) => L + (i / (rows.length - 1)) * (R - L);
+      const sy = (v) => T2 + (1 - (v - lo) / (hi - lo)) * (B - T2);
+      const pts = dVals.map((v, i) => [sx(i), sy(v)]);
+      const line = this.path(pts);
+      const area = line + ' L' + R + ' ' + B + ' L' + L + ' ' + B + ' Z';
+      const xt = [0, 0.33, 0.66, 1].map((f) => {
+        const idx = Math.round(f * (rows.length - 1));
+        return { x: sx(idx), label: rows[idx].date.slice(2, 7) };
+      });
+      const gainSegs = showInv ? this.diffSegs(rows.map((_, i) => sx(i)), vals, invs, sy) : [];
+      const markers = []; const txAt = {};
+      const t0 = new Date(rows[0].date).getTime(), t1 = new Date(rows[rows.length - 1].date).getTime();
+      M.transactions.forEach((tx) => {
+        const tt = new Date(tx.date).getTime();
+        if (tt < t0 - 4 * 864e5 || tt > t1 + 4 * 864e5) return;
+        let bi = 0, bd = Infinity;
+        rows.forEach((r2, i) => { const dd = Math.abs(new Date(r2.date).getTime() - tt); if (dd < bd) { bd = dd; bi = i; } });
+        const kind = tx.shares > 0 ? 'BUY' : tx.shares < 0 ? 'SELL' : 'DIV';
+        markers.push({ cx: sx(bi), cy: sy(dVals[bi]), fill: kind === 'BUY' ? posC : kind === 'SELL' ? negC : '#6366f1' });
+        (txAt[bi] = txAt[bi] || []).push(kind + ' ' + (tx.shares !== 0 ? Math.abs(tx.shares) + ' ' : '') + tx.ticker + ' · ' + this.fmt(tx.costEur));
+      });
+      let iMin = 0, iMax = 0;
+      dVals.forEach((v, i) => { if (v < dVals[iMin]) iMin = i; if (v > dVals[iMax]) iMax = i; });
+      const clampX = (x) => Math.max(L + 26, Math.min(R - 26, x));
+      const hiLos = [
+        { cx: pts[iMax][0], cy: pts[iMax][1], x: clampX(pts[iMax][0]), y: pts[iMax][1] - 7, label: isPct ? fmtPct(dVals[iMax]) : this.fmt(vals[iMax]) },
+        { cx: pts[iMin][0], cy: pts[iMin][1], x: clampX(pts[iMin][0]), y: pts[iMin][1] + 13, label: isPct ? fmtPct(dVals[iMin]) : this.fmt(vals[iMin]) },
+      ];
+      this._chart = {
+        xs: pts.map((p) => p[0]), ys: pts.map((p) => p[1]),
+        infos: rows.map((r2, i) => {
+          const dte = new Date(r2.date);
+          const lines = [this.mkLine(isPct ? fmtPct(dVals[i]) : this.fmt(vals[i]), '#101216', true)];
+          if (showInv) {
+            lines.push(this.mkLine('invested ' + this.fmt(invs[i]), '#8b929c'));
+            lines.push(this.mkLine(this.signed(vals[i] - invs[i]) + ' P&L', vals[i] >= invs[i] ? posC : negC));
+          }
+          if (showBench) lines.push(this.mkLine('S&P 500 ' + (isPct ? fmtPct(dBench[i]) : this.fmt(bench[i])), '#6366f1'));
+          (txAt[i] || []).forEach((t) => lines.push(this.mkLine(t, '#6a6f78')));
+          return { title: dte.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }), lines };
+        }),
+      };
+      const up = vals[vals.length - 1] >= vals[0];
+      geo = {
+        linePath: line, areaPath: showInv ? '' : area,
+        investedPath: showInv ? this.path(invs.map((v, i) => [sx(i), sy(v)])) : '',
+        benchPath: showBench ? this.path(dBench.map((v, i) => [sx(i), sy(v)])) : '',
+        showBenchLine: showBench,
+        bands: [], gainSegs, markers, hiLos,
+        gridLines: [0, 0.5, 1].map((f) => {
+          const v = hi - f * (hi - lo);
+          return { y: sy(v), labelY: sy(v) - 4, label: isPct ? fmtPct(v) : '€' + (v / 1000).toFixed(0) + 'k' };
+        }),
+        xTicks: xt,
+        lineColor: up ? posC : negC,
+        showBaseline: false, baselineY: 0, baselineLabelY: 0,
+        showInvested: showInv, showNow: false, nowX: 0, nowY: 0,
+        showEmptyMsg: false,
+      };
+    }
+
+    // hover / crosshair
+    const ch = this._chart;
+    const hI = hoverI != null && ch.xs.length ? Math.min(hoverI, ch.xs.length - 1) : null;
+    const tw = 190;
+    let tipL = 0;
+    if (hI != null) {
+      tipL = ch.xs[hI] + 14;
+      if (tipL + tw > chartW - 6) tipL = ch.xs[hI] - 14 - tw;
+    }
+    const hover = {
+      hoverOn: hI != null,
+      hoverX: hI != null ? ch.xs[hI] : 0,
+      hoverY: hI != null ? ch.ys[hI] : 0,
+      tipLeft: tipL + 'px',
+      tipTitle: hI != null ? ch.infos[hI].title : '',
+      tipLines: hI != null ? ch.infos[hI].lines : [],
+    };
+
+    // hero delta
+    let delta, pct, label;
+    if (period === '1d') {
+      if (preOpen) { delta = 0; pct = 0; label = 'today · markets closed'; }
+      else { delta = T.dayPl; pct = T.dayPlPct; label = 'today'; }
+    } else {
+      const cutoffs = { '1m': 4, '3m': 13, ytd: 26, '1y': 52, '3y': 156, total: 999 };
+      const rows = M.chartData.slice(-Math.min((cutoffs[period] || 999) + 1, M.chartData.length));
+      const f = rows[0], l = rows[rows.length - 1];
+      delta = (l.value - l.invested) - (f.value - f.invested);
+      pct = f.value > 0 ? (delta / f.value) * 100 : 0;
+      label = { '1m': 'past month', '3m': 'past 3 months', ytd: 'this year', '1y': 'past year', '3y': 'past 3 years', total: 'all time' }[period];
+    }
+
+    const sorted = [...M.POSITIONS].sort((a, b) => b.value - a.value);
+    const heroValue = preOpen && period === '1d' ? T.value - T.dayPl : T.value;
+
+    return {
+      ...layout,
+      totalValueStr: this.fmt(heroValue),
+      heroDelta: this.signed(delta) + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)',
+      heroLabel: label,
+      heroColor: delta >= 0 ? posC : negC,
+      is1d: period === '1d',
+      helper1d: preOpen
+        ? 'Markets open at ' + this.fmtMin(firstOpen) + ' CET'
+        : 'Since first market open, ' + this.fmtMin(firstOpen) + ' CET · dot = latest',
+      liveDotColor: anyOpen ? '#047857' : '#b3b8c0',
+      liveLabel: (anyOpen ? 'LIVE' : 'CLOSED') + ' · EUR/USD ' + M.fx.eurusd,
+      ...geo,
+      ...hover,
+
+      periods: PERIODS.map(([key, lbl]) => ({
+        label: lbl,
+        select: () => this.setState({ period: key }),
+        bg: period === key ? '#eceae3' : 'transparent',
+        color: period === key ? '#101216' : '#8b929c',
+        weight: period === key ? '700' : '500',
+      })),
+
+      rows: sorted.map((p) => ({
+        ticker: p.ticker, color: M.COLORS[p.ticker],
+        sharesStr: p.shares + ' sh',
+        valueStr: this.fmt(p.value),
+        ...this.sparkFor(p, M, simNow),
+      })),
+
+      watchRows: (M.WATCHLIST || []).map((p) => {
+        const base = {
+          ticker: p.ticker, color: M.COLORS[p.ticker], labelStr: p.label,
+          ...this.sparkFor(p, M, simNow),
+        };
+        if (!base.pre && this.state.dayMode === 'eur') {
+          const d = p.price - p.prevClose;
+          const abs = Math.abs(d);
+          base.dayStr = p.currency === 'GBX'
+            ? (d >= 0 ? '+' : '-') + abs.toFixed(2) + 'p'
+            : (d >= 0 ? '+' : '-') + (p.currency === 'USD' ? '$' : '€') + abs.toFixed(2);
+        }
+        return base;
+      }),
+
+      investedStr: this.fmt(T.invested),
+      alloc: sorted.map((p) => ({
+        ticker: p.ticker, color: M.COLORS[p.ticker],
+        width: ((p.value / T.value) * 100).toFixed(1) + '%',
+        pctStr: ((p.value / T.value) * 100).toFixed(0) + '%',
+      })),
+
+      txs: M.transactions.slice(0, 3).map((tx) => ({
+        kind: tx.shares > 0 ? 'BUY' : tx.shares < 0 ? 'SELL' : 'DIV',
+        kindBg: tx.shares > 0 ? 'rgba(4,120,87,0.10)' : tx.shares < 0 ? 'rgba(185,28,28,0.10)' : 'rgba(99,102,241,0.10)',
+        kindColor: tx.shares > 0 ? posC : tx.shares < 0 ? negC : '#6366f1',
+        ticker: tx.ticker,
+        detail: (tx.shares !== 0 ? Math.abs(tx.shares) + ' sh · ' : '') + tx.date.slice(5),
+        costStr: this.fmt(tx.costEur),
+      })),
+    };
+  }
+}
+</script>
+</body>
+</html>
