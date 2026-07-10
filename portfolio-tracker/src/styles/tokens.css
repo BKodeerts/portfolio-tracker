@@ -58,6 +58,25 @@
   --card-radius: 16px;
   --card-shadow: 0 1px 2px rgba(16, 18, 22, 0.03);
 
+  /* ── Dashboard v3: holdings/watch cards, chart features ── */
+  --card-border-hover: rgba(16, 18, 22, 0.18);
+  --watch-border:       rgba(16, 18, 22, 0.14);
+  --watch-border-hover: rgba(16, 18, 22, 0.30);
+  --c-pos-washed: rgba(4, 120, 87, 0.55);
+  --c-neg-washed: rgba(185, 28, 28, 0.55);
+  --c-bench: #6366f1;
+  --chart-fill-pos: rgba(4, 120, 87, 0.09);
+  --chart-fill-neg: rgba(185, 28, 28, 0.09);
+  --chart-band:        rgba(16, 18, 22, 0.018);
+  --chart-band-strong: rgba(16, 18, 22, 0.045);
+  --chart-band-label:  #c6cad1;
+  --chart-crosshair:   rgba(16, 18, 22, 0.25);
+  --chart-hilo-dot:    #101216;
+  --chart-hilo-label:  #6a6f78;
+  --tip-bg:     rgba(255, 255, 255, 0.97);
+  --tip-border: rgba(16, 18, 22, 0.09);
+  --tip-shadow: 0 4px 14px rgba(16, 18, 22, 0.08);
+
   /* ── Shadows ── */
   --shadow-card:  0 1px 2px rgba(16,18,22,0.04), 0 1px 3px rgba(16,18,22,0.02);
   --shadow-hover: 0 4px 12px rgba(16,18,22,0.08), 0 1px 3px rgba(16,18,22,0.04);
@@ -150,6 +169,25 @@
   --card-border: rgba(255, 255, 255, 0.08);
   --card-radius: 16px;
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  /* ── Dashboard v3: holdings/watch cards, chart features ── */
+  --card-border-hover: rgba(255, 255, 255, 0.22);
+  --watch-border:       rgba(255, 255, 255, 0.16);
+  --watch-border-hover: rgba(255, 255, 255, 0.34);
+  --c-pos-washed: rgba(52, 211, 153, 0.55);
+  --c-neg-washed: rgba(248, 113, 113, 0.55);
+  --c-bench: #818cf8;
+  --chart-fill-pos: rgba(52, 211, 153, 0.10);
+  --chart-fill-neg: rgba(248, 113, 113, 0.10);
+  --chart-band:        rgba(255, 255, 255, 0.025);
+  --chart-band-strong: rgba(255, 255, 255, 0.055);
+  --chart-band-label:  #555b66;
+  --chart-crosshair:   rgba(255, 255, 255, 0.28);
+  --chart-hilo-dot:    #f2f4f7;
+  --chart-hilo-label:  #8b929c;
+  --tip-bg:     rgba(21, 24, 28, 0.97);
+  --tip-border: rgba(255, 255, 255, 0.10);
+  --tip-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
 
   /* ── Shadows ── */
   --shadow-card:  0 1px 2px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.02);

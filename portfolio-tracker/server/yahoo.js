@@ -275,6 +275,7 @@ async function fetchIntraday(yahooSymbol) {
     date:          sessionDate,
     previousClose,
     currency:      meta.currency || null,
+    shortName:     meta.shortName || meta.longName || null,
     marketState:   deriveMarketState(periods),
     exchange:      meta.exchangeName || null,
     ...deriveExtendedPrices(points, periods?.pre, periods?.post),

@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.10.0] — 2026-07-10
+
+### Dashboard v3 — holdings cards, watchlist, chart features (design handoff 4)
+
+- **Holdings rows → cards**: the dashboard holdings list is now a card grid (`minmax(150px,1fr)`, ~3-up in the desktop holdings column, 2-up on mobile) with a radically decluttered hierarchy — color dot + ticker and the native market price up top, a full-width session sparkline (same pre/live/post market-hours states), and a footer where your EUR value stays muted and the **day change is the only loud number**.
+- **Day-change toggle (Apple Stocks-style)**: tapping any card's day number — or the "today · %" label above the grid — flips *all* cards between day-% and the position's day-€ impact. The choice is persisted. Pre-open cards show the previous session's move in washed-out green/red with the prev close as price; the toggle then switches between % and the native per-share change.
+- **Watchlist**: tickers from Settings → Watchlist now render below Holdings as visually distinct cards — dashed border, transparent background, hollow color dot, company name in the footer. Day-€ mode shows the native per-share change (no position exists), including GBX pence (`+0.44p`). Cards link to the stock detail page.
+- **GBX formatting**: pence-quoted LSE tickers format as `11.86p` — no fake £ conversion.
+- **Main chart features** (portfolio chart):
+  - **Crosshair + tooltip** — hover or touch-drag snaps to the nearest point: time (1D) or date title, the value, day delta vs prev close (1D) or invested + P&L lines (periods), the S&P 500 when the overlay is on, and any transactions at that point.
+  - **€ | % toggle** — a segmented control next to the period pills; % re-bases 1D vs prev close and longer periods vs the window start. In % the invested overlay and gain fill are hidden.
+  - **"vs S&P 500" chip** — overlays the real S&P 500 benchmark series (indigo), re-based to the window's first portfolio value (€) or 0% (%). Inactive on 1D.
+  - **Gain/loss fill** — in € mode the region between the value line and the dashed invested line fills green above / red below, split at crossings (replaces the plain gradient there).
+  - **Transaction markers** — buy/sell/dividend dots on the value line; details surface in the tooltip.
+  - **Session shading (1D)** — EU / EU+US / US bands with small uppercase labels.
+  - **High/low tags** — the period max/min get small dots with value labels (omitted when flat).
+
 ## [0.9.1] — 2026-07-07
 
 ### Calculation Fixes

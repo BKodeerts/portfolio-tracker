@@ -182,6 +182,109 @@ export function buildTickerSpark(yahoo: string): TickerSpark | null {
   };
 }
 
+/** Live EUR value of a position (last intraday tick × live FX), static fallback. */
+export function livePositionValueEur(pos: { ticker: string; yahoo?: string; currency: string; shares: number; value: number }): number {
+  const yahoo = pos.yahoo ?? pos.ticker;
+  const intra = intradayStore.data[yahoo];
+  const price = (intra?.points ?? []).at(-1)?.close ?? intra?.previousClose;
+  if (price == null) return pos.value;
+  return toEurLive(pos.currency, pos.shares * price, intradayStore.liveRates) ?? pos.value;
+}
+
+/**
+ * Previous session's move for a pre-open card (spark points are yesterday's
+ * session): per-share native change and % from session open to prev close.
+ */
+export function prevSessionMove(spark: TickerSpark): { pct: number; native: number } | null {
+  const first = spark.points[0]?.close;
+  const last = spark.points[spark.points.length - 1]?.close;
+  if (!first || last == null) return null;
+  return { pct: ((last - first) / first) * 100, native: last - first };
+}
+
+/** Watchlist card data: tracked-but-not-held tickers from the intraday store. */
+export interface WatchCard {
+  ticker: string;
+  yahoo: string;
+  /** Company name (Yahoo shortName), fallback to configured label/symbol. */
+  label: string;
+  /** Trading currency ("GBp" normalised to GBX). */
+  currency: string;
+  prevClose: number | null;
+  price: number | null;
+  changePct: number | null;
+  /** Day change per share in the trading currency (no position exists). */
+  changeNative: number | null;
+}
+
+export function buildWatchCards(): WatchCard[] {
+  return portfolioStore.watchlistData.map((w) => {
+    const yahoo = w.yahoo ?? w.ticker;
+    const intra = intradayStore.data[yahoo];
+    const rawCcy = intra?.currency ?? 'EUR';
+    const currency = rawCcy === 'GBp' ? 'GBX' : rawCcy;
+    const prevClose = intra?.previousClose ?? null;
+    const price = (intra?.points ?? []).at(-1)?.close ?? null;
+    const changePct = price != null && prevClose ? ((price - prevClose) / prevClose) * 100 : null;
+    const changeNative = price != null && prevClose != null ? price - prevClose : null;
+    return {
+      ticker: w.ticker,
+      yahoo,
+      label: intra?.shortName ?? w.label ?? w.ticker,
+      currency, prevClose, price, changePct, changeNative,
+    };
+  });
+}
+
+/**
+ * S&P 500 overlay for a period-filtered chart slice: growth ratio vs the
+ * window's first available index value, aligned per row (at-or-before date).
+ * Null when the server series or the window is too thin.
+ */
+export function buildBenchmarkRatios(filtered: ChartPoint[]): (number | null)[] | null {
+  const sp = portfolioStore.sp500Data;
+  if (sp.length < 2 || filtered.length < 2) return null;
+  let j = 0;
+  let base: number | null = null;
+  const out: (number | null)[] = [];
+  for (const row of filtered) {
+    while (j + 1 < sp.length && sp[j + 1]!.date <= row.date) j++;
+    const v = sp[j]!.date <= row.date ? sp[j]!.value : null;
+    if (v != null && base == null) base = v;
+    out.push(v != null && base != null && base > 0 ? v / base : null);
+  }
+  return base != null ? out : null;
+}
+
+/** 1D session-shading bands (minutes-of-day CET): EU / EU+US overlap / US. */
+export interface SessionBand {
+  start: number;
+  end: number;
+  label: string;
+  strong: boolean;
+}
+
+const US_OPEN_MIN = 15.5 * 60;
+const EU_CLOSE_MIN = 17.5 * 60;
+
+export function buildSessionBands(dayStart: number, dayEnd: number): SessionBand[] {
+  if (dayEnd <= dayStart) return [];
+  if (dayEnd <= US_OPEN_MIN) return [{ start: dayStart, end: dayEnd, label: 'EU', strong: false }];
+  if (dayStart >= EU_CLOSE_MIN) return [{ start: dayStart, end: dayEnd, label: 'US', strong: false }];
+  if (dayStart >= US_OPEN_MIN) {
+    // US-only portfolio that still overlaps the EU close (e.g. 15:30 start).
+    if (dayEnd <= EU_CLOSE_MIN) return [{ start: dayStart, end: dayEnd, label: 'EU + US', strong: true }];
+    return [
+      { start: dayStart, end: EU_CLOSE_MIN, label: 'EU + US', strong: true },
+      { start: EU_CLOSE_MIN, end: dayEnd, label: 'US', strong: false },
+    ];
+  }
+  const bands: SessionBand[] = [{ start: dayStart, end: US_OPEN_MIN, label: 'EU', strong: false }];
+  bands.push({ start: US_OPEN_MIN, end: Math.min(EU_CLOSE_MIN, dayEnd), label: 'EU + US', strong: true });
+  if (dayEnd > EU_CLOSE_MIN) bands.push({ start: EU_CLOSE_MIN, end: dayEnd, label: 'US', strong: false });
+  return bands;
+}
+
 /** Top winner / top loser by day % (only if actually positive / negative). */
 export function getMovers(cards: SparkCard[]): Movers {
   const cs = cards.filter((c) => c.changePct != null);
