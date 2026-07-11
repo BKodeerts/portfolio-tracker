@@ -83,10 +83,12 @@
 
   // ── Chart / market clock ────────────────────────────────────────────────────
   const session = $derived(period === '1d' ? buildPortfolioIntradaySession() : null);
+  /** No trading today (weekend/holiday): chart shows the last session in full. */
+  const prevSession = $derived(session?.prevSession ?? false);
   /** Before the first exchange opens: empty chart, zero delta, dimmed captions. */
-  const preOpen    = $derived(session != null && session.nowMin < session.dayStart);
+  const preOpen    = $derived(session != null && !prevSession && session.nowMin < session.dayStart);
   /** After the last exchange closes: full-day series, no "now" dot. */
-  const afterClose = $derived(session != null && session.nowMin > session.dayEnd);
+  const afterClose = $derived(session != null && (prevSession || session.nowMin > session.dayEnd));
 
   const fmtMin = (m: number) =>
     `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
@@ -344,7 +346,11 @@
           {fmtEurSigned(heroDelta.pl)}{#if heroDelta.pct != null}&nbsp;({fmtPct(heroDelta.pct)}){/if}
         </span>
       {/if}
-      <span class="hero-label">{period === '1d' && preOpen ? 'today · markets closed' : periodDeltaLabel(period)}</span>
+      <span class="hero-label">
+        {period === '1d' && prevSession
+          ? 'last session · markets closed'
+          : period === '1d' && preOpen ? 'today · markets closed' : periodDeltaLabel(period)}
+      </span>
     </div>
   </div>
 
@@ -410,9 +416,11 @@
     </div>
     {#if period === '1d'}
       <div class="pills-caption">
-        {preOpen
-          ? `Markets open at ${firstOpenLabel} CET`
-          : `Since first market open, ${firstOpenLabel} CET · dot = latest`}
+        {prevSession
+          ? 'Last trading session · markets closed today'
+          : preOpen
+            ? `Markets open at ${firstOpenLabel} CET`
+            : `Since first market open, ${firstOpenLabel} CET · dot = latest`}
       </div>
     {/if}
   </div>

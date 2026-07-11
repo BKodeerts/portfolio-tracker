@@ -50,8 +50,10 @@ function createIntradayStore() {
 
       // If the server returned data from a previous trading day (Yahoo CDN lag at
       // session open, or cached stale data), schedule one immediate force-refresh
-      // so the UI updates as soon as fresh candles are available.
-      if (!force) {
+      // so the UI updates as soon as fresh candles are available. On weekends the
+      // last session's date is the expected state, not staleness — don't refetch.
+      const dow = new Date().getDay();
+      if (!force && dow !== 0 && dow !== 6) {
         const today = new Date().toISOString().slice(0, 10);
         const hasStaleDate = Object.values(result).some((d) => d?.date && d.date < today);
         if (hasStaleDate) {
