@@ -55,6 +55,8 @@ function getOptions() {
       mqttPort:                  raw.mqtt_port     ?? 1883,
       mqttUsername:              raw.mqtt_username ?? null,
       mqttPassword:              raw.mqtt_password ?? null,
+      taxHousehold:              app.taxHousehold === 'couple' ? 'couple' : 'individual',
+      taxBrokerWithholds:        Boolean(app.taxBrokerWithholds ?? false),
     };
   } catch {
     return {
@@ -71,6 +73,8 @@ function getOptions() {
       mqttPort:                  1883,
       mqttUsername:              null,
       mqttPassword:              null,
+      taxHousehold:              app.taxHousehold === 'couple' ? 'couple' : 'individual',
+      taxBrokerWithholds:        Boolean(app.taxBrokerWithholds ?? false),
     };
   }
 }

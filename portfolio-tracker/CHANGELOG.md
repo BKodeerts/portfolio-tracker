@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.11.0] — 2026-07-11
+
+### Capital gains tax screen — meerwaardebelasting (design handoff)
+
+- **New Tax tab** (Portfolio / Analysis / **Tax** / Activity, desktop nav + mobile tab bar): a full overview of the Belgian capital gains tax (wet van 3 april 2026) — 10% flat on realized gains above the yearly exemption.
+- **Server-computed tax report** (`server/domain/tax.js`, pure + tested, exposed via `/api/portfolio`): per tax year (2026 →) the realized sales with the Belgian basis rule — pre-2026 lots step up to the 31/12/2025 "foto" value (derived from cached candles + FX at that date), actual purchase price when higher (until end 2030) — FIFO across lots, same-year loss offsetting, indexed exemption (€10,000 / €10,300 / €10,600, ×2 for couples), 10% above the exemption, broker withholding since 1 Jun 2026 and the resulting reclaim/pay balance.
+- **The screen**: year chips, four hero cards (net realized gain, exemption used with progress bar, tax due, context-dependent balance card), realized-sales list with basis chips and withholding notes, full calculation table, tax-free headroom with a **sell simulator** (tap positions to see the tax impact of selling), the rules that apply to you, and a settlement-status card for closed years.
+- **New settings** (Algemeen): household (individueel/koppel) and whether your broker withholds 10% at sale.
+
 ## [0.10.1] — 2026-07-10
 
 ### Fixed

@@ -10,7 +10,8 @@ const { fetchDailyQuote, fetchCandles, fetchIntraday, fetchQuoteSummary, sleep, 
 const { readCache, readStaleCache, writeCache, QUOTES_CACHE_TTL, CACHE_TTL, INTRADAY_CACHE_TTL } = require('./cache.js');
 const { getOptions } = require('./ha-helper.js');
 
-const { FX_DEFS, FX_FALLBACK, toEurAtRate, nonEurCurrencies, fxSymbolsFor } = require('./domain/fx.js');
+const { FX_DEFS, FX_FALLBACK, toEur, toEurAtRate, nonEurCurrencies, fxSymbolsFor } = require('./domain/fx.js');
+const { FOTO_DATE, computeTaxReport } = require('./domain/tax.js');
 const {
   buildMeta: buildMetaPure,
   buildManualPricesMap,
@@ -428,6 +429,26 @@ async function computeFullPortfolio() {
   // Backward compat
   const usdExposurePct = currencyExposure.USD ?? 0;
 
+  // Belgian capital gains tax (meerwaardebelasting) — basis "foto" = EUR price
+  // per share at the last trading date on/before 31/12/2025.
+  const { taxHousehold, taxBrokerWithholds } = getOptions();
+  const fotoDate = sortedDates.filter(d => d <= FOTO_DATE).at(-1) ?? null;
+  const fotoPrices = {};
+  for (const [ticker, m] of Object.entries(meta)) {
+    const p = fotoDate != null ? priceMaps[m.yahoo]?.[fotoDate] : null;
+    fotoPrices[ticker] = p != null ? toEur(m.currency, p, fotoDate, fxMaps) : null;
+  }
+  const tax = computeTaxReport({
+    txsByTicker: txByTicker,
+    adjSharesFn,
+    fotoPrices,
+    positionValues: Object.fromEntries(positions.map(p => [p.ticker, p.value])),
+    household: taxHousehold,
+    brokerWithholds: taxBrokerWithholds,
+    currentYear: new Date().getFullYear(),
+    today: new Date().toISOString().slice(0, 10),
+  });
+
   // Watchlist (symbols from HA options config)
   const { watchlist: watchlistSymbols } = getOptions();
   const watchlistData = watchlistSymbols?.length ? await fetchWatchlistPrices(watchlistSymbols) : [];
@@ -456,6 +477,7 @@ async function computeFullPortfolio() {
     totalInvested: Math.round(totalInvested * 100) / 100,
     watchlistData,
     riskMetrics, rollingReturns, twrPct, irrPct,
+    tax,
   };
 }
 

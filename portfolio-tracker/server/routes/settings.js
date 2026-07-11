@@ -14,6 +14,8 @@ const DEFAULTS = {
   intradayDuringMarketHours: false,
   pushInterval:              15,
   pushPositions:             false,
+  taxHousehold:              'individual', // meerwaardebelasting: 'individual' | 'couple'
+  taxBrokerWithholds:        false,        // broker withholds 10% at sale (since 1 Jun 2026)
 };
 
 const VALID_CURRENCIES = new Set(['EUR', ...Object.keys(FX_DEFS)]);
@@ -38,7 +40,7 @@ router.get('/settings', (req, res) => {
 router.post('/settings', (req, res) => {
   try {
     const { baseCurrency, watchlist, intradayDuringMarketHours,
-            pushInterval, pushPositions } = req.body;
+            pushInterval, pushPositions, taxHousehold, taxBrokerWithholds } = req.body;
     const current = readSettings();
 
     if (typeof baseCurrency === 'string') {
@@ -59,6 +61,10 @@ router.post('/settings', (req, res) => {
     } else if (Array.isArray(pushPositions)) {
       current.pushPositions = pushPositions.map(s => String(s).trim().toUpperCase()).filter(Boolean);
     }
+    if (taxHousehold === 'individual' || taxHousehold === 'couple')
+      current.taxHousehold = taxHousehold;
+    if (typeof taxBrokerWithholds === 'boolean')
+      current.taxBrokerWithholds = taxBrokerWithholds;
 
     writeSettings(current);
     invalidatePortfolioCache();
