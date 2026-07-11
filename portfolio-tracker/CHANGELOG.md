@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.11.3] — 2026-07-11
+
+### Fixed
+
+- **"prev close" chart caption removed**: 0.11.2 fixed its collision with the high/low tags by shifting the tag sideways, which left the number floating far from its data point. The caption is gone entirely instead — the dashed baseline is self-explanatory and the tooltip carries the delta vs prev close — so high/low tags always sit at their points.
+
 ## [0.11.2] — 2026-07-11
 
 ### Fixed
