@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.3] — 2026-07-11
+
+### Fixed
+
+- **"prev close" chart caption removed**: 0.11.2 fixed its collision with the high/low tags by shifting the tag sideways, which left the number floating far from its data point. The caption is gone entirely instead — the dashed baseline is self-explanatory and the tooltip carries the delta vs prev close — so high/low tags always sit at their points.
+- **No stray dotted ghost tail on weekends**: ticker sparklines drew the drawn session's *own* pre-market as a dotted "upcoming pre-market" tail on weekends (Yahoo's trading periods still describe Friday's finished session), and reserved the tail width even without ghost data. The ghost now only appears when its window genuinely follows the drawn session, and the session line uses the full width otherwise.
+
 ## [0.11.2] — 2026-07-11
 
 ### Fixed

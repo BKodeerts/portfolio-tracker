@@ -163,20 +163,6 @@
     return segs;
   }
 
-  /**
-   * The "prev close" caption sits left of the dashed baseline; when a hi/lo
-   * tag lands in that corner (session opened at its high/low, near the prev
-   * close) the two texts overlap into garbage — shift the tag clear of it.
-   */
-  function avoidPrevCloseCaption(tags: Geom['hiLos'], baselineY: number): Geom['hiLos'] {
-    const capRight = L + 2 + 56; // ~"prev close" width at 9px mono
-    return tags.map((t) => {
-      const halfW = t.label.length * 2.8;
-      const overlaps = Math.abs(t.ly - (baselineY - 5)) < 11 && t.lx - halfW < capRight + 4;
-      return overlaps ? { ...t, lx: Math.min(R - halfW, capRight + 6 + halfW) } : t;
-    });
-  }
-
   /** Max/min tags over the displayed values (skipped when the series is flat). */
   function hiLoTags(pts: [number, number][], vals: number[]): Geom['hiLos'] {
     if (!showHiLo || pts.length < 2) return [];
@@ -306,7 +292,7 @@
       ...none,
       pts,
       bandRects,
-      hiLos: dimmed ? [] : avoidPrevCloseCaption(hiLoTags(pts, vals), sy(prevClose)),
+      hiLos: dimmed ? [] : hiLoTags(pts, vals),
     };
   });
 
@@ -373,9 +359,11 @@
       <line x1={L} x2={R} y1={g.y} y2={g.y} stroke="var(--chart-gridline)" stroke-width="1" />
       <text class="axis" x={R - 2} y={g.labelY} text-anchor="end">{g.label}</text>
     {/each}
+    <!-- Prev-close baseline: the dashed line is the established idiom and the
+         tooltip carries the delta, so no text label — it only ever collided
+         with hi/lo tags and the line itself near the open. -->
     {#if geom.baselineY != null}
       <line x1={L} x2={R} y1={geom.baselineY} y2={geom.baselineY} stroke="var(--chart-axis-label)" stroke-width="1" stroke-dasharray="3 4" />
-      <text class="axis" x={L + 2} y={geom.baselineY - 5}>prev close</text>
     {/if}
     {#each geom.gainSegs as seg}
       <path d={seg.d} fill={seg.pos ? 'var(--chart-fill-pos)' : 'var(--chart-fill-neg)'} />

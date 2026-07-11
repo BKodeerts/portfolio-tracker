@@ -159,11 +159,15 @@ export function buildTickerSpark(yahoo: string): TickerSpark | null {
   }
 
   // Pre-open: dim yesterday's session; today's pre-market becomes a ghost tail.
+  // The ghost must belong to the NEXT session (its window starts after the
+  // drawn session ends) — on weekends tradingPeriods still describe the drawn
+  // (Friday) session itself, and its own pre-market is not a tail.
   const periods = intra.tradingPeriods;
   let ghostPoints: IntradayPoint[] = [];
   let ghostStart: number | null = null;
   let ghostEnd: number | null = null;
-  if (periods?.pre && periods.regular && periods.regular.start > periods.pre.start) {
+  if (periods?.pre && periods.regular && periods.regular.start > periods.pre.start
+      && periods.pre.start >= session.end) {
     const pre = periods.pre;
     const tail = (intra.allPoints ?? []).filter((p) => p.ts >= pre.start && p.ts < periods.regular!.start);
     if (tail.length >= 2) {
