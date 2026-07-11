@@ -1,6 +1,6 @@
 import { portfolioStore } from '$lib/stores/portfolio.svelte';
 import { intradayStore } from '$lib/stores/intraday.svelte';
-import { getTradingMins, isExchangeOpen, normalizeMarketState, sessionBounds, fmtSessionTime } from '$lib/market';
+import { getTradingMins, isExchangeOpen, normalizeMarketState, sessionBounds, fmtSessionTime, fmtOpenAt, nextSessionOpen } from '$lib/market';
 import { toEurLive, liveRateFor } from '$lib/fx';
 import type { ChartPoint } from '$lib/types/portfolio';
 import type { IntradayData, IntradayPoint } from '$lib/types/candle';
@@ -173,12 +173,17 @@ export function buildTickerSpark(yahoo: string): TickerSpark | null {
     }
   }
 
-  const nextOpenTs = periods?.regular?.start ?? sessionBounds(yahoo, today)?.open ?? null;
+  // tradingPeriods may describe an already-finished session (weekends) — roll
+  // forward to the real next open so the hint never implies "opens today".
+  const periodOpen = periods?.regular?.start ?? sessionBounds(yahoo, today)?.open ?? null;
+  const nextOpenTs = periodOpen != null && periodOpen > Date.now() / 1000
+    ? periodOpen
+    : nextSessionOpen(yahoo);
   return {
     phase, points, prevClose,
     sessionStart: session.start, sessionEnd: session.end,
     ghostPoints, ghostStart, ghostEnd,
-    hint: nextOpenTs != null ? `prev session · opens ${fmtSessionTime(nextOpenTs)}` : 'prev session',
+    hint: nextOpenTs != null ? `prev session · opens ${fmtOpenAt(nextOpenTs)}` : 'prev session',
   };
 }
 

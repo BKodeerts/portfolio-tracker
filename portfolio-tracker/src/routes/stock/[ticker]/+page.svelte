@@ -10,7 +10,7 @@
   import { fetchCandles } from '$lib/api/candles';
   import { fmtEur, fmtEurSigned, fmtNative, fmtNativeSigned, fmtPct, fmtPct1 } from '$lib/utils/fmt';
   import { PERIOD_OPTIONS, periodCutoff } from '$lib/utils/period';
-  import { isExchangeOpen, normalizeMarketState, sessionBounds } from '$lib/market';
+  import { isExchangeOpen, normalizeMarketState, sessionBounds, fmtOpenAt, nextSessionOpen } from '$lib/market';
   import { toEurLiveOrFallback } from '$lib/fx';
   import PeriodPills from '$lib/components/shared/PeriodPills.svelte';
   import PeriodChart from '$lib/components/shared/PeriodChart.svelte';
@@ -213,8 +213,16 @@
 
   /* ── Market-state labels (chip, hero caption) ── */
 
-  const openLabel  = $derived(fmtMin(intraSession.start));
   const closeLabel = $derived(fmtMin(intraSession.end));
+  // Day-qualified next-open label ("15:30" today, "Mon 15:30" on weekends) —
+  // tradingPeriods may describe an already-finished session, so roll forward.
+  const openLabel = $derived.by(() => {
+    const regStart = iData?.tradingPeriods?.regular?.start;
+    const nextOpen = regStart != null && regStart > Date.now() / 1000
+      ? regStart
+      : nextSessionOpen(yahoo);
+    return nextOpen != null ? fmtOpenAt(nextOpen) : fmtMin(intraSession.start);
+  });
   const chipLabel  = $derived(
     phase === 'live' ? 'OPEN' : phase === 'pre' ? `OPENS ${openLabel}` : 'CLOSED',
   );

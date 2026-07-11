@@ -163,6 +163,20 @@
     return segs;
   }
 
+  /**
+   * The "prev close" caption sits left of the dashed baseline; when a hi/lo
+   * tag lands in that corner (session opened at its high/low, near the prev
+   * close) the two texts overlap into garbage — shift the tag clear of it.
+   */
+  function avoidPrevCloseCaption(tags: Geom['hiLos'], baselineY: number): Geom['hiLos'] {
+    const capRight = L + 2 + 56; // ~"prev close" width at 9px mono
+    return tags.map((t) => {
+      const halfW = t.label.length * 2.8;
+      const overlaps = Math.abs(t.ly - (baselineY - 5)) < 11 && t.lx - halfW < capRight + 4;
+      return overlaps ? { ...t, lx: Math.min(R - halfW, capRight + 6 + halfW) } : t;
+    });
+  }
+
   /** Max/min tags over the displayed values (skipped when the series is flat). */
   function hiLoTags(pts: [number, number][], vals: number[]): Geom['hiLos'] {
     if (!showHiLo || pts.length < 2) return [];
@@ -292,7 +306,7 @@
       ...none,
       pts,
       bandRects,
-      hiLos: dimmed ? [] : hiLoTags(pts, vals),
+      hiLos: dimmed ? [] : avoidPrevCloseCaption(hiLoTags(pts, vals), sy(prevClose)),
     };
   });
 
