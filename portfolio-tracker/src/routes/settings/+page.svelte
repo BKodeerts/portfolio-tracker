@@ -32,6 +32,8 @@
   let newTicker     = $state('');
   let haPushActive  = $state(false);
   let pushInterval  = $state(15);
+  let taxHousehold  = $state<'individual' | 'couple'>('individual');
+  let taxWithholds  = $state(false);
 
   // Transient UI
   let saveMsg  = $state('');
@@ -66,6 +68,8 @@
         watchlist    = [...(s.watchlist ?? [])];
         pushInterval = s.pushInterval ?? 15;
         haPushActive = s.pushPositions !== false;
+        taxHousehold = s.taxHousehold ?? 'individual';
+        taxWithholds = s.taxBrokerWithholds ?? false;
       } catch { /* ignore */ }
       loading = false;
     })();
@@ -209,6 +213,32 @@
                   type="checkbox"
                   bind:checked={intradayAuto}
                   onchange={() => persist({ intradayDuringMarketHours: intradayAuto })}
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="row">
+              <div class="row-text">
+                <div class="row-label">Meerwaardebelasting — huishouden</div>
+                <div class="row-hint">De vrijstelling geldt per persoon en verdubbelt voor koppels.</div>
+              </div>
+              <div class="seg">
+                <button class="seg-btn" class:on={taxHousehold === 'individual'} onclick={() => { taxHousehold = 'individual'; persist({ taxHousehold }); }}>Individueel</button>
+                <button class="seg-btn" class:on={taxHousehold === 'couple'}     onclick={() => { taxHousehold = 'couple'; persist({ taxHousehold }); }}>Koppel</button>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="row-text">
+                <div class="row-label">Broker houdt 10% in bij verkoop</div>
+                <div class="row-hint">Sinds 1 juni 2026, afhankelijk van je broker en opt-in. Zonder inhouding geef je alle winsten zelf aan.</div>
+              </div>
+              <label class="switch">
+                <input
+                  type="checkbox"
+                  bind:checked={taxWithholds}
+                  onchange={() => persist({ taxBrokerWithholds: taxWithholds })}
                 />
                 <span class="slider"></span>
               </label>

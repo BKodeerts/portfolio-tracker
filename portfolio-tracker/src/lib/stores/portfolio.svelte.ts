@@ -1,4 +1,4 @@
-import type { PortfolioResponse, Position, ChartPoint, BenchmarkPoint, RiskMetrics, RollingReturns, AnnualPl, WatchlistEntry, TickerMeta } from '$lib/types/portfolio';
+import type { PortfolioResponse, Position, ChartPoint, BenchmarkPoint, RiskMetrics, RollingReturns, AnnualPl, WatchlistEntry, TickerMeta, TaxReport } from '$lib/types/portfolio';
 import type { Transaction } from '$lib/types/transaction';
 import type { BonusItem } from '$lib/types/bonus';
 import { fetchPortfolio, fetchTransactions } from '$lib/api/portfolio';
@@ -31,6 +31,7 @@ function createPortfolioStore() {
   let baseCurrency     = $state('EUR');
   let twrPct           = $state<number | null>(null);
   let irrPct           = $state<number | null>(null);
+  let tax              = $state<TaxReport | null>(null);
   let activeBenchmark  = $state<'vwce' | 'sp500' | 'both'>('vwce');
   let bonusItems       = $state<BonusItem[]>([]);
 
@@ -85,6 +86,7 @@ function createPortfolioStore() {
     baseCurrency     = p.baseCurrency;
     twrPct           = p.twrPct;
     irrPct           = p.irrPct;
+    tax              = p.tax ?? null;
   }
 
   function sortPositions(col: SortCol) {
@@ -134,6 +136,7 @@ function createPortfolioStore() {
     get baseCurrency()      { return baseCurrency; },
     get twrPct()            { return twrPct; },
     get irrPct()            { return irrPct; },
+    get tax()               { return tax; },
     get activeBenchmark()   { return activeBenchmark; },
     get bonusItems()        { return bonusItems; },
     get loaded()            { return loaded; },

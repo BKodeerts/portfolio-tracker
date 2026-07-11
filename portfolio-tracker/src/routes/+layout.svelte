@@ -12,7 +12,7 @@
   interface Props { children: import('svelte').Snippet }
   const { children }: Props = $props();
 
-  function isAt(route: '/' | '/analysis' | '/transactions' | '/import' | '/bonus' | '/settings'): boolean {
+  function isAt(route: '/' | '/analysis' | '/tax' | '/transactions' | '/import' | '/bonus' | '/settings'): boolean {
     const current = page.url.pathname;
     const target = resolve(route);
     if (route === '/') return current === target;
@@ -41,6 +41,7 @@
   const isSettingsPage = $derived(isAt('/settings'));
   const isPortfolio    = $derived(isAt('/'));
   const isAnalysis     = $derived(isAt('/analysis'));
+  const isTax          = $derived(isAt('/tax'));
   const isTransactions = $derived(isAt('/transactions'));
 
   // Stock detail is a drill-in page: no top nav, its own back-button header.
@@ -128,6 +129,10 @@
   <a href={resolve('/analysis')}     class="mtab" class:active={isAnalysis}>
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={isAnalysis ? 2.2 : 1.7} stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 4"/></svg>
     <span>Analysis</span>
+  </a>
+  <a href={resolve('/tax')}          class="mtab" class:active={isTax}>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={isTax ? 2.2 : 1.7} stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M9 9h.01M15 9h.01M9 14l2 2 4-4"/></svg>
+    <span>Tax</span>
   </a>
   <a href={resolve('/transactions')} class="mtab" class:active={isTransactions}>
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={isTransactions ? 2.2 : 1.7} stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>

@@ -98,6 +98,59 @@ export interface TickerMeta {
   manualPriceAsOf?: string | null;
 }
 
+/* ── Belgian capital gains tax (meerwaardebelasting) — mirrors server/domain/tax.js ── */
+
+export interface TaxSale {
+  date: string;
+  year: number;
+  ticker: string;
+  shares: number;
+  proceeds: number;
+  basis: number;
+  /** Which basis dominated the sold shares: 31/12/2025 "foto" value or purchase price. */
+  basisType: 'foto' | 'aankoop';
+  /** True when a pre-2026 lot used the actual purchase price because it was higher than the foto. */
+  costAboveFoto: boolean;
+  gain: number;
+  withheld: number;
+}
+
+export interface TaxYear {
+  year: number;
+  exemption: number;
+  sales: TaxSale[];
+  gains: number;
+  losses: number;
+  net: number;
+  used: number;
+  taxable: number;
+  tax: number;
+  withheld: number;
+  /** withheld − tax: >0 reclaim via aangifte, <0 still due. */
+  balance: number;
+  headroom: number;
+}
+
+export interface TaxSimPosition {
+  ticker: string;
+  basis: number;
+  /** Latent taxable gain if sold today (current value − taxable basis). */
+  gain: number;
+  /** Which basis dominates the open shares: foto value or purchase price (post-2025 lots). */
+  basisType: 'foto' | 'aankoop';
+  /** True when the open lots use the purchase price because it is higher than the foto. */
+  usesCost: boolean;
+}
+
+export interface TaxReport {
+  rate: number;
+  currentYear: number;
+  household: 'individual' | 'couple';
+  brokerWithholds: boolean;
+  years: TaxYear[];
+  simPositions: TaxSimPosition[];
+}
+
 export interface PortfolioResponse {
   chartData: ChartPoint[];
   benchmarkData: BenchmarkPoint[];
@@ -120,4 +173,5 @@ export interface PortfolioResponse {
   baseCurrency: string;
   twrPct: number | null;
   irrPct: number | null;
+  tax: TaxReport | null;
 }

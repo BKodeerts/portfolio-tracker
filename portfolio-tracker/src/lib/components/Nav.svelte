@@ -5,6 +5,7 @@
   const tabs = [
     { path: '/',             label: 'Portfolio' },
     { path: '/analysis',     label: 'Analysis' },
+    { path: '/tax',          label: 'Tax' },
     { path: '/transactions', label: 'Activity' },
   ] as const;
 
