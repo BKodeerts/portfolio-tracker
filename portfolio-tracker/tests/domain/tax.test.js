@@ -217,8 +217,17 @@ describe('computeSimPositions', () => {
     );
     const iii = rows.find(r => r.ticker === 'III');
     const jjj = rows.find(r => r.ticker === 'JJJ');
-    expect(iii).toMatchObject({ basis: 300, gain: 100, usesCost: true });
-    expect(jjj).toMatchObject({ basis: 200, gain: 200, usesCost: false });
+    expect(iii).toMatchObject({ basis: 300, gain: 100, usesCost: true, basisType: 'aankoop' });
+    expect(jjj).toMatchObject({ basis: 200, gain: 200, usesCost: false, basisType: 'foto' });
+  });
+
+  it('marks positions bought entirely after the foto date as purchase-price based', () => {
+    const txs = {
+      NEW: [{ date: '2026-02-01', ticker: 'NEW', shares: 10, costEur: 100 }],
+    };
+    const rows = computeSimPositions(txs, noAdj, { NEW: 20 }, { NEW: 150 }, '2026-07-01');
+    // foto price exists but the lot post-dates it: basis = cost, not flagged as higher-than-foto
+    expect(rows[0]).toMatchObject({ basis: 100, gain: 50, usesCost: false, basisType: 'aankoop' });
   });
 
   it('sorts by simulated gain descending and skips sold-out tickers', () => {
@@ -264,7 +273,7 @@ describe('computeTaxReport', () => {
     expect(r.years[1].exemption).toBe(10300);
     expect(r.years[1].sales).toHaveLength(0);
     // Simulator: 10 open shares, basis 10×25 (foto) = 250 → gain 250
-    expect(r.simPositions).toEqual([{ ticker: 'MMM', basis: 250, gain: 250, usesCost: false }]);
+    expect(r.simPositions).toEqual([{ ticker: 'MMM', basis: 250, gain: 250, basisType: 'foto', usesCost: false }]);
   });
 
   it('returns null before the first tax year', () => {

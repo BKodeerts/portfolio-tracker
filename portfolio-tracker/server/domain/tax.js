@@ -158,12 +158,23 @@ function computeSimPositions(txsByTicker, adjSharesFn, fotoPrices, positionValue
     if (!openLots.length) continue;
     let basis = 0;
     let usesCost = false;
+    let fotoShares = 0;
+    let totalShares = 0;
     for (const lot of openLots) {
       const b = lotBasisPerShare(lot, foto, today);
       basis += lot.shares * b.basis;
+      if (b.fromFoto) fotoShares += lot.shares;
       if (b.costAboveFoto) usesCost = true;
+      totalShares += lot.shares;
     }
-    rows.push({ ticker, basis: round2(basis), gain: round2(value - basis), usesCost });
+    rows.push({
+      ticker,
+      basis: round2(basis),
+      gain: round2(value - basis),
+      // Which basis dominates the open shares (post-2025 lots are purchase-price based)
+      basisType: totalShares > 0 && fotoShares >= totalShares / 2 ? 'foto' : 'aankoop',
+      usesCost,
+    });
   }
   return rows.sort((a, b) => b.gain - a.gain);
 }

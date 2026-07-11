@@ -116,8 +116,10 @@
       color: getColor(p.ticker),
       selected: !!simSel[p.ticker],
       sub: p.gain < 0
-        ? (p.usesCost ? 'latent loss vs purchase price' : 'latent loss vs foto')
-        : (p.usesCost ? 'sell all · vs purchase price (higher than foto)' : 'sell all · vs foto'),
+        ? `latent loss vs ${p.basisType === 'foto' ? 'foto' : 'purchase price'}`
+        : p.usesCost
+          ? 'sell all · vs purchase price (higher than foto)'
+          : `sell all · vs ${p.basisType === 'foto' ? 'foto' : 'purchase price'}`,
     }));
   });
   const simOn      = $derived(Object.values(simSel).some(Boolean));

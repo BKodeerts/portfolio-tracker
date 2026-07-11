@@ -136,6 +136,8 @@ export interface TaxSimPosition {
   basis: number;
   /** Latent taxable gain if sold today (current value − taxable basis). */
   gain: number;
+  /** Which basis dominates the open shares: foto value or purchase price (post-2025 lots). */
+  basisType: 'foto' | 'aankoop';
   /** True when the open lots use the purchase price because it is higher than the foto. */
   usesCost: boolean;
 }
