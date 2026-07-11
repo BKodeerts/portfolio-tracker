@@ -46,11 +46,12 @@
   const geom = $derived.by(() => {
     if (!points || points.length < 2 || !prevClose || sessionEnd <= sessionStart) return null;
     const H = height;
-    const mainW = phase === 'pre' ? MAIN_W : W;
-
     const ghost = phase === 'pre' && ghostPoints.length >= 2
       && ghostStart != null && ghostEnd != null && ghostEnd > ghostStart
       ? ghostPoints : [];
+    // Only reserve the tail width when there is a ghost to draw in it —
+    // pre-open without pre-market data (weekends) uses the full width.
+    const mainW = ghost.length ? MAIN_W : W;
 
     const pcts = points.map((p) => ((p.close - prevClose) / prevClose) * 100);
     const gPcts = ghost.map((p) => ((p.close - prevClose) / prevClose) * 100);
