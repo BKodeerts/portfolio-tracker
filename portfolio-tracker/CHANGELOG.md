@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1] — 2026-07-11
+
+### Fixed
+
+- **Weekend dashboard no longer blank**: on Saturdays/Sundays every ticker sparkline was empty and the 1D portfolio chart drew a flat green 0-line on its baseline. Two causes: the server's stale-session guard discarded Friday's candles when Yahoo still reported Friday's (finished) session as the current trading period, returning zero intraday points all weekend; and the 1D portfolio series only kept points from today's calendar day, collapsing to the prev-close baseline on non-trading days. The dashboard now always shows the **last trading session** when no market trades today — the full Friday session in the chart (labeled "last session · markets closed", no live dot), sparklines in their dimmed prev-session state, and the hero delta showing Friday's move vs Thursday's close.
+- The intraday store no longer schedules a pointless "stale data" force-refresh on weekends, when a previous-day session date is the expected state.
+
 ## [0.11.0] — 2026-07-11
 
 ### Capital gains tax screen — meerwaardebelasting (design handoff)
