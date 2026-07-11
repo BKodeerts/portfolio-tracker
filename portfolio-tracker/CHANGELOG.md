@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.2] — 2026-07-11
+
+### Fixed
+
+- **Chart label collision**: the "prev close" caption and a high/low value tag overlapped into garbled text when the session opened at its high or low near the prev-close line — the tag now shifts right, clear of the caption.
+- **Weekend "opens" hints carry the day**: sparkline hints and the stock-page chip/captions said "opens 15:30" on Saturdays, implying today. The next open is now computed by rolling forward past the weekend and labeled with the day when it isn't today ("opens Mon 15:30"). New `nextSessionOpen` / `fmtOpenAt` helpers in `$lib/market`, with tests.
+
 ## [0.11.1] — 2026-07-11
 
 ### Fixed

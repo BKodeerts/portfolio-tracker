@@ -92,3 +92,39 @@ export function fmtSessionTime(ts: number): string {
     timeZone: 'Europe/Brussels', hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(ts * 1000));
 }
+
+/**
+ * Next regular-session open strictly after `from` (unix seconds). Skips
+ * Sat/Sun in the exchange's own timezone; exchange holidays are not known,
+ * so around one this may be a day early — acceptable for hint captions.
+ */
+export function nextSessionOpen(yahooSymbol: string, from: Date = new Date()): number | null {
+  const sfx = yahooSuffix(yahooSymbol);
+  const def = EXCHANGE_DEFS[sfx] ?? EXCHANGE_DEFS['']!;
+  const fromSec = Math.floor(from.getTime() / 1000);
+  for (let i = 0; i < 8; i++) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: def.tz, weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date((fromSec + i * 86400) * 1000));
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+    if (['Sat', 'Sun'].includes(get('weekday'))) continue;
+    const open = sessionBounds(yahooSymbol, `${get('year')}-${get('month')}-${get('day')}`)?.open;
+    if (open != null && open > fromSec) return open;
+  }
+  return null;
+}
+
+/**
+ * Open-time caption: "HH:MM" when `ts` falls today (Brussels), otherwise
+ * "Mon HH:MM" — so weekend hints don't read as if the market opens today.
+ */
+export function fmtOpenAt(ts: number): string {
+  const brusselsDay = (d: Date) => new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Brussels', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(d);
+  const at = new Date(ts * 1000);
+  const time = fmtSessionTime(ts);
+  if (brusselsDay(at) === brusselsDay(new Date())) return time;
+  const weekday = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Brussels', weekday: 'short' }).format(at);
+  return `${weekday} ${time}`;
+}
