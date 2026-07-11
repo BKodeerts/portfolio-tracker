@@ -9,8 +9,12 @@ import { toEurLive, toEurLiveOrFallback } from '$lib/fx';
  *
  * The x-axis spans from the first market open of the day (min over held
  * tickers, typically 09:00 CET) to the last close (max, typically 22:00),
- * in minutes-of-day Europe/Brussels. Points from before today's first open
- * (i.e. yesterday's session) are dropped — no overnight shelf.
+ * in minutes-of-day Europe/Brussels. Points from before the drawn day's first
+ * open (i.e. an older session) are dropped — no overnight shelf.
+ *
+ * On days with no trading at all (weekends, holidays) the chart falls back to
+ * the most recent day that has intraday points and draws that full session,
+ * flagged via `prevSession`.
  */
 
 export interface PortfolioIntradaySession {
@@ -24,6 +28,8 @@ export interface PortfolioIntradaySession {
   dayEnd: number;
   /** Current minutes-of-day CET (may be < dayStart or > dayEnd). */
   nowMin: number;
+  /** True when the drawn day is a previous session (no trading today). */
+  prevSession: boolean;
 }
 
 const GRID_STEP = 5;
@@ -60,6 +66,17 @@ export function buildPortfolioIntradaySession(): PortfolioIntradaySession | null
   const minuteOf = (ts: number) => Math.floor(((ts + offset) % DAY_SECS) / 60);
   const dayIdxOf = (ts: number) => Math.floor((ts + offset) / DAY_SECS);
 
+  // Day to draw: today when any held ticker traded today, otherwise the most
+  // recent day with intraday points (weekends/holidays show the last session).
+  let latestIdx = -Infinity;
+  for (const pos of held) {
+    const yahoo = portfolioStore.tickerMeta[pos.ticker]?.yahoo ?? pos.ticker;
+    const last = intradayStore.data[yahoo]?.points?.at(-1);
+    if (last) latestIdx = Math.max(latestIdx, dayIdxOf(last.ts));
+  }
+  const displayIdx = Number.isFinite(latestIdx) ? Math.min(latestIdx, todayIdx) : todayIdx;
+  const prevSession = displayIdx < todayIdx;
+
   interface Entry {
     /** Position value in EUR at minute m (last price at-or-before m, else prevClose). */
     valueAt: (m: number) => number;
@@ -91,9 +108,9 @@ export function buildPortfolioIntradaySession(): PortfolioIntradaySession | null
       dayEnd = Math.max(dayEnd, minuteOf(closeTs));
     }
 
-    // Today's points only (drops yesterday's overnight shelf), as minutes-of-day.
+    // The drawn day's points only (drops older sessions' overnight shelf).
     const pts = (intra.points ?? [])
-      .filter((p) => dayIdxOf(p.ts) === todayIdx)
+      .filter((p) => dayIdxOf(p.ts) === displayIdx)
       .map((p) => ({ min: minuteOf(p.ts), close: p.close }));
 
     const toEur = (native: number) =>
@@ -120,11 +137,12 @@ export function buildPortfolioIntradaySession(): PortfolioIntradaySession | null
 
   const prevCloseTotal = entries.reduce((s, e) => s + e.prevCloseEur, 0);
 
-  if (nowMin < dayStart) {
-    return { points: [], prevCloseTotal, dayStart, dayEnd, nowMin };
+  if (!prevSession && nowMin < dayStart) {
+    return { points: [], prevCloseTotal, dayStart, dayEnd, nowMin, prevSession };
   }
 
-  const gridEnd = Math.min(nowMin, dayEnd);
+  // A previous session is complete — always draw it in full, regardless of now.
+  const gridEnd = prevSession ? dayEnd : Math.min(nowMin, dayEnd);
   const minutes: number[] = [];
   for (let m = dayStart; m <= gridEnd; m += GRID_STEP) minutes.push(m);
   if (minutes[minutes.length - 1] !== gridEnd) minutes.push(gridEnd);
@@ -134,5 +152,5 @@ export function buildPortfolioIntradaySession(): PortfolioIntradaySession | null
     value: entries.reduce((s, e) => s + e.valueAt(m), 0),
   }));
 
-  return { points, prevCloseTotal, dayStart, dayEnd, nowMin };
+  return { points, prevCloseTotal, dayStart, dayEnd, nowMin, prevSession };
 }
