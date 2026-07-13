@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="./mock.js"></script>
+  <style>
+    html { scrollbar-gutter: stable; }
+    body { margin: 0; background: #fafaf8; }
+    a { color: #101216; }
+    a:hover { color: #047857; }
+  </style>
+</helmet>
+<div data-screen-label="Revamp Tax (meerwaardebelasting)" style="width:100%; min-height:100vh; background:#fafaf8; color:#101216; font-family:Inter,ui-sans-serif,system-ui,sans-serif; letter-spacing:-0.005em; position:relative">
+
+  <!-- ── Desktop top nav ── -->
+  <sc-if value="{{ isDesk }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex; align-items:center; gap:28px; max-width:1160px; margin:0 auto; padding:18px 24px 0">
+      <div style="font-size:15px; font-weight:700; letter-spacing:-0.02em">Portfolio</div>
+      <div style="display:flex; gap:4px">
+        <div style="font-size:12.5px; font-weight:500; color:#8b929c; padding:6px 12px; border-radius:8px; cursor:pointer" style-hover="color:#101216">Portfolio</div>
+        <div style="font-size:12.5px; font-weight:500; color:#8b929c; padding:6px 12px; border-radius:8px; cursor:pointer" style-hover="color:#101216">Analysis</div>
+        <div style="font-size:12.5px; font-weight:700; color:#101216; padding:6px 12px; border-radius:8px; background:#eceae3; cursor:pointer">Tax</div>
+        <div style="font-size:12.5px; font-weight:500; color:#8b929c; padding:6px 12px; border-radius:8px; cursor:pointer" style-hover="color:#101216">Activity</div>
+      </div>
+      <div style="margin-left:auto; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:8px; color:#8b929c; cursor:pointer; flex-shrink:0" style-hover="color:#101216; background:#eceae3"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.09a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></div>
+    </div>
+  </sc-if>
+
+  <div style="max-width:1160px; margin:0 auto; padding:18px {{ pagePad }} 96px">
+
+    <!-- ── Header ── -->
+    <div style="display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:4px">
+      <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ true }}">
+        <div style="font-size:15px; font-weight:700; letter-spacing:-0.02em">Capital gains tax</div>
+      </sc-if>
+      <sc-if value="{{ isDesk }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:15px; font-weight:700; letter-spacing:-0.02em">Capital gains tax</div>
+      </sc-if>
+      <div style="font-size:11px; color:#8b929c">meerwaardebelasting · 10% on realized gains</div>
+      <div style="margin-left:auto; display:flex; gap:2px">
+        <sc-for list="{{ yearChips }}" as="y" hint-placeholder-count="2">
+          <div onClick="{{ y.pick }}" style="padding:5px 14px; font-size:12px; font-weight:{{ y.weight }}; color:{{ y.color }}; background:{{ y.bg }}; border-radius:8px; cursor:{{ y.cursor }}">{{ y.label }}</div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="font-size:11px; color:#8b929c; margin-bottom:22px">Filed via aangifte {{ filingYear }} · exemption {{ exemptionStr }} {{ householdLabel }}</div>
+
+    <!-- ── Hero strip ── -->
+    <div style="display:grid; grid-template-columns:{{ heroCols }}; gap:10px; margin-bottom:30px">
+      <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.07); border-radius:14px; padding:14px 16px; box-shadow:0 1px 2px rgba(16,18,22,0.03)">
+        <div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#8b929c; margin-bottom:6px">Net realized gain</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; color:{{ netColor }}">{{ netStr }}</div>
+        <div style="font-size:10.5px; color:#8b929c; margin-top:4px">{{ realizedCount }} sales in {{ selYear }}</div>
+      </div>
+      <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.07); border-radius:14px; padding:14px 16px; box-shadow:0 1px 2px rgba(16,18,22,0.03)">
+        <div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#8b929c; margin-bottom:6px">Exemption used</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700">{{ usedPctStr }}</div>
+        <div style="height:5px; border-radius:999px; background:rgba(16,18,22,0.07); margin-top:8px; overflow:hidden">
+          <div style="height:100%; border-radius:999px; background:#101216; width:{{ usedBarW }}"></div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#8b929c; margin-top:5px">{{ usedStr }} / {{ exemptionStr }}</div>
+      </div>
+      <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.07); border-radius:14px; padding:14px 16px; box-shadow:0 1px 2px rgba(16,18,22,0.03)">
+        <div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#8b929c; margin-bottom:6px">Tax due</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; color:{{ taxColor }}">{{ taxStr }}</div>
+        <div style="font-size:10.5px; color:#8b929c; margin-top:4px">10% above exemption</div>
+      </div>
+      <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.07); border-radius:14px; padding:14px 16px; box-shadow:0 1px 2px rgba(16,18,22,0.03)">
+        <div style="font-size:10px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:#8b929c; margin-bottom:6px">{{ balanceLabel }}</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; color:{{ balanceColor }}">{{ balanceStr }}</div>
+        <div style="font-size:10.5px; color:#8b929c; margin-top:4px">{{ balanceSub }}</div>
+      </div>
+    </div>
+
+    <!-- ── Columns ── -->
+    <div style="display:flex; flex-wrap:wrap; gap:28px 56px; align-items:flex-start">
+
+      <!-- Left: realized + calculation -->
+      <div style="flex:1 1 420px; min-width:0">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:2px">
+          <div style="font-size:13px; font-weight:600">Realized in {{ selYear }}</div>
+          <div style="font-size:11px; color:#8b929c">basis: foto 31/12/25 or purchase price</div>
+        </div>
+        <sc-for list="{{ sales }}" as="s" hint-placeholder-count="3">
+          <div style="display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid rgba(16,18,22,0.06)">
+            <span style="width:6px; height:6px; border-radius:2px; flex-shrink:0; background:{{ s.color }}"></span>
+            <div style="min-width:0; flex:1">
+              <div style="display:flex; align-items:center; gap:8px">
+                <span style="font-size:12.5px; font-weight:700">{{ s.ticker }}</span>
+                <span style="font-size:10.5px; color:#8b929c">{{ s.detail }}</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px; margin-top:3px">
+                <span style="font-size:9.5px; font-weight:600; padding:2px 6px; border-radius:5px; background:rgba(16,18,22,0.05); color:#6a6f78; font-family:'JetBrains Mono',monospace">{{ s.basisChip }}</span>
+                <span style="font-size:10px; color:#b3b8c0">{{ s.note }}</span>
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:{{ s.gainColor }}">{{ s.gainStr }}</div>
+              <sc-if value="{{ s.hasWithheld }}" hint-placeholder-val="{{ false }}">
+                <div style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#8b929c; margin-top:2px">withheld {{ s.withheldStr }}</div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="font-size:13px; font-weight:600; margin:26px 0 2px">Calculation</div>
+        <sc-for list="{{ calcRows }}" as="c" hint-placeholder-count="6">
+          <div style="display:flex; align-items:baseline; justify-content:space-between; padding:9px 0; border-bottom:1px solid rgba(16,18,22,0.06)">
+            <div style="font-size:12px; color:{{ c.labelColor }}; font-weight:{{ c.weight }}">{{ c.label }}</div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:12.5px; font-weight:{{ c.weight }}; color:{{ c.valColor }}">{{ c.value }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- Right: headroom simulator + rules -->
+      <div style="flex:1 1 380px; min-width:0">
+        <sc-if value="{{ isClosedYear }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.07); border-radius:16px; padding:16px 18px; box-shadow:0 1px 2px rgba(16,18,22,0.03)">
+            <div style="display:flex; align-items:center; gap:8px">
+              <span style="width:8px; height:8px; border-radius:50%; background:{{ statusDot }}"></span>
+              <div style="font-size:13px; font-weight:600">{{ statusTitle }}</div>
+            </div>
+            <div style="margin-top:8px">
+              <sc-for list="{{ statusRows }}" as="sr" hint-placeholder-count="3">
+                <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid rgba(16,18,22,0.06)">
+                  <span style="font-size:11.5px; color:#6a6f78">{{ sr.label }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:{{ sr.weight }}; color:{{ sr.color }}">{{ sr.value }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="font-size:10.5px; color:#8b929c; margin-top:10px; line-height:1.5">{{ statusNote }}</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isOpenYear }}" hint-placeholder-val="{{ true }}">
+        <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.07); border-radius:16px; padding:16px 18px; box-shadow:0 1px 2px rgba(16,18,22,0.03)">
+          <div style="display:flex; align-items:baseline; justify-content:space-between">
+            <div style="font-size:13px; font-weight:600">Tax-free headroom</div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:{{ headroomColor }}">{{ headroomStr }}</div>
+          </div>
+          <div style="font-size:11px; color:#8b929c; margin-top:3px; line-height:1.5">{{ headroomHint }}</div>
+          <div style="margin-top:12px">
+            <sc-for list="{{ simRows }}" as="p" hint-placeholder-count="6">
+              <div onClick="{{ p.toggle }}" style="display:flex; align-items:center; gap:10px; padding:10px 10px; margin:0 -10px; border-radius:10px; cursor:pointer; background:{{ p.rowBg }}" style-hover="background:rgba(16,18,22,0.04)">
+                <div style="width:15px; height:15px; border-radius:5px; flex-shrink:0; border:1.5px solid {{ p.boxBorder }}; background:{{ p.boxBg }}; display:flex; align-items:center; justify-content:center">
+                  <sc-if value="{{ p.sel }}" hint-placeholder-val="{{ false }}">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l6 6L20 7"></path></svg>
+                  </sc-if>
+                </div>
+                <span style="width:6px; height:6px; border-radius:2px; flex-shrink:0; background:{{ p.color }}"></span>
+                <span style="font-size:12.5px; font-weight:700">{{ p.ticker }}</span>
+                <span style="font-size:10.5px; color:#8b929c">{{ p.subStr }}</span>
+                <span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:{{ p.gainColor }}">{{ p.gainStr }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ simOn }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:10px; padding:11px 13px; background:#f4f3ee; border-radius:10px">
+              <div style="display:flex; align-items:baseline; justify-content:space-between; padding:3px 0">
+                <span style="font-size:11.5px; color:#6a6f78">If sold: net realized gain</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700">{{ simNetStr }}</span>
+              </div>
+              <div style="display:flex; align-items:baseline; justify-content:space-between; padding:3px 0">
+                <span style="font-size:11.5px; color:#6a6f78">Tax due (10% above exemption)</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:{{ simTaxColor }}">{{ simTaxStr }}</span>
+              </div>
+              <div style="font-size:10.5px; color:#8b929c; margin-top:4px; line-height:1.5">{{ simHint }}</div>
+            </div>
+          </sc-if>
+        </div>
+        </sc-if>
+
+        <div style="font-size:13px; font-weight:600; margin:26px 0 2px">Rules that apply to you</div>
+        <sc-for list="{{ rules }}" as="r" hint-placeholder-count="5">
+          <div style="display:flex; gap:10px; padding:9px 0; border-bottom:1px solid rgba(16,18,22,0.06)">
+            <span style="width:4px; height:4px; border-radius:50%; background:#c6cad1; margin-top:7px; flex-shrink:0"></span>
+            <div style="font-size:11.5px; color:#6a6f78; line-height:1.55">{{ r.text }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Mobile bottom tab bar ── -->
+  <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ true }}">
+    <div style="position:fixed; bottom:0; left:0; right:0; background:rgba(250,250,248,0.92); backdrop-filter:blur(20px); border-top:1px solid rgba(16,18,22,0.07); padding:8px 12px 24px; z-index:200; display:flex; justify-content:space-around">
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 12px; color:#8b929c; font-size:10px; font-weight:500">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M7 14l4-5 3 3 5-7"></path></svg>
+        <span>Portfolio</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 12px; color:#8b929c; font-size:10px; font-weight:500">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v9l6.4 4"></path></svg>
+        <span>Analysis</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 12px; color:#101216; font-size:10px; font-weight:700">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"></path><path d="M9 9h.01M15 9h.01M9 14l2 2 4-4"></path></svg>
+        <span>Tax</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 12px; color:#8b929c; font-size:10px; font-weight:500">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg>
+        <span>Activity</span>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1280, &quot;height&quot;: 900}, &quot;viewpoint&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;today (Jul 2026)&quot;, &quot;options&quot;: [&quot;today (Jul 2026)&quot;, &quot;future (Jul 2028)&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Tax settings&quot;}, &quot;broker&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;withholds at sale&quot;, &quot;options&quot;: [&quot;withholds at sale&quot;, &quot;no withholding&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Tax settings&quot;}, &quot;lastAssessment&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;pending&quot;, &quot;options&quot;: [&quot;pending&quot;, &quot;received&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Tax settings&quot;}, &quot;scenario&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;under limit&quot;, &quot;options&quot;: [&quot;under limit&quot;, &quot;above limit&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Tax settings&quot;}, &quot;household&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;individual — €10,000&quot;, &quot;options&quot;: [&quot;individual — €10,000&quot;, &quot;couple — €20,000&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Tax settings&quot;}}">
+class Component extends DCLogic {
+  state = { sel: {}, year: null, ready: false, vw: typeof window !== 'undefined' ? window.innerWidth : 1200 };
+
+  componentDidMount() {
+    const check = () => {
+      if (window.PT_MOCK) this.setState({ ready: true });
+      else setTimeout(check, 60);
+    };
+    check();
+    this._onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this._onResize);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._onResize);
+  }
+
+  fmt(v) {
+    return (v < 0 ? '-' : '') + '€' + Math.round(Math.abs(v)).toLocaleString('en-US');
+  }
+  signed(v) {
+    return (v >= 0 ? '+' : '-') + '€' + Math.round(Math.abs(v)).toLocaleString('en-US');
+  }
+
+  renderVals() {
+    const M = window.PT_MOCK;
+    const { sel, vw } = this.state;
+    const isDesk = vw >= 900;
+    const posC = '#047857', negC = '#b91c1c';
+    const layout = {
+      isDesk, isMobile: !isDesk,
+      pagePad: isDesk ? '24px' : '20px',
+      heroCols: isDesk ? 'repeat(4,1fr)' : '1fr 1fr',
+    };
+    if (!M || !M.TAX) {
+      return { ...layout, filingYear: '', exemptionStr: '', householdLabel: '', netStr: '', netColor: posC,
+        realizedCount: '', usedPctStr: '', usedBarW: '0%', usedStr: '', taxStr: '', taxColor: '#101216',
+        balanceLabel: 'Reclaimable', balanceStr: '', balanceColor: posC, balanceSub: '',
+        yearChips: [], selYear: '', isOpenYear: true, isClosedYear: false,
+        statusDot: posC, statusTitle: '', statusRows: [], statusNote: '',
+        sales: [], calcRows: [], simRows: [], rules: [],
+        headroomStr: '', headroomColor: posC, headroomHint: '', simOn: false, simNetStr: '', simTaxStr: '', simTaxColor: '#101216', simHint: '' };
+    }
+
+    const TX = M.TAX;
+    const couple = (this.props.household ?? 'individual — €10,000') !== 'individual — €10,000';
+
+    const future = (this.props.viewpoint ?? 'today (Jul 2026)') !== 'today (Jul 2026)';
+    const nowYear = future ? 2028 : 2026;
+    const selYear = Math.min(this.state.year || nowYear, nowYear);
+    const isClosedYear = selYear < nowYear;
+
+    const EXBASE = { 2026: TX.exemptionBase, 2027: 10300, 2028: 10600 };
+    const exemption = (couple ? 2 : 1) * EXBASE[selYear];
+
+    const aboveLimit = (this.props.scenario ?? 'under limit') === 'above limit';
+    const realized2026 = aboveLimit
+      ? [
+          TX.realized[0],
+          { date: '2026-03-20', ticker: 'RKLB', shares: 180, proceeds: 14260, basis: 4620, basisType: 'foto', gain: 9640, withheld: 0, note: 'transition — self-declare' },
+          TX.realized[1],
+          TX.realized[2],
+          { date: '2026-06-30', ticker: 'SMR', shares: 60, proceeds: 4410, basis: 1980, basisType: 'foto', gain: 2430, withheld: 243, note: 'broker withheld 10%' },
+        ]
+      : TX.realized;
+
+    const REALIZED_BY_YEAR = {
+      2026: realized2026,
+      2027: [
+        { date: '2027-03-09', ticker: 'ASTS', shares: 30, basisType: 'foto', gain: 4120, withheld: 412, note: 'broker withheld 10%' },
+        { date: '2027-06-18', ticker: 'LUNR', shares: 120, basisType: 'aankoop', gain: -1230, withheld: 0, note: 'actual cost basis (higher than foto)' },
+        { date: '2027-10-02', ticker: 'SXRT', shares: 4, basisType: 'foto', gain: 1890, withheld: 189, note: 'broker withheld 10%' },
+      ],
+      2028: [
+        { date: '2028-02-14', ticker: 'SMR', shares: 60, basisType: 'foto', gain: 2840, withheld: 284, note: 'broker withheld 10%' },
+        { date: '2028-05-27', ticker: 'EUDF', shares: 80, basisType: 'aankoop', gain: 1160, withheld: 116, note: 'actual cost basis (higher than foto)' },
+      ],
+    };
+    const withholds = (this.props.broker ?? 'withholds at sale') === 'withholds at sale';
+    const realized = withholds
+      ? REALIZED_BY_YEAR[selYear]
+      : REALIZED_BY_YEAR[selYear].map((s) => (s.withheld > 0 ? { ...s, withheld: 0, note: 'no withholding — self-declare' } : s));
+
+    const yearsList = future ? [2026, 2027, 2028] : [2026, 2027];
+    const yearChips = yearsList.map((y) => {
+      const enabled = y <= nowYear;
+      const active = y === selYear;
+      return {
+        label: String(y),
+        pick: enabled ? () => this.setState({ year: y }) : undefined,
+        weight: active ? '700' : '500',
+        color: active ? '#101216' : enabled ? '#8b929c' : '#c6cad1',
+        bg: active ? '#eceae3' : 'transparent',
+        cursor: enabled ? 'pointer' : 'default',
+      };
+    });
+
+    const gains = realized.filter((s) => s.gain > 0).reduce((a, s) => a + s.gain, 0);
+    const losses = realized.filter((s) => s.gain < 0).reduce((a, s) => a + s.gain, 0);
+    const net = gains + losses;
+    const netPos = Math.max(0, net);
+    const used = Math.min(netPos, exemption);
+    const taxable = Math.max(0, netPos - exemption);
+    const tax = taxable * TX.rate;
+    const withheld = realized.reduce((a, s) => a + s.withheld, 0);
+    const balance = withheld - tax; // >0 reclaim, <0 still due
+    const reclaim = Math.max(0, balance);
+    const due = Math.max(0, -balance);
+    const headroom = Math.max(0, exemption - netPos);
+
+    // simulator
+    // until end 2030 the actual purchase price may be used as basis if higher than the foto
+    const simBasis = (p) => Math.max(p.fotoValueEur, p.costEur);
+    const simGain = (p) => p.value - simBasis(p);
+    const selGain = M.POSITIONS.filter((p) => sel[p.ticker]).reduce((a, p) => a + simGain(p), 0);
+    const simNet = Math.max(0, net + selGain);
+    const simTaxable = Math.max(0, simNet - exemption);
+    const simTax = simTaxable * TX.rate;
+    const simOn = Object.values(sel).some(Boolean);
+
+    const fmtD = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+    // status of the selected (closed) year, seen from nowYear
+    const assessedRecent = (this.props.lastAssessment ?? 'pending') === 'received';
+    const settled = isClosedYear && (selYear + 2 <= nowYear || assessedRecent); // assessed the year after filing, unless already received
+    const status = !isClosedYear ? null : settled
+      ? {
+          dot: posC, title: 'Settled',
+          rows: [
+            { label: 'Filed', value: 'aangifte ' + (selYear + 1) + ' · 28 Jun ' + (selYear + 1), weight: '500', color: '#101216' },
+            { label: 'Assessment received', value: (selYear + 2 <= nowYear ? '12 Aug ' : '4 Jul ') + (selYear + 1), weight: '500', color: '#101216' },
+            { label: balance >= 0 ? 'Reclaimed' : 'Paid', value: balance >= 0 ? this.signed(reclaim) : this.fmt(due), weight: '700', color: balance >= 0 ? posC : negC },
+          ],
+          note: 'This tax year is closed. Figures are final as assessed.',
+        }
+      : {
+          dot: '#b45309', title: 'Filed — assessment pending',
+          rows: [
+            { label: 'Filed', value: 'aangifte ' + (selYear + 1) + ' · 24 Jun ' + (selYear + 1), weight: '500', color: '#101216' },
+            { label: balance >= 0 ? 'Expected refund' : 'Expected payment', value: balance >= 0 ? this.signed(reclaim) : this.fmt(due), weight: '700', color: balance >= 0 ? posC : negC },
+          ],
+          note: 'The assessment usually arrives within a few months of filing.',
+        };
+
+    return {
+      ...layout,
+      filingYear: selYear + 1,
+      selYear,
+      yearChips,
+      isOpenYear: !isClosedYear,
+      isClosedYear,
+      statusDot: status ? status.dot : posC,
+      statusTitle: status ? status.title : '',
+      statusRows: status ? status.rows : [],
+      statusNote: status ? status.note : '',
+      exemptionStr: this.fmt(exemption),
+      householdLabel: couple ? '(couple)' : '(per person, indexed)',
+      netStr: this.signed(net), netColor: net >= 0 ? posC : negC,
+      realizedCount: realized.length,
+      usedPctStr: Math.round((used / exemption) * 100) + '%',
+      usedBarW: Math.min(100, (used / exemption) * 100).toFixed(1) + '%',
+      usedStr: this.fmt(used),
+      taxStr: this.fmt(tax), taxColor: tax > 0 ? negC : '#101216',
+      balanceLabel: withheld === 0
+        ? (settled ? (tax > 0 ? 'Paid' : 'No tax due') : 'Due via aangifte')
+        : settled ? (balance >= 0 ? 'Reclaimed' : 'Paid') : balance >= 0 ? 'Reclaimable' : 'Still due',
+      balanceStr: withheld === 0 ? this.fmt(tax) : balance >= 0 ? this.signed(reclaim) : this.fmt(due),
+      balanceColor: withheld === 0 ? (tax > 0 ? negC : '#101216') : balance >= 0 ? posC : negC,
+      balanceSub: settled
+        ? 'settled ' + (selYear + 2 <= nowYear ? '12 Aug ' : '4 Jul ') + (selYear + 1)
+        : withheld === 0
+        ? 'your broker does not withhold — self-declare all gains'
+        : balance >= 0
+        ? 'withheld ' + this.fmt(withheld) + ' · claim via aangifte'
+        : 'withheld ' + this.fmt(withheld) + ' of ' + this.fmt(tax) + ' · pay via aangifte',
+      headroomStr: this.fmt(headroom),
+      headroomColor: headroom > 0 ? posC : negC,
+      headroomHint: headroom > 0
+        ? 'Gains you can still realize in 2026 without paying tax. Tap positions to simulate selling.'
+        : 'Exemption fully used — every additional euro of realized gains is taxed at 10%. Tap positions to simulate selling.',
+
+      sales: realized.map((s) => ({
+        ticker: s.ticker, color: M.COLORS[s.ticker] || '#8b929c',
+        detail: s.shares + ' sh · ' + fmtD(s.date),
+        basisChip: s.basisType === 'foto' ? 'foto 31/12/25' : 'purchase price',
+        note: s.note,
+        gainStr: this.signed(s.gain), gainColor: s.gain >= 0 ? posC : negC,
+        hasWithheld: s.withheld > 0, withheldStr: this.fmt(s.withheld),
+      })),
+
+      calcRows: [
+        { label: 'Realized gains', value: this.signed(gains), valColor: posC, labelColor: '#3c414a', weight: '500' },
+        { label: 'Realized losses (same year)', value: this.signed(losses), valColor: negC, labelColor: '#3c414a', weight: '500' },
+        { label: 'Net realized gain', value: this.fmt(net), valColor: '#101216', labelColor: '#101216', weight: '700' },
+        { label: 'Exemption applied', value: '−' + this.fmt(used).slice(0), valColor: '#8b929c', labelColor: '#3c414a', weight: '500' },
+        { label: 'Taxable base', value: this.fmt(taxable), valColor: '#101216', labelColor: '#101216', weight: '700' },
+        { label: 'Tax (10%)', value: this.fmt(tax), valColor: tax > 0 ? negC : '#101216', labelColor: '#101216', weight: '700' },
+        { label: withholds ? (selYear === 2026 ? 'Withheld by broker since 1 Jun' : 'Withheld by broker') : 'Withheld by broker (not supported)', value: this.fmt(withheld), valColor: '#8b929c', labelColor: '#3c414a', weight: '500' },
+        withheld === 0
+          ? { label: (settled ? 'Paid via aangifte ' : 'To pay via aangifte ') + (selYear + 1), value: this.fmt(tax), valColor: tax > 0 ? negC : '#101216', labelColor: '#101216', weight: '700' }
+          : balance >= 0
+          ? { label: (settled ? 'Reclaimed via aangifte ' : 'To reclaim via aangifte ') + (selYear + 1), value: this.signed(reclaim), valColor: posC, labelColor: '#101216', weight: '700' }
+          : { label: (settled ? 'Paid via aangifte ' : 'To pay via aangifte ') + (selYear + 1), value: this.fmt(due), valColor: negC, labelColor: '#101216', weight: '700' },
+      ],
+
+      simRows: [...M.POSITIONS].sort((a, b) => simGain(b) - simGain(a)).map((p) => {
+        const isSel = !!sel[p.ticker];
+        const g = simGain(p);
+        const usesCost = p.costEur > p.fotoValueEur;
+        return {
+          ticker: p.ticker, color: M.COLORS[p.ticker],
+          sel: isSel,
+          toggle: () => this.setState((s) => ({ sel: { ...s.sel, [p.ticker]: !s.sel[p.ticker] } })),
+          rowBg: isSel ? 'rgba(16,18,22,0.035)' : 'transparent',
+          boxBorder: isSel ? '#101216' : 'rgba(16,18,22,0.25)',
+          boxBg: isSel ? '#101216' : 'transparent',
+          subStr: g < 0
+            ? (usesCost ? 'latent loss vs purchase price' : 'latent loss vs foto')
+            : (usesCost ? 'sell all · vs purchase price (higher than foto)' : 'sell all · vs foto'),
+          gainStr: this.signed(g),
+          gainColor: g >= 0 ? posC : negC,
+        };
+      }),
+
+      simOn,
+      simNetStr: this.fmt(simNet),
+      simTaxStr: this.fmt(simTax), simTaxColor: simTax > 0 ? negC : posC,
+      simHint: simTax > 0
+        ? 'Exceeds your exemption by ' + this.fmt(simTaxable) + ' — consider spreading sales across tax years.'
+        : 'Fits within your remaining exemption — no tax due.',
+
+      rules: [
+        { text: '10% flat on gains realized since 1 Jan 2026. Costs and transaction taxes are not deductible.' },
+        { text: 'Basis for pre-2026 holdings = value on 31/12/2025 ("foto"). Until end 2030 you may use your actual purchase price if it was higher.' },
+        { text: 'Losses offset gains within the same year only — no carry-forward of losses.' },
+        { text: 'Exemption ' + this.fmt(TX.exemptionBase) + '/person/year (indexed). Carry-forward of +€1,000/yr up to €15,000 only in years you use less than €1,000 — you used ' + this.fmt(used) + ' in ' + selYear + ', so ' + (selYear + 1) + ' resets to the base exemption.' },
+        { text: 'Since 1 Jun 2026 your broker may withhold 10% at sale (depends on the broker and whether you opted in) — withholding ignores your exemption, so reclaim any excess via your aangifte. Gains without withholding must be self-declared.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

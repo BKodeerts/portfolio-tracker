@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="./mock.js"></script>
+  <style>
+    html { scrollbar-gutter: stable; }
+    body { margin: 0; background: #fafaf8; }
+    a { color: #101216; } a:hover { color: #047857; }
+  </style>
+</helmet>
+<div data-screen-label="Revamp Settings (responsive)" style="width:100%; min-height:100vh; background:#fafaf8; color:#101216; font-family:Inter,ui-sans-serif,system-ui,sans-serif; letter-spacing:-0.005em; position:relative">
+
+  <!-- ── Desktop top nav ── -->
+  <sc-if value="{{ isDesk }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex; align-items:center; gap:28px; max-width:1160px; margin:0 auto; padding:18px 24px 0">
+      <div style="font-size:15px; font-weight:700; letter-spacing:-0.02em">Portfolio</div>
+      <div style="display:flex; gap:4px">
+        <div style="font-size:12.5px; font-weight:500; color:#8b929c; padding:6px 12px; border-radius:8px; cursor:pointer" style-hover="color:#101216">Portfolio</div>
+        <div style="font-size:12.5px; font-weight:500; color:#8b929c; padding:6px 12px; border-radius:8px; cursor:pointer" style-hover="color:#101216">Analysis</div>
+        <div style="font-size:12.5px; font-weight:500; color:#8b929c; padding:6px 12px; border-radius:8px; cursor:pointer" style-hover="color:#101216">Tax</div>
+        <div style="font-size:12.5px; font-weight:500; color:#8b929c; padding:6px 12px; border-radius:8px; cursor:pointer" style-hover="color:#101216">Activity</div>
+      </div>
+      <div style="margin-left:auto; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:8px; background:#eceae3; color:#101216; cursor:pointer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.09a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ── Mobile top bar ── -->
+  <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex; align-items:center; gap:10px; padding:14px 20px 0">
+      <sc-if value="{{ mobDetail }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ goBack }}" style="width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:#eceae3; cursor:pointer; flex-shrink:0">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+        </div>
+      </sc-if>
+      <div style="font-size:15px; font-weight:700; letter-spacing:-0.02em">{{ mobTitle }}</div>
+    </div>
+  </sc-if>
+
+  <div style="max-width:1160px; margin:0 auto; padding:18px 0 110px">
+    <div style="display:flex; gap:0 56px; padding:0 {{ pagePad }}; align-items:flex-start">
+
+      <!-- ── Section nav (desktop always; mobile = list view) ── -->
+      <sc-if value="{{ showNav }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:{{ navFlex }}; min-width:0">
+          <sc-if value="{{ isDesk }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:22px; font-weight:700; letter-spacing:-0.02em; margin:4px 0 18px">Settings</div>
+          </sc-if>
+          <sc-for list="{{ sections }}" as="s" hint-placeholder-count="5">
+            <div onClick="{{ s.select }}" style="display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:10px; cursor:pointer; background:{{ s.bg }}; user-select:none" style-hover="background:#f1efe9">
+              <div style="width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:8px; background:{{ s.iconBg }}; font-size:13px; flex-shrink:0">{{ s.icon }}</div>
+              <div style="min-width:0; flex:1">
+                <div style="font-size:13px; font-weight:{{ s.weight }}">{{ s.title }}</div>
+                <div style="font-size:11px; color:#8b929c; margin-top:1px">{{ s.subtitle }}</div>
+              </div>
+              <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+                <div style="color:#b3b8c0; font-size:16px">›</div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- ── Panel ── -->
+      <sc-if value="{{ showPanel }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:2 1 480px; min-width:0; max-width:640px">
+          <sc-if value="{{ isDesk }}" hint-placeholder-val="{{ false }}">
+            <div style="margin:4px 0 6px; padding-bottom:14px; border-bottom:1px solid rgba(16,18,22,0.08)">
+              <div style="font-size:17px; font-weight:700; letter-spacing:-0.01em">{{ panelTitle }}</div>
+              <div style="font-size:12px; color:#8b929c; margin-top:2px">{{ panelSub }}</div>
+            </div>
+          </sc-if>
+
+          <!-- General -->
+          <sc-if value="{{ isGeneral }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 0; border-bottom:1px solid rgba(16,18,22,0.06)">
+              <div style="min-width:0; flex:1">
+                <div style="font-size:13px; font-weight:600">Base currency</div>
+                <div style="font-size:11.5px; color:#8b929c; margin-top:2px">All amounts are converted to this currency.</div>
+              </div>
+              <select value="{{ baseCurrency }}" onChange="{{ setCurrency }}" style="background:#ffffff; border:1px solid rgba(16,18,22,0.12); border-radius:8px; padding:6px 10px; font-size:12.5px; font-family:'JetBrains Mono',monospace; font-weight:600; color:#101216">
+                <sc-for list="{{ currencies }}" as="c" hint-placeholder-count="3">
+                  <option value="{{ c }}">{{ c }}</option>
+                </sc-for>
+              </select>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 0; border-bottom:1px solid rgba(16,18,22,0.06)">
+              <div style="min-width:0; flex:1">
+                <div style="font-size:13px; font-weight:600">Privacy mode</div>
+                <div style="font-size:11.5px; color:#8b929c; margin-top:2px">Blur all amounts.</div>
+              </div>
+              <div onClick="{{ togglePrivacy }}" style="width:42px; height:24px; border-radius:999px; background:{{ privacyBg }}; position:relative; cursor:pointer; flex-shrink:0; transition:background 0.15s">
+                <div style="position:absolute; top:3px; left:{{ privacyKnob }}; width:18px; height:18px; border-radius:50%; background:#ffffff; box-shadow:0 1px 2px rgba(16,18,22,0.2); transition:left 0.15s"></div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 0; border-bottom:1px solid rgba(16,18,22,0.06)">
+              <div style="min-width:0; flex:1">
+                <div style="font-size:13px; font-weight:600">Intraday during market hours</div>
+                <div style="font-size:11.5px; color:#8b929c; margin-top:2px">Refresh quotes every minute while markets are open.</div>
+              </div>
+              <div onClick="{{ toggleIntraday }}" style="width:42px; height:24px; border-radius:999px; background:{{ intradayBg }}; position:relative; cursor:pointer; flex-shrink:0; transition:background 0.15s">
+                <div style="position:absolute; top:3px; left:{{ intradayKnob }}; width:18px; height:18px; border-radius:50%; background:#ffffff; box-shadow:0 1px 2px rgba(16,18,22,0.2); transition:left 0.15s"></div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 0; border-bottom:1px solid rgba(16,18,22,0.06); flex-wrap:wrap">
+              <div style="min-width:0; flex:1 1 220px">
+                <div style="font-size:13px; font-weight:600">Capital gains tax — household</div>
+                <div style="font-size:11.5px; color:#8b929c; margin-top:2px">The exemption is per person and doubles for couples.</div>
+              </div>
+              <div style="display:flex; border:1px solid rgba(16,18,22,0.12); border-radius:8px; overflow:hidden; flex-shrink:0">
+                <div onClick="{{ setIndividual }}" style="padding:6px 12px; font-size:11.5px; cursor:pointer; font-weight:{{ indWt }}; color:{{ indC }}; background:{{ indBg }}">Individual</div>
+                <div onClick="{{ setCouple }}" style="padding:6px 12px; font-size:11.5px; cursor:pointer; font-weight:{{ cplWt }}; color:{{ cplC }}; background:{{ cplBg }}">Couple</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 0; border-bottom:1px solid rgba(16,18,22,0.06)">
+              <div style="min-width:0; flex:1">
+                <div style="font-size:13px; font-weight:600">Broker withholds 10% at sale</div>
+                <div style="font-size:11.5px; color:#8b929c; margin-top:2px">Since 1 June 2026, depending on your broker and opt-in. Without withholding you declare all gains yourself.</div>
+              </div>
+              <div onClick="{{ toggleWithholds }}" style="width:42px; height:24px; border-radius:999px; background:{{ withholdsBg }}; position:relative; cursor:pointer; flex-shrink:0; transition:background 0.15s">
+                <div style="position:absolute; top:3px; left:{{ withholdsKnob }}; width:18px; height:18px; border-radius:50%; background:#ffffff; box-shadow:0 1px 2px rgba(16,18,22,0.2); transition:left 0.15s"></div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 0; flex-wrap:wrap">
+              <div style="min-width:0; flex:1 1 220px">
+                <div style="font-size:13px; font-weight:600">Theme</div>
+                <div style="font-size:11.5px; color:#8b929c; margin-top:2px">System preference, light, or dark.</div>
+              </div>
+              <div style="display:flex; border:1px solid rgba(16,18,22,0.12); border-radius:8px; overflow:hidden; flex-shrink:0">
+                <sc-for list="{{ themes }}" as="t" hint-placeholder-count="3">
+                  <div onClick="{{ t.select }}" style="padding:6px 12px; font-size:11.5px; cursor:pointer; font-weight:{{ t.weight }}; color:{{ t.color }}; background:{{ t.bg }}">{{ t.label }}</div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- Watchlist -->
+          <sc-if value="{{ isWatchlist }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; color:#8b929c; text-transform:uppercase; margin:14px 0 10px">Active tickers</div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px">
+              <sc-for list="{{ watchChips }}" as="w" hint-placeholder-count="4">
+                <div style="display:inline-flex; align-items:center; gap:7px; background:#ffffff; border:1px solid rgba(16,18,22,0.10); border-radius:999px; padding:6px 8px 6px 11px; font-size:12.5px; font-weight:600">
+                  <span style="width:6px; height:6px; border-radius:50%; background:{{ w.color }}"></span>
+                  {{ w.ticker }}
+                  <span onClick="{{ w.remove }}" style="color:#b3b8c0; cursor:pointer; font-size:14px; line-height:1; padding:0 3px" style-hover="color:#101216">×</span>
+                </div>
+              </sc-for>
+              <sc-if value="{{ watchEmpty }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:12px; color:#8b929c">No tickers yet.</span>
+              </sc-if>
+            </div>
+            <div style="display:flex; gap:8px">
+              <input value="{{ newTicker }}" onChange="{{ typeTicker }}" onKeyDown="{{ tickerKey }}" placeholder="Add ticker…" style="flex:1; background:#ffffff; border:1px solid rgba(16,18,22,0.12); border-radius:8px; padding:8px 12px; font-size:12.5px; font-family:'JetBrains Mono',monospace; color:#101216; min-width:0" />
+              <div onClick="{{ addTicker }}" style="padding:8px 16px; font-size:12.5px; font-weight:600; background:#101216; color:#fafaf8; border-radius:8px; cursor:pointer; user-select:none; flex-shrink:0">Add</div>
+            </div>
+            <div style="font-size:11.5px; color:#8b929c; margin-top:12px">Watchlist tickers appear on the dashboard without a position.</div>
+          </sc-if>
+
+          <!-- Home Assistant -->
+          <sc-if value="{{ isHa }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 0; border-bottom:1px solid rgba(16,18,22,0.06)">
+              <div style="min-width:0; flex:1">
+                <div style="font-size:13px; font-weight:600">Push active</div>
+                <div style="font-size:11.5px; color:#8b929c; margin-top:2px">Sends portfolio value and P&amp;L over MQTT.</div>
+              </div>
+              <div onClick="{{ toggleHa }}" style="width:42px; height:24px; border-radius:999px; background:{{ haBg }}; position:relative; cursor:pointer; flex-shrink:0; transition:background 0.15s">
+                <div style="position:absolute; top:3px; left:{{ haKnob }}; width:18px; height:18px; border-radius:50%; background:#ffffff; box-shadow:0 1px 2px rgba(16,18,22,0.2); transition:left 0.15s"></div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 0; border-bottom:1px solid rgba(16,18,22,0.06)">
+              <div style="min-width:0; flex:1">
+                <div style="font-size:13px; font-weight:600">Interval</div>
+                <div style="font-size:11.5px; color:#8b929c; margin-top:2px">How often a push is sent.</div>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px; flex-shrink:0">
+                <input value="{{ pushInterval }}" onChange="{{ setInterval }}" type="number" min="1" max="60" style="width:56px; text-align:right; background:#ffffff; border:1px solid rgba(16,18,22,0.12); border-radius:8px; padding:6px 8px; font-size:12.5px; font-family:'JetBrains Mono',monospace; font-weight:600; color:#101216" />
+                <span style="font-size:11.5px; color:#8b929c">min</span>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 0">
+              <div style="min-width:0; flex:1">
+                <div style="font-size:13px; font-weight:600">Push manually</div>
+                <div style="font-size:11.5px; color:#8b929c; margin-top:2px">Send an update to Home Assistant now.</div>
+              </div>
+              <div onClick="{{ pushNow }}" style="padding:7px 14px; font-size:12px; font-weight:600; border:1px solid rgba(16,18,22,0.12); border-radius:8px; cursor:pointer; user-select:none; background:#ffffff; flex-shrink:0" style-hover="background:#f1efe9">{{ pushLabel }}</div>
+            </div>
+            <sc-if value="{{ hasHaMsg }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:12px; color:#047857; font-family:'JetBrains Mono',monospace">{{ haMsg }}</div>
+            </sc-if>
+          </sc-if>
+
+          <!-- Data -->
+          <sc-if value="{{ isData }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; color:#8b929c; text-transform:uppercase; margin:14px 0 10px">Import &amp; export</div>
+            <div style="display:grid; grid-template-columns:{{ dataCols }}; gap:10px">
+              <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.10); border-radius:12px; padding:14px 16px; cursor:pointer" style-hover="border-color:rgba(16,18,22,0.22)">
+                <div style="font-size:13px; font-weight:600">↑ Import CSV</div>
+                <div style="font-size:11.5px; color:#8b929c; margin-top:3px">DeGiro, Bolero, T212</div>
+              </div>
+              <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.10); border-radius:12px; padding:14px 16px; opacity:0.55">
+                <div style="font-size:13px; font-weight:600">↓ Export CSV</div>
+                <div style="font-size:11.5px; color:#8b929c; margin-top:3px">{{ txCount }} transactions · coming soon</div>
+              </div>
+            </div>
+            <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; color:#8b929c; text-transform:uppercase; margin:22px 0 10px">Danger zone</div>
+            <div onClick="{{ clearCache }}" style="padding:10px; text-align:center; font-size:12.5px; font-weight:600; border:1px solid rgba(16,18,22,0.12); border-radius:8px; cursor:pointer; user-select:none; background:#ffffff" style-hover="background:#f1efe9">{{ cacheLabel }}</div>
+            <div style="padding:10px; text-align:center; font-size:12.5px; font-weight:600; border:1px solid rgba(185,28,28,0.4); color:#b91c1c; border-radius:8px; cursor:pointer; user-select:none; margin-top:8px" style-hover="background:rgba(185,28,28,0.05)">Delete all transactions…</div>
+            <sc-if value="{{ hasCacheMsg }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:12px; color:#047857; font-family:'JetBrains Mono',monospace; margin-top:12px">{{ cacheMsg }}</div>
+            </sc-if>
+          </sc-if>
+
+          <!-- About -->
+          <sc-if value="{{ isAbout }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:2px; padding:20px 0 16px">
+              <div style="width:56px; height:56px; border-radius:14px; background:#101216; color:#fafaf8; display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:700; margin-bottom:8px">P</div>
+              <div style="font-size:15px; font-weight:600">Portfolio tracker</div>
+              <div style="font-size:11.5px; color:#8b929c; font-family:'JetBrains Mono',monospace">v0.7.0-redesign.2 · build 2026.07.03</div>
+            </div>
+            <sc-for list="{{ aboutRows }}" as="r" hint-placeholder-count="4">
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:13px 0; border-bottom:1px solid rgba(16,18,22,0.06)">
+                <span style="font-size:13px; font-weight:500">{{ r.label }}</span>
+                <span style="font-size:12px; color:#8b929c; font-family:'JetBrains Mono',monospace">{{ r.value }}</span>
+              </div>
+            </sc-for>
+          </sc-if>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <!-- ── Mobile bottom tab bar ── -->
+  <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ true }}">
+    <div style="position:fixed; bottom:0; left:0; right:0; background:rgba(250,250,248,0.92); backdrop-filter:blur(20px); border-top:1px solid rgba(16,18,22,0.07); padding:8px 12px 24px; z-index:200; display:flex; justify-content:space-around">
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 12px; color:#8b929c; font-size:10px; font-weight:500">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M7 14l4-5 3 3 5-7"></path></svg>
+        <span>Portfolio</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 12px; color:#8b929c; font-size:10px; font-weight:500">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v9l6.4 4"></path></svg>
+        <span>Analysis</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 12px; color:#8b929c; font-size:10px; font-weight:500">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"></path><path d="M9 9h.01M15 9h.01M9 14l2 2 4-4"></path></svg>
+        <span>Tax</span>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 12px; color:#8b929c; font-size:10px; font-weight:500">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg>
+        <span>Activity</span>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1280, &quot;height&quot;: 900}}">
+class Component extends DCLogic {
+  state = {
+    active: 'general', mobDetail: false, ready: false,
+    vw: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    baseCurrency: 'EUR', privacy: false, intraday: true,
+    household: 'individual', withholds: false, theme: 'system',
+    watchlist: null, newTicker: '',
+    haActive: false, pushInterval: 15, haMsg: '', pushing: false,
+    cacheMsg: '', clearing: false,
+  };
+
+  componentDidMount() {
+    const check = () => {
+      if (window.PT_MOCK) this.setState({ ready: true, watchlist: window.PT_MOCK.WATCHLIST.map((w) => w.ticker) });
+      else setTimeout(check, 60);
+    };
+    check();
+    this._onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this._onResize);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._onResize);
+  }
+
+  sw(on) {
+    return { bg: on ? '#047857' : '#d5d8dd', knob: on ? '21px' : '3px' };
+  }
+
+  renderVals() {
+    const M = window.PT_MOCK;
+    const st = this.state;
+    const isDesk = st.vw >= 900;
+    const active = st.active;
+    const wl = st.watchlist || [];
+
+    const SECTIONS = [
+      { id: 'general', title: 'General', icon: '⚙', sub: 'Display, currency, privacy' },
+      { id: 'watchlist', title: 'Watchlist', icon: '☆', sub: wl.length + ' ticker' + (wl.length === 1 ? '' : 's') },
+      { id: 'ha', title: 'Home Assistant', icon: '⚡', sub: st.haActive ? 'Active' : 'Off' },
+      { id: 'data', title: 'Data', icon: '⭳', sub: 'Import, export, cache' },
+      { id: 'about', title: 'About', icon: 'ⓘ', sub: 'v0.7.0-redesign.2' },
+    ];
+    const cur = SECTIONS.find((s) => s.id === active) || SECTIONS[0];
+
+    const swP = this.sw(st.privacy), swI = this.sw(st.intraday), swW = this.sw(st.withholds), swH = this.sw(st.haActive);
+    const segOn = (on) => ({ bg: on ? '#eceae3' : 'transparent', color: on ? '#101216' : '#8b929c', weight: on ? '700' : '500' });
+    const ind = segOn(st.household === 'individual'), cpl = segOn(st.household === 'couple');
+
+    const txs = M ? M.transactions : [];
+    const firstDate = txs.length ? [...txs].map((t) => t.date).sort()[0] : '—';
+
+    return {
+      isDesk, isMobile: !isDesk,
+      pagePad: isDesk ? '24px' : '20px',
+      showNav: isDesk || !st.mobDetail,
+      showPanel: isDesk || st.mobDetail,
+      navFlex: isDesk ? '0 0 260px' : '1 1 100%',
+      mobDetail: st.mobDetail,
+      mobTitle: st.mobDetail ? cur.title : 'Settings',
+      goBack: () => this.setState({ mobDetail: false }),
+      panelTitle: cur.title, panelSub: cur.sub,
+
+      sections: SECTIONS.map((s) => ({
+        title: s.title, subtitle: s.sub, icon: s.icon,
+        select: () => this.setState({ active: s.id, mobDetail: true }),
+        bg: isDesk && active === s.id ? '#eceae3' : 'transparent',
+        iconBg: isDesk && active === s.id ? '#e0ddd2' : '#eceae3',
+        weight: isDesk && active === s.id ? '700' : '600',
+      })),
+
+      isGeneral: active === 'general', isWatchlist: active === 'watchlist',
+      isHa: active === 'ha', isData: active === 'data', isAbout: active === 'about',
+
+      // General
+      currencies: ['EUR', 'USD', 'GBP', 'CHF', 'SEK', 'DKK', 'NOK', 'CAD', 'AUD', 'JPY'],
+      baseCurrency: st.baseCurrency,
+      setCurrency: (e) => this.setState({ baseCurrency: e.target.value }),
+      privacyBg: swP.bg, privacyKnob: swP.knob,
+      togglePrivacy: () => this.setState((s) => ({ privacy: !s.privacy })),
+      intradayBg: swI.bg, intradayKnob: swI.knob,
+      toggleIntraday: () => this.setState((s) => ({ intraday: !s.intraday })),
+      indBg: ind.bg, indC: ind.color, indWt: ind.weight,
+      cplBg: cpl.bg, cplC: cpl.color, cplWt: cpl.weight,
+      setIndividual: () => this.setState({ household: 'individual' }),
+      setCouple: () => this.setState({ household: 'couple' }),
+      withholdsBg: swW.bg, withholdsKnob: swW.knob,
+      toggleWithholds: () => this.setState((s) => ({ withholds: !s.withholds })),
+      themes: [['system', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([key, label]) => {
+        const on = segOn(st.theme === key);
+        return { label, select: () => this.setState({ theme: key }), bg: on.bg, color: on.color, weight: on.weight };
+      }),
+
+      // Watchlist
+      watchChips: wl.map((t) => ({
+        ticker: t,
+        color: (M && M.COLORS[t]) || '#8b929c',
+        remove: () => this.setState((s) => ({ watchlist: s.watchlist.filter((x) => x !== t) })),
+      })),
+      watchEmpty: wl.length === 0,
+      newTicker: st.newTicker,
+      typeTicker: (e) => this.setState({ newTicker: e.target.value }),
+      tickerKey: (e) => { if (e.key === 'Enter') this.addTicker(); },
+      addTicker: () => this.addTicker(),
+
+      // Home Assistant
+      haBg: swH.bg, haKnob: swH.knob,
+      toggleHa: () => this.setState((s) => ({ haActive: !s.haActive })),
+      pushInterval: st.pushInterval,
+      setInterval: (e) => this.setState({ pushInterval: Math.max(1, Math.min(60, +e.target.value || 15)) }),
+      pushLabel: st.pushing ? 'Pushing…' : 'Push now',
+      pushNow: () => {
+        this.setState({ pushing: true, haMsg: '' });
+        setTimeout(() => {
+          this.setState({ pushing: false, haMsg: '9 sensors pushed' });
+          setTimeout(() => this.setState({ haMsg: '' }), 3000);
+        }, 700);
+      },
+      haMsg: st.haMsg, hasHaMsg: !!st.haMsg,
+
+      // Data
+      dataCols: isDesk ? '1fr 1fr' : '1fr',
+      txCount: txs.length,
+      cacheLabel: st.clearing ? 'Clearing…' : '↻ Clear cache',
+      clearCache: () => {
+        this.setState({ clearing: true, cacheMsg: '' });
+        setTimeout(() => {
+          this.setState({ clearing: false, cacheMsg: '14 files cleared' });
+          setTimeout(() => this.setState({ cacheMsg: '' }), 3000);
+        }, 700);
+      },
+      cacheMsg: st.cacheMsg, hasCacheMsg: !!st.cacheMsg,
+
+      // About
+      aboutRows: [
+        { label: 'Data source', value: 'Yahoo Finance' },
+        { label: 'Framework', value: 'SvelteKit 2.x' },
+        { label: 'Transactions', value: String(txs.length) },
+        { label: 'First entry', value: firstDate },
+      ],
+    };
+  }
+
+  addTicker() {
+    const t = this.state.newTicker.trim().toUpperCase();
+    if (!t || (this.state.watchlist || []).includes(t)) return;
+    this.setState((s) => ({ watchlist: [...(s.watchlist || []), t], newTicker: '' }));
+  }
+}
+</script>
+</body>
+</html>
