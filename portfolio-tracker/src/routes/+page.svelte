@@ -10,6 +10,7 @@
   import PeriodPills from '$lib/components/shared/PeriodPills.svelte';
   import AllocationBar from '$lib/components/shared/AllocationBar.svelte';
   import ActivityList from '$lib/components/shared/ActivityList.svelte';
+  import SettingsGear from '$lib/components/shared/SettingsGear.svelte';
   import HoldingCard, { type DayTone } from '$lib/components/dashboard/HoldingCard.svelte';
   import { buildPortfolioIntradaySession } from '$lib/derived/intraday';
   import {
@@ -307,9 +308,12 @@
   <!-- ── Top bar row (mobile only — desktop uses the global top nav) ── -->
   <div class="topbar">
     <div class="topbar-title">Portfolio</div>
-    <div class="topbar-status mono">
-      <span class="live-dot" class:open={anyOpen}></span>
-      <span>{anyOpen ? 'LIVE' : 'CLOSED'}{#if intradayStore.liveEurUsd}&nbsp;· EUR/USD {intradayStore.liveEurUsd.toFixed(3)}{/if}</span>
+    <div class="topbar-right">
+      <div class="topbar-status mono">
+        <span class="live-dot" class:open={anyOpen}></span>
+        <span>{anyOpen ? 'LIVE' : 'CLOSED'}{#if intradayStore.liveEurUsd}&nbsp;· EUR/USD {intradayStore.liveEurUsd.toFixed(3)}{/if}</span>
+      </div>
+      <SettingsGear />
     </div>
   </div>
 
@@ -519,6 +523,11 @@
     font-size: 15px;
     font-weight: 700;
     letter-spacing: -0.02em;
+  }
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
   .topbar-status {
     display: flex;

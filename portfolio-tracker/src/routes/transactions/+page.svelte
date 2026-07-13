@@ -1,525 +1,321 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
-  import { fmt } from '$lib/utils/fmt';
-  import { saveTransactions } from '$lib/api/portfolio';
   import { getColor } from '$lib/utils/color';
+  import PrivacyValue from '$lib/components/PrivacyValue.svelte';
+  import SettingsGear from '$lib/components/shared/SettingsGear.svelte';
   import type { Transaction } from '$lib/types/transaction';
 
-  const CURRENCIES = ['EUR','USD','GBP','GBX','CLP','CHF','SEK','DKK','NOK','CAD','AUD','JPY','MXN','BRL'];
+  type Kind = 'BUY' | 'SELL' | 'DIV';
+  type Filter = 'all' | Kind;
 
-  let search   = $state('');
-  let saving   = $state(false);
-  let saveMsg  = $state('');
-  let showAdd  = $state(false);
-  let dirty    = $state(false);
-  let typeFilter = $state<'all' | 'buy' | 'sell' | 'dividend'>('all');
+  const FILTERS: { key: Filter; label: string }[] = [
+    { key: 'all',  label: 'All' },
+    { key: 'BUY',  label: 'Buys' },
+    { key: 'SELL', label: 'Sells' },
+    { key: 'DIV',  label: 'Dividends' },
+  ];
 
-  // local editable copy
-  let txs = $state<Transaction[]>([]);
+  let filter = $state<Filter>('all');
 
-  $effect(() => {
-    if (!dirty) txs = portfolioStore.rawTransactions.map((t) => ({ ...t }));
-  });
+  /**
+   * Same rule as the Dashboard's activity preview: >0 BUY, <0 SELL, ===0 DIV —
+   * plus the server's `type: 'dividend'` tag (server/domain/positions.js isDividend).
+   */
+  function kindOf(tx: Transaction): Kind {
+    if (tx.type === 'dividend' || tx.shares === 0) return 'DIV';
+    return tx.shares > 0 ? 'BUY' : 'SELL';
+  }
 
-  const filtered = $derived.by(() => {
-    let result = txs;
-    if (typeFilter === 'buy')      result = result.filter((t) => t.shares > 0);
-    if (typeFilter === 'sell')     result = result.filter((t) => t.shares < 0);
-    if (typeFilter === 'dividend') result = result.filter((t) => t.shares === 0);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter((t) =>
-        [t.ticker, t.yahoo ?? '', t.label ?? '', t.isin ?? ''].some((v) =>
-          v.toLowerCase().includes(q),
-        ),
-      );
+  /** Design-handoff amount format: `€1,234` from 1k up (rounded), else `€12.34` with a trailing .00 stripped. */
+  function fmtAmt(v: number): string {
+    const abs = Math.abs(v);
+    const str = abs >= 1000
+      ? Math.round(abs).toLocaleString('en-US')
+      : abs.toFixed(2).replace(/\.00$/, '');
+    return `${v < 0 ? '-' : ''}€${str}`;
+  }
+  const fmtAmtSigned = (v: number): string => (v >= 0 ? '+' : '-') + fmtAmt(Math.abs(v));
+
+  const sorted = $derived(
+    [...portfolioStore.rawTransactions].sort((a, b) => b.date.localeCompare(a.date)),
+  );
+
+  // ── Year summary — over ALL transactions, regardless of the active filter ──
+  const year = new Date().getFullYear();
+  const netInvested = $derived.by(() => {
+    let net = 0;
+    for (const tx of sorted) {
+      if (!tx.date.startsWith(String(year))) continue;
+      const kind = kindOf(tx);
+      if (kind === 'BUY') net += tx.costEur;
+      else if (kind === 'SELL') net -= tx.costEur;
     }
-    // newest first
-    return [...result].sort((a, b) => b.date.localeCompare(a.date));
+    return net;
   });
+  // Realized P&L and dividends are FIFO money math — server-computed per year (annualPl).
+  const annual    = $derived(portfolioStore.annualPl.find((y) => y.year === String(year)));
+  const realized  = $derived(annual?.realizedPl ?? 0);
+  const dividends = $derived(annual?.dividends ?? 0);
 
-  // Group by month (YYYY-MM)
-  const grouped = $derived.by(() => {
-    const groups: { key: string; label: string; rows: Transaction[] }[] = [];
-    const seen = new Map<string, number>();
+  // ── Filtered list, grouped by month (newest first) ──
+  const filtered = $derived(filter === 'all' ? sorted : sorted.filter((tx) => kindOf(tx) === filter));
+
+  interface MonthGroup { key: string; label: string; net: number; txs: Transaction[] }
+  const groups = $derived.by(() => {
+    const out: MonthGroup[] = [];
+    const byKey = new Map<string, MonthGroup>();
     for (const tx of filtered) {
       const key = tx.date.slice(0, 7);
-      let idx = seen.get(key);
-      if (idx === undefined) {
-        idx = groups.length;
-        seen.set(key, idx);
-        const [y, m] = key.split('-');
-        const months = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
-        groups.push({ key, label: `${months[Number(m)-1]} ${y}`, rows: [] });
+      let g = byKey.get(key);
+      if (!g) {
+        g = {
+          key,
+          label: new Date(`${key}-01`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+          net: 0,
+          txs: [],
+        };
+        byKey.set(key, g);
+        out.push(g);
       }
-      groups[idx]!.rows.push(tx);
+      // cash-flow sign: sells + dividends in, buys out
+      g.net += kindOf(tx) === 'BUY' ? -tx.costEur : tx.costEur;
+      g.txs.push(tx);
     }
-    return groups;
+    return out;
   });
 
-  // Summary stats over current filtered set
-  const stats = $derived.by(() => {
-    let bought = 0, sold = 0, div = 0;
-    let buyCount = 0, sellCount = 0, divCount = 0;
-    for (const t of txs) {
-      if (t.shares > 0) { bought += t.costEur; buyCount++; }
-      else if (t.shares < 0) { sold += t.costEur; sellCount++; }
-      else { div += t.costEur; divCount++; }
-    }
-    return { bought, sold, div, buyCount, sellCount, divCount, net: bought - sold };
+  const emptyLabel = $derived(
+    filter === 'all' ? 'activity' : (FILTERS.find((f) => f.key === filter)?.label ?? '').toLowerCase(),
+  );
+  const firstMonth = $derived.by(() => {
+    const oldest = sorted[sorted.length - 1];
+    if (!oldest) return '';
+    return new Date(`${oldest.date.slice(0, 7)}-01`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
   });
 
-  // ── Add form ─────────────────────────────────────────────────────────────────
-  const today = new Date().toISOString().slice(0, 10);
-  let addType     = $state<'buy' | 'sell' | 'dividend'>('buy');
-  let addDate     = $state(today);
-  let addTicker   = $state('');
-  let addYahoo    = $state('');
-  let addLabel    = $state('');
-  let addIsin     = $state('');
-  let addShares   = $state('');
-  let addCostEur  = $state('');
-  let addCurrency = $state('USD');
-
-  function resetAdd() {
-    addType = 'buy'; addDate = today; addTicker = ''; addYahoo = ''; addLabel = '';
-    addIsin = ''; addShares = ''; addCostEur = ''; addCurrency = 'USD';
+  function nameOf(tx: Transaction): string {
+    return tx.label ?? portfolioStore.tickerMeta[tx.ticker]?.label ?? '';
   }
-
-  function addTx() {
-    const shares  = parseFloat(addShares);
-    const costEur = parseFloat(addCostEur);
-    if (!addDate || !addTicker || isNaN(costEur)) return;
-
-    const ticker = addTicker.toUpperCase().trim();
-    const yahoo  = addYahoo.trim() || ticker;
-    const finalShares = addType === 'dividend' ? 0
-      : (addType === 'sell' ? -Math.abs(isNaN(shares) ? 0 : shares) : Math.abs(isNaN(shares) ? 0 : shares));
-
-    const tx: Transaction = {
-      date: addDate, ticker, yahoo,
-      label: addLabel.trim() || undefined,
-      isin:  addIsin.trim() || undefined,
-      shares: finalShares,
-      costEur: Math.abs(costEur),
-      currency: addCurrency,
-    };
-
-    dirty = true;
-    txs = [...txs, tx].sort((a, b) => a.date.localeCompare(b.date));
-    showAdd = false;
-    resetAdd();
+  function detailOf(tx: Transaction): string {
+    if (kindOf(tx) === 'DIV') return 'cash dividend';
+    // costEur is stored EUR-converted, so non-EUR tickers show an approximate per-share price
+    const ccy = tx.currency ?? portfolioStore.tickerMeta[tx.ticker]?.currency ?? 'EUR';
+    const prefix = ccy === 'EUR' ? '€' : '≈€';
+    return `${Math.abs(tx.shares)} sh @ ${prefix}${(tx.costEur / Math.abs(tx.shares)).toFixed(2)}`;
   }
-
-  function deleteTx(tx: Transaction) {
-    const idx = txs.indexOf(tx);
-    if (idx < 0) return;
-    dirty = true;
-    txs = txs.filter((_, i) => i !== idx);
-  }
-
-  async function save() {
-    saving = true; saveMsg = '';
-    try {
-      await saveTransactions('replace', txs);
-      portfolioStore.rawTransactions = txs;
-      dirty = false;
-      saveMsg = 'Opgeslagen';
-      setTimeout(() => { saveMsg = ''; }, 2000);
-    } catch (e) {
-      saveMsg = e instanceof Error ? e.message : 'Opslaan mislukt';
-    } finally {
-      saving = false;
-    }
-  }
-
-  function discard() {
-    dirty = false;
-    txs = portfolioStore.rawTransactions.map((t) => ({ ...t }));
-  }
-
-  function txKind(t: Transaction): 'koop' | 'verk' | 'div' {
-    if (t.shares === 0) return 'div';
-    return t.shares > 0 ? 'koop' : 'verk';
+  function dateOf(tx: Transaction): string {
+    return new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   }
 </script>
 
-<div class="page-root">
-  <!-- Hero -->
-  <div class="tx-hero">
+<!-- Mobile title bar (desktop uses the global top nav) -->
+<div class="topbar">
+  <div class="topbar-title">Activity</div>
+  <SettingsGear />
+</div>
+
+<div class="activity-page">
+
+  <!-- ── Year summary — unaffected by the filter ── -->
+  <div class="summary">
     <div>
-      <div class="h-eyebrow">Transacties</div>
-      <div class="tx-title">{txs.length} geboekt · netto <span class="mono">{fmt(stats.net)}</span></div>
+      <div class="sum-label">Net invested · {year}</div>
+      <div class="sum-value mono"><PrivacyValue value={fmtAmt(netInvested)} /></div>
     </div>
-    <div class="tx-stats">
-      <div class="tx-stat">
-        <div class="tx-stat-label">Gekocht</div>
-        <div class="tx-stat-val mono">{fmt(stats.bought)}</div>
-        <div class="tx-stat-sub">{stats.buyCount}×</div>
+    <div>
+      <div class="sum-label">Realized P&amp;L</div>
+      <div class="sum-value mono" class:pos={realized >= 0} class:neg={realized < 0}>
+        <PrivacyValue value={fmtAmtSigned(realized)} />
       </div>
-      <div class="tx-stat">
-        <div class="tx-stat-label">Verkocht</div>
-        <div class="tx-stat-val mono">{fmt(stats.sold)}</div>
-        <div class="tx-stat-sub">{stats.sellCount}×</div>
-      </div>
-      <div class="tx-stat">
-        <div class="tx-stat-label">Dividend</div>
-        <div class="tx-stat-val mono c-pos">{fmt(stats.div)}</div>
-        <div class="tx-stat-sub">{stats.divCount}×</div>
-      </div>
+    </div>
+    <div>
+      <div class="sum-label">Dividends</div>
+      <div class="sum-value mono"><PrivacyValue value={fmtAmt(dividends)} /></div>
     </div>
   </div>
 
-  <!-- Toolbar -->
-  <div class="tx-toolbar">
-    <div class="tx-search">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/>
-      </svg>
-      <input type="text" placeholder="Zoek ticker, ISIN, naam…" bind:value={search} />
-      {#if search}
-        <button class="clear-btn" onclick={() => (search = '')} aria-label="Wis zoekterm">×</button>
-      {/if}
-    </div>
-
-    <div class="seg">
-      <button class:on={typeFilter === 'all'}      onclick={() => (typeFilter = 'all')}>Alle</button>
-      <button class:on={typeFilter === 'buy'}      onclick={() => (typeFilter = 'buy')}>Koop</button>
-      <button class:on={typeFilter === 'sell'}     onclick={() => (typeFilter = 'sell')}>Verkoop</button>
-      <button class:on={typeFilter === 'dividend'} onclick={() => (typeFilter = 'dividend')}>Dividend</button>
-    </div>
-
-    <div class="tx-actions">
-      <a href={resolve('/import')} class="btn">⤒ CSV</a>
-      <button class="btn primary" onclick={() => (showAdd = !showAdd)}>
-        {showAdd ? 'Sluiten' : '+ Transactie'}
+  <!-- ── Filter chips — apply to the list only ── -->
+  <div class="chips">
+    {#each FILTERS as f (f.key)}
+      <button class="chip" class:active={filter === f.key} onclick={() => (filter = f.key)}>
+        {f.label}
       </button>
-    </div>
+    {/each}
   </div>
 
-  <!-- Inline add form -->
-  {#if showAdd}
-    <div class="add-drawer">
-      <div class="add-drawer-head">
-        <div class="seg">
-          <button class:on={addType === 'buy'}      onclick={() => (addType = 'buy')}>Koop</button>
-          <button class:on={addType === 'sell'}     onclick={() => (addType = 'sell')}>Verkoop</button>
-          <button class:on={addType === 'dividend'} onclick={() => (addType = 'dividend')}>Dividend</button>
-        </div>
-        <button class="ghost-btn" onclick={() => (showAdd = false)}>Annuleren</button>
+  <!-- ── Transaction list, grouped by month ── -->
+  <div class="list">
+    {#each groups as g (g.key)}
+      <div class="month-head">
+        <div class="month-label">{g.label}</div>
+        <div class="month-net mono">net <PrivacyValue value={fmtAmtSigned(g.net)} /></div>
       </div>
-
-      <div class="add-grid">
-        <label class="add-field">
-          <span>Datum *</span>
-          <input type="date" bind:value={addDate} />
-        </label>
-        <label class="add-field">
-          <span>Ticker *</span>
-          <input type="text" bind:value={addTicker} placeholder="GOOGL" style="text-transform:uppercase" />
-        </label>
-        <label class="add-field">
-          <span>Yahoo</span>
-          <input type="text" bind:value={addYahoo} placeholder="GOOGL" />
-        </label>
-        <label class="add-field add-field-wide">
-          <span>Naam</span>
-          <input type="text" bind:value={addLabel} placeholder="Alphabet Inc." />
-        </label>
-        <label class="add-field">
-          <span>ISIN</span>
-          <input type="text" bind:value={addIsin} placeholder="US02079K3059" />
-        </label>
-        {#if addType !== 'dividend'}
-          <label class="add-field">
-            <span>Aandelen *</span>
-            <input type="number" bind:value={addShares} step="any" placeholder="10" />
-          </label>
-        {/if}
-        <label class="add-field">
-          <span>Kosten € *</span>
-          <input type="number" bind:value={addCostEur} step="any" min="0" placeholder="1234.56" />
-        </label>
-        <label class="add-field">
-          <span>Munt</span>
-          <select bind:value={addCurrency}>
-            {#each CURRENCIES as c}<option value={c}>{c}</option>{/each}
-          </select>
-        </label>
-      </div>
-
-      <div class="add-drawer-foot">
-        <button class="btn primary" onclick={addTx}>Transactie toevoegen</button>
-      </div>
-    </div>
-  {/if}
-
-  <!-- Grouped list -->
-  {#if grouped.length === 0}
-    <div class="empty">
-      <div class="empty-icon">∅</div>
-      <div class="empty-title">{search || typeFilter !== 'all' ? 'Niets gevonden' : 'Nog geen transacties'}</div>
-      <div class="empty-sub">
-        {search || typeFilter !== 'all'
-          ? 'Pas je zoekterm of filter aan.'
-          : 'Voeg je eerste transactie toe of importeer een CSV.'}
-      </div>
-    </div>
-  {:else}
-    <div class="tx-groups">
-      {#each grouped as g}
-        <div class="tx-group">
-          <div class="tx-group-head">
-            <div class="tx-group-label">{g.label}</div>
-            <div class="tx-group-count">{g.rows.length}</div>
+      {#each g.txs as tx, i (`${g.key}-${i}`)}
+        {@const kind = kindOf(tx)}
+        <a class="row" href={resolve('/stock/[ticker]', { ticker: tx.ticker })}>
+          <span class="kind-chip {kind.toLowerCase()}">{kind}</span>
+          <div class="row-main">
+            <div class="row-top">
+              <span class="tsquare" style="background:{getColor(tx.ticker)}"></span>
+              <span class="row-ticker">{tx.ticker}</span>
+              <span class="row-name">{nameOf(tx)}</span>
+            </div>
+            <div class="row-detail mono">{detailOf(tx)}</div>
           </div>
-          <div class="tx-list">
-            {#each g.rows as tx}
-              {@const kind = txKind(tx)}
-              <div class="tx-row">
-                <div class="tx-date mono">{tx.date.slice(8)}</div>
-                <div class="tx-ticker">
-                  <span class="ticker-dot" style="background:{getColor(tx.ticker)}"></span>
-                  <div class="tx-ticker-text">
-                    <div class="tx-ticker-name">{tx.ticker}</div>
-                    {#if tx.label}
-                      <div class="tx-ticker-label">{tx.label}</div>
-                    {/if}
-                  </div>
-                </div>
-                <div class="tx-kind">
-                  <span class="pill-badge sm" class:pos={kind === 'koop'} class:neg={kind === 'verk'} class:neutral={kind === 'div'}>
-                    {kind === 'koop' ? 'KOOP' : kind === 'verk' ? 'VERK' : 'DIV'}
-                  </span>
-                </div>
-                <div class="tx-shares mono desktop-only">
-                  {tx.shares !== 0 ? Math.abs(tx.shares).toLocaleString('nl-BE') : '—'}
-                </div>
-                <div class="tx-cost mono">
-                  <span class:c-pos={kind === 'div'}>{fmt(tx.costEur)}</span>
-                </div>
-                <div class="tx-ccy mono desktop-only">{tx.currency}</div>
-                <div class="tx-isin mono desktop-only">{tx.isin ?? '—'}</div>
-                <button class="tx-del" onclick={() => deleteTx(tx)} title="Verwijderen" aria-label="Verwijderen">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
-                  </svg>
-                </button>
-              </div>
-            {/each}
+          <div class="row-right">
+            <div class="row-amt mono" class:sell={kind === 'SELL'} class:div={kind === 'DIV'}>
+              <PrivacyValue value={kind === 'BUY' ? `-${fmtAmt(tx.costEur)}` : `+${fmtAmt(tx.costEur)}`} />
+            </div>
+            <div class="row-date">{dateOf(tx)}</div>
           </div>
-        </div>
+        </a>
       {/each}
-    </div>
-  {/if}
+    {/each}
 
-  <!-- Footer summary -->
-  <div class="tx-footer">
-    <div>{filtered.length} van {txs.length} transacties</div>
-    {#if dirty}
-      <div class="tx-footer-actions">
-        <span class="dirty-dot"></span>
-        <span class="h-sm">Niet opgeslagen wijzigingen</span>
-        <button class="btn ghost" onclick={discard}>Annuleren</button>
-        <button class="btn primary" disabled={saving} onclick={save}>
-          {saving ? 'Opslaan…' : 'Opslaan'}
-        </button>
-        {#if saveMsg}<span class="save-msg" class:c-neg={saveMsg.includes('mislukt')}>{saveMsg}</span>{/if}
-      </div>
-    {:else if saveMsg}
-      <span class="save-msg c-pos">✓ {saveMsg}</span>
+    {#if filtered.length === 0}
+      <div class="empty-row">No {emptyLabel} in this period.</div>
+    {/if}
+
+    {#if firstMonth}
+      <div class="foot-caption">Showing all activity since {firstMonth}</div>
     {/if}
   </div>
 </div>
 
 <style>
-  .page-root { padding-bottom: 80px; }
+  /* ── Mobile title bar ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px 0;
+  }
+  .topbar-title { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
 
-  /* ── Hero ── */
-  .tx-hero {
-    display: flex; align-items: flex-end; justify-content: space-between;
-    gap: 24px; flex-wrap: wrap;
-    padding: 4px 0 18px;
-  }
-  .tx-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-top: 4px; }
-  .tx-stats { display: flex; gap: 6px; flex-wrap: wrap; }
-  .tx-stat {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-    padding: 8px 14px; min-width: 110px;
-  }
-  .tx-stat-label {
-    font-size: 9px; font-weight: 600; color: var(--fg-muted);
-    text-transform: uppercase; letter-spacing: 0.08em;
-  }
-  .tx-stat-val { font-size: 16px; font-weight: 600; margin-top: 3px; }
-  .tx-stat-sub { font-size: 10px; color: var(--fg-muted); margin-top: 1px; }
-
-  /* ── Toolbar ── */
-  .tx-toolbar {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    margin-bottom: 14px;
-  }
-  .tx-search {
-    flex: 1 1 280px; max-width: 360px;
-    display: flex; align-items: center; gap: 8px;
-    height: 34px; padding: 0 12px;
-    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-    color: var(--fg-muted); font-size: 13px;
-  }
-  .tx-search:focus-within { border-color: var(--border-strong); color: var(--fg); }
-  .tx-search input {
-    flex: 1; border: 0; outline: 0; background: transparent; color: var(--fg);
-    font-size: 13px; font-family: inherit;
-  }
-  .clear-btn {
-    width: 18px; height: 18px; border: 0; border-radius: 50%;
-    background: var(--surface-2); color: var(--fg-muted); cursor: pointer;
-    font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center;
-  }
-  .clear-btn:hover { background: var(--border); color: var(--fg); }
-  .tx-actions { display: flex; gap: 6px; margin-left: auto; }
-
-  /* ── Add drawer ── */
-  .add-drawer {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-    margin-bottom: 14px; overflow: hidden;
-  }
-  .add-drawer-head {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px; border-bottom: 1px solid var(--border);
-    background: var(--surface-2);
-  }
-  .ghost-btn {
-    background: transparent; border: 0; color: var(--fg-muted);
-    font-size: 12px; cursor: pointer; padding: 4px 8px; border-radius: 6px;
-  }
-  .ghost-btn:hover { background: var(--surface); color: var(--fg); }
-  .add-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 10px; padding: 16px;
-  }
-  .add-field { display: flex; flex-direction: column; gap: 4px; }
-  .add-field-wide { grid-column: span 2; }
-  .add-field span {
-    font-size: 10px; font-weight: 600; color: var(--fg-muted);
-    text-transform: uppercase; letter-spacing: 0.06em;
-  }
-  .add-field input, .add-field select {
-    height: 32px; padding: 0 10px; border-radius: 8px;
-    border: 1px solid var(--border); background: var(--surface-2); color: var(--fg);
-    font-size: 13px; font-family: inherit; outline: 0;
-  }
-  .add-field input:focus, .add-field select:focus { border-color: var(--border-strong); }
-  .add-drawer-foot {
-    padding: 0 16px 16px; display: flex; justify-content: flex-end;
+  .activity-page {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 18px 0 110px;
+    --page-pad: 20px;
   }
 
-  /* ── Groups ── */
-  .tx-groups { display: flex; flex-direction: column; gap: 18px; }
-  .tx-group { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
-  .tx-group-head {
-    display: flex; align-items: baseline; justify-content: space-between;
-    padding: 10px 16px;
-    background: var(--surface-2);
-    border-bottom: 1px solid var(--border);
+  .mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-feature-settings: 'tnum', 'zero';
   }
-  .tx-group-label {
-    font-size: 11px; font-weight: 600; color: var(--fg-muted);
-    text-transform: uppercase; letter-spacing: 0.08em;
+
+  /* ── Year summary ── */
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px 28px;
+    margin: 6px var(--page-pad) 0;
   }
-  .tx-group-count {
-    font-size: 10px; color: var(--fg-muted);
-    font-family: 'JetBrains Mono', monospace;
+  .sum-label { font-size: 11px; color: var(--fg-faint); margin-bottom: 4px; }
+  .sum-value { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+  .sum-value.pos { color: var(--c-pos); }
+  .sum-value.neg { color: var(--c-neg); }
+
+  /* ── Filter chips ── */
+  .chips {
+    display: flex;
+    gap: 6px;
+    margin: 26px var(--page-pad) 0;
   }
+  .chip {
+    padding: 6px 13px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 8px;
+    border: 1px solid var(--border-2);
+    background: transparent;
+    color: var(--fg-faint);
+    cursor: pointer;
+    user-select: none;
+    font-family: inherit;
+    letter-spacing: inherit;
+  }
+  .chip.active {
+    font-weight: 700;
+    color: var(--fg);
+    background: var(--pill-selected-bg);
+    border-color: transparent;
+  }
+
+  /* ── Month groups ── */
+  .list {
+    max-width: 720px;
+    padding: 0 var(--page-pad);
+  }
+  .month-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 26px 0 2px;
+  }
+  .month-label { font-size: 13px; font-weight: 600; letter-spacing: 0.01em; }
+  .month-net   { font-size: 11px; color: var(--fg-faint); }
 
   /* ── Rows ── */
-  .tx-list { }
-  .tx-row {
-    display: grid;
-    grid-template-columns: 36px 1fr 60px 80px 120px 50px 130px 28px;
-    align-items: center; gap: 12px;
-    padding: 10px 16px;
-    border-top: 1px solid var(--border);
-    transition: background .12s;
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--hairline);
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.12s;
   }
-  .tx-row:first-child { border-top: 0; }
-  .tx-row:hover { background: var(--surface-2); }
+  .row:hover { background: var(--row-hover); }
 
-  .tx-date { font-size: 12px; color: var(--fg-muted); font-weight: 600; }
-  .tx-ticker { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .ticker-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .tx-ticker-text { min-width: 0; }
-  .tx-ticker-name { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; }
-  .tx-ticker-label {
-    font-size: 10px; color: var(--fg-muted); margin-top: 1px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .kind-chip {
+    width: 34px;
+    text-align: center;
+    padding: 3px 0;
+    border-radius: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
   }
-  .tx-shares { text-align: right; font-size: 12px; color: var(--fg-muted); }
-  .tx-cost { text-align: right; font-size: 13px; font-weight: 600; }
-  .tx-ccy { text-align: right; font-size: 11px; color: var(--fg-muted); }
-  .tx-isin {
-    text-align: right; font-size: 10px; color: var(--fg-muted);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .tx-del {
-    width: 28px; height: 28px; border: 0; border-radius: 6px;
-    background: transparent; color: var(--fg-muted); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    opacity: 0; transition: opacity .15s, background .15s, color .15s;
-  }
-  .tx-row:hover .tx-del { opacity: 1; }
-  .tx-del:hover { background: rgba(248,113,113,0.15); color: #f87171; opacity: 1; }
+  .kind-chip.buy  { background: var(--c-pos-tint); color: var(--c-pos); }
+  .kind-chip.sell { background: var(--c-neg-tint); color: var(--c-neg); }
+  .kind-chip.div  { background: var(--c-div-tint); color: var(--c-div); }
 
-  /* ── Empty ── */
-  .empty {
-    text-align: center; padding: 64px 24px;
-    background: var(--surface); border: 1px dashed var(--border); border-radius: 14px;
+  .row-main { min-width: 0; flex: 1; }
+  .row-top  { display: flex; align-items: center; gap: 6px; }
+  .tsquare  { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; }
+  .row-ticker { font-size: 13px; font-weight: 700; }
+  .row-name {
+    font-size: 11px;
+    color: var(--fg-faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
-  .empty-icon { font-size: 32px; color: var(--fg-muted); margin-bottom: 10px; }
-  .empty-title { font-size: 15px; font-weight: 700; }
-  .empty-sub { font-size: 12px; color: var(--fg-muted); margin-top: 4px; }
+  .row-detail { font-size: 10px; color: var(--fg-faint); margin-top: 3px; }
 
-  /* ── Footer / save bar ── */
-  .tx-footer {
-    margin-top: 16px;
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 12px; color: var(--fg-muted); flex-wrap: wrap; gap: 8px;
-  }
-  .tx-footer-actions {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-    padding: 6px 8px 6px 12px;
-  }
-  .dirty-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--c-warn, #f59e0b);
-    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
-  }
-  .save-msg { font-size: 11px; }
+  .row-right { text-align: right; flex-shrink: 0; }
+  .row-amt { font-size: 13.5px; font-weight: 700; color: var(--fg); }
+  .row-amt.sell { color: var(--c-pos); }
+  .row-amt.div  { color: var(--c-div); }
+  .row-date { font-size: 10px; color: var(--chart-axis-label); margin-top: 3px; }
 
-  .mono { font-family: 'JetBrains Mono', monospace; }
-
-  /* Pill colors — neutral for dividend */
-  :global(.pill-badge.sm.neutral) {
-    background: var(--surface-2);
-    color: var(--fg-muted);
-    border: 1px solid var(--border);
+  .empty-row {
+    font-size: 12px;
+    color: var(--fg-faint);
+    padding: 32px 0;
+    text-align: center;
   }
+  .foot-caption { font-size: 11px; color: var(--chart-axis-label); padding: 18px 0 0; }
 
-  /* ── Mobile ── */
-  @media (max-width: 720px) {
-    .desktop-only { display: none !important; }
-    .tx-hero { gap: 12px; }
-    .tx-stats { width: 100%; }
-    .tx-stat { flex: 1; min-width: 0; padding: 8px 10px; }
-    .tx-stat-val { font-size: 13px; }
-    .tx-search { flex: 1 1 100%; max-width: 100%; }
-    .tx-actions { margin-left: 0; }
-    .tx-row {
-      grid-template-columns: 28px 1fr 56px auto 28px;
-      gap: 8px; padding: 12px;
-    }
-    .add-field-wide { grid-column: auto; }
+  /* ── Desktop (≥900px) ── */
+  @media (min-width: 900px) {
+    .topbar { display: none; }
+    .activity-page { --page-pad: 24px; }
+    .summary { grid-template-columns: repeat(3, minmax(0, 220px)); }
+    .sum-value { font-size: 24px; }
   }
 </style>
