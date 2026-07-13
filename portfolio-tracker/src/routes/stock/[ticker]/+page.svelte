@@ -8,7 +8,8 @@
   import { intradayStore } from '$lib/stores/intraday.svelte';
   import { buildTickerSpark, type SparkPhase } from '$lib/derived/dashboard';
   import { fetchCandles } from '$lib/api/candles';
-  import { fmtEur, fmtEurSigned, fmtNative, fmtNativeSigned, fmtPct, fmtPct1 } from '$lib/utils/fmt';
+  import { fetchTickerStats } from '$lib/api/stats';
+  import { fmtCompact, fmtCompactNative, fmtEur, fmtEurSigned, fmtNative, fmtNativeSigned, fmtPct, fmtPct1 } from '$lib/utils/fmt';
   import { PERIOD_OPTIONS, periodCutoff } from '$lib/utils/period';
   import { isExchangeOpen, normalizeMarketState, sessionBounds, fmtOpenAt, nextSessionOpen } from '$lib/market';
   import { toEurLiveOrFallback } from '$lib/fx';
@@ -19,6 +20,7 @@
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
   import type { Period } from '$lib/utils/period';
   import type { Candle, IntradayData } from '$lib/types/candle';
+  import type { TickerStats } from '$lib/types/stats';
   import type { Transaction } from '$lib/types/transaction';
 
   /* ── Local helpers (shared modules don't export these; see report) ── */
@@ -172,6 +174,19 @@
     return () => { stale = true; };
   });
 
+  /* ── Reference stats: 52w range, mkt cap, volumes, P/E, stock price returns ── */
+
+  let stats = $state<TickerStats | null>(null);
+  $effect(() => {
+    const sym = yahoo;
+    if (!sym) { stats = null; return; }
+    let stale = false;
+    fetchTickerStats(sym)
+      .then((s) => { if (!stale) stats = s; })
+      .catch(() => { if (!stale) stats = null; });
+    return () => { stale = true; };
+  });
+
   /* ── 1D chart geometry ── */
 
   const intraSession = $derived.by(() => {
@@ -247,9 +262,37 @@
     return cutoff ? candles.filter((c) => c.date >= cutoff) : candles;
   });
 
+  // The series endpoint must equal the displayed market price — Yahoo's daily
+  // candles can lag the live quote (24h disk cache, intraday moves), so patch
+  // the final close to the market price. No drift between chart, caption, hero.
+  const displayCandles = $derived.by(() => {
+    if (visibleCandles.length === 0 || livePrice == null) return visibleCandles;
+    const last = visibleCandles[visibleCandles.length - 1]!;
+    if (last.close === livePrice) return visibleCandles;
+    return [...visibleCandles.slice(0, -1), { ...last, close: livePrice }];
+  });
+
   const historyData = $derived(
-    visibleCandles.map((c) => ({ x: Date.parse(c.date), value: c.close })),
+    displayCandles.map((c) => ({ x: Date.parse(c.date), value: c.close })),
   );
+
+  /* ── Period movement in the hero (Delta 1, handoff 4): first close → market price ── */
+
+  const PERIOD_HERO_LABELS: Record<Exclude<Period, '1d'>, string> = {
+    '1m': 'Past month', '3m': 'Past 3 months', ytd: 'Year to date',
+    '1y': 'Past year', '3y': 'Past 3 years', total: 'All time',
+  };
+  const MINUS = '−'; // typographic minus per the design
+  const signedNative = (v: number, ccy: string) => `${v >= 0 ? '+' : MINUS}${fmtNative(Math.abs(v), ccy)}`;
+  const signedPct1 = (v: number) => `${v >= 0 ? '+' : MINUS}${Math.abs(v).toFixed(1)}%`;
+
+  const periodDelta = $derived.by(() => {
+    if (period === '1d' || displayCandles.length < 2) return null;
+    const first = displayCandles[0]!.close;
+    const last = displayCandles[displayCandles.length - 1]!.close;
+    if (!(first > 0)) return null;
+    return { first, last, abs: last - first, pct: (last / first - 1) * 100 };
+  });
 
   const historyTicks = $derived.by(() => {
     const cs = visibleCandles;
@@ -279,8 +322,8 @@
   const txMarks = $derived(buildTxMarkers(historyData.map((d) => d.x), txs));
 
   function tipHistory(i: number): ChartTip | null {
-    const c = visibleCandles[i];
-    const first = visibleCandles[0]?.close;
+    const c = displayCandles[i];
+    const first = displayCandles[0]?.close;
     if (!c || first == null) return null;
     const delta = c.close - first;
     const pct = first > 0 ? (delta / first) * 100 : 0;
@@ -329,6 +372,29 @@
     date: t.date, ticker: t.ticker, shares: t.shares, costEur: t.costEur, detail: txDetail(t),
   })));
 
+  /* ── Key stats + 52w range bar (Delta 2, handoff 4) ── */
+
+  const rangePos = $derived.by(() => {
+    if (stats?.low52w == null || stats?.high52w == null || livePrice == null) return null;
+    const span = stats.high52w - stats.low52w;
+    if (span <= 0) return null;
+    return Math.min(1, Math.max(0, (livePrice - stats.low52w) / span));
+  });
+
+  const keyStats = $derived([
+    { label: 'Mkt cap', value: stats?.mktCap != null ? fmtCompactNative(stats.mktCap, currency) : '—' },
+    { label: 'Volume',  value: stats?.volume != null ? fmtCompact(stats.volume) : '—' },
+    { label: 'Avg vol', value: stats?.avgVolume != null ? fmtCompact(stats.avgVolume) : '—' },
+    { label: 'P/E',     value: stats?.pe != null ? stats.pe.toFixed(1) : '—' },
+  ]);
+
+  /* ── Returns card (Delta 3, handoff 4): price returns of the stock ── */
+
+  const RETURN_CELLS = [['1m', '1M'], ['6m', '6M'], ['1y', '1Y'], ['3y', '3Y'], ['all', 'All']] as const;
+  const returnCells = $derived(
+    RETURN_CELLS.map(([key, label]) => ({ label, value: stats?.returns?.[key] ?? null })),
+  );
+
   /* ── Display strings ── */
 
   const sharesStr = $derived(shares.toLocaleString('en-US', { maximumFractionDigits: 4 }));
@@ -369,15 +435,27 @@
         {:else}
           <div class="hero-price mono">—</div>
         {/if}
-        {#if phase === 'pre'}
-          <div class="hero-change mono pre-dash">—</div>
-        {:else if dayChangeAbs != null && dayChangePct != null}
-          <div class="hero-change mono" class:pos={dayChangeAbs >= 0} class:neg={dayChangeAbs < 0}>
-            {fmtNativeSigned(dayChangeAbs, currency)} ({fmtPct(dayChangePct)})
+        {#if period === '1d'}
+          {#if phase === 'pre'}
+            <div class="hero-change mono pre-dash">—</div>
+          {:else if dayChangeAbs != null && dayChangePct != null}
+            <div class="hero-change mono" class:pos={dayChangeAbs >= 0} class:neg={dayChangeAbs < 0}>
+              {fmtNativeSigned(dayChangeAbs, currency)} ({fmtPct(dayChangePct)})
+            </div>
+          {/if}
+        {:else if periodDelta != null}
+          <div class="hero-change mono" class:pos={periodDelta.abs >= 0} class:neg={periodDelta.abs < 0}>
+            {signedNative(periodDelta.abs, currency)} ({signedPct1(periodDelta.pct)})
           </div>
         {/if}
       </div>
-      <div class="hero-caption">{heroCaption}</div>
+      <div class="hero-caption">
+        {#if period !== '1d' && periodDelta != null}
+          {PERIOD_HERO_LABELS[period]} · {fmtNative(periodDelta.first, currency)} → {fmtNative(periodDelta.last, currency)}
+        {:else}
+          {heroCaption}
+        {/if}
+      </div>
     </div>
 
     <!-- ── Chart (full-bleed, market price only) ── -->
@@ -428,6 +506,50 @@
     <div class="pills-row">
       <PeriodPills options={PERIOD_OPTIONS} selected={period} onselect={selectPeriod} />
     </div>
+
+    <!-- ── Key stats + 52-week range bar ── -->
+    {#if stats != null}
+      <div class="stats-strip">
+        {#if rangePos != null && stats.low52w != null && stats.high52w != null}
+          <div class="range">
+            <div class="range-head">
+              <span class="mono">{fmtNative(stats.low52w, currency)}</span>
+              <span class="range-label">52W Range</span>
+              <span class="mono">{fmtNative(stats.high52w, currency)}</span>
+            </div>
+            <div class="range-track">
+              <div class="range-fill" style="width:{(rangePos * 100).toFixed(1)}%"></div>
+              <div class="range-marker" style="left:{(rangePos * 100).toFixed(1)}%"></div>
+            </div>
+          </div>
+        {/if}
+        <div class="key-stats">
+          {#each keyStats as s (s.label)}
+            <span>{s.label} <span class="key-val mono">{s.value}</span></span>
+          {/each}
+        </div>
+      </div>
+
+      <!-- ── Returns: price returns of the stock, not the position ── -->
+      <div class="returns-card">
+        <div class="returns-title">Returns</div>
+        <div class="rr-grid">
+          {#each returnCells as t (t.label)}
+            {#if t.value != null}
+              <div class="rr-tile" class:tint-pos={t.value >= 0} class:tint-neg={t.value < 0}>
+                <div class="rr-val mono {t.value >= 0 ? 'pos' : 'neg'}">{signedPct1(t.value)}</div>
+                <div class="rr-period">{t.label}</div>
+              </div>
+            {:else}
+              <div class="rr-tile tint-null">
+                <div class="rr-val mono null-val">–</div>
+                <div class="rr-period">{t.label}</div>
+              </div>
+            {/if}
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     <!-- ── Columns: position card + history (stacked on mobile) ── -->
     <div class="columns">
@@ -581,6 +703,94 @@
     color: var(--fg-faint);
   }
   .pills-row { margin-top: 8px; }
+
+  /* ── Key stats + 52w range bar strip ── */
+  .stats-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px 32px;
+    margin-top: 16px;
+    padding: 12px 0;
+    border-top: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .range { flex: 1 1 260px; min-width: 220px; }
+  .range-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--fg-faint);
+    margin-bottom: 5px;
+  }
+  .range-label {
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .range-track {
+    position: relative;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+  }
+  .range-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 2px;
+    background: var(--border-strong);
+  }
+  .range-marker {
+    position: absolute;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--fg);
+    border: 2px solid var(--bg);
+    transform: translate(-50%, -50%);
+  }
+  .key-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    font-size: 11px;
+    color: var(--fg-faint);
+  }
+  .key-val { font-weight: 600; color: var(--fg-secondary); }
+
+  /* ── Returns card (cell anatomy identical to the Analysis rolling returns) ── */
+  .returns-card {
+    margin-top: 20px;
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    padding: 14px 18px;
+  }
+  .returns-title { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+  .rr-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+  .rr-tile {
+    text-align: center;
+    padding: 10px 2px;
+    border-radius: 10px;
+  }
+  .rr-tile.tint-pos { background: var(--c-pos-tint); }
+  .rr-tile.tint-neg { background: var(--c-neg-tint); }
+  .rr-tile.tint-null { background: var(--surface-2); }
+  .rr-val { font-size: 12px; font-weight: 700; }
+  .rr-period {
+    font-size: 10px;
+    color: var(--fg-faint);
+    margin-top: 3px;
+  }
+  .null-val { color: var(--fg-faint); }
 
   /* ── Columns: position card + history ── */
   .columns {

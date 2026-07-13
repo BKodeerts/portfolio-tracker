@@ -41,8 +41,9 @@ CI (`.github/workflows/ci.yml`) runs on every PR: `npm test`, `npm run check`, `
   - `positions.js` — shares, FIFO cost basis, native-currency avg cost, realized P&L, split detection
   - `performance.js` — TWR, XIRR, risk metrics, rolling returns
   - `series.js` — chart/benchmark series building
+  - `stats.js` — per-ticker price returns (1M/6M/1Y/3Y/all) for the stock detail Returns card
 - **`server/portfolio.js`**: thin orchestrator over `domain/` (`computeFullPortfolio` / `computeCurrentSnapshot`), shared by API routes, HA integration, and scheduler
-- **Routes** (`server/routes/`): thin HTTP layer, each file mounts on `/api` — candles (`/candles/:symbol`, `/batch`, `/quotes`, `/intraday`, `/lookup`), transactions, portfolio, settings, ha, bonus, cache-routes, ticker-meta
+- **Routes** (`server/routes/`): thin HTTP layer, each file mounts on `/api` — candles (`/candles/:symbol`, `/batch`, `/quotes`, `/intraday`, `/lookup`), transactions, portfolio, settings, ha, bonus, cache-routes, ticker-meta, stats (`/stats/:symbol` — 52w range, mkt cap, volumes, P/E, price returns)
 - **`server/routes/portfolio.js`**: 5-min in-memory response cache with generation-based invalidation on transaction writes; concurrent requests share one in-flight computation (60s timeout)
 - **`server/yahoo.js`**: Yahoo Finance v8 API client (`query1.finance.yahoo.com`), native `https`, 100ms delay between requests, 3 retries with 2s/4s/8s backoff
 - **`server/cache.js`**: disk-based JSON cache in `cache/` — 24h TTL historical candles, 15min quotes, 5min intraday

@@ -67,6 +67,7 @@ app.use('/api', require('./routes/cache-routes.js'));
 app.use('/api', require('./routes/ha.js'));
 app.use('/api', require('./routes/portfolio.js'));
 app.use('/api', require('./routes/settings.js'));
+app.use('/api', require('./routes/stats.js'));
 app.use('/api/ticker-meta', require('./routes/ticker-meta.js'));
 
 // ── Health check ──────────────────────────────────────────────────────────────

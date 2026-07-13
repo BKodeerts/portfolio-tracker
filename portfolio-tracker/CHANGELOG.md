@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.12.0] — 2026-07-13
+
+### Added
+
+- **Stock Detail v3** (design handoff 4): three new information blocks between the chart and the position/history columns.
+  - The hero delta now follows the selected period pill: 1D keeps today's change vs prev close, other periods show the $ and % move from the first close of the period to the current market price, with a `Past 3 months · $36.78 → $53.42` caption. The history series' final point is patched to the live market price so chart, caption, and hero never drift.
+  - Key-stats strip below the period pills: a 52-week range bar (low/high labels, filled track, current-price marker) plus Mkt cap / Volume / Avg vol / P/E reference stats.
+  - "Returns" card with the stock's own price returns over 1M / 6M / 1Y / 3Y / All, using the same tinted-cell anatomy as the Analysis page's rolling returns.
+- New `/api/stats/:symbol` endpoint (15-min cache): 52w range and volumes from Yahoo's chart API, market cap / trailing P/E via Yahoo's authenticated quote endpoint (best-effort, `—` when unavailable), and price returns computed server-side in the new tested `server/domain/stats.js`.
+
 ## [0.11.4] — 2026-07-13
 
 ### Added
