@@ -40,6 +40,25 @@ export const fmtNativeSigned = (v: number, currency: string): string =>
     ? `${v >= 0 ? '+' : '-'}${abs2(v)}p`
     : `${v >= 0 ? '+' : '-'}${ccySymbol(currency)}${abs2(v)}`;
 
+/** `16.9B` / `4.2M` / `987K` — compact magnitude, 1 decimal, trailing .0 stripped. */
+export const fmtCompact = (v: number): string => {
+  const a = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  const unit = (div: number, sfx: string) => {
+    const s = (a / div).toFixed(1).replace(/\.0$/, '');
+    return `${sign}${s}${sfx}`;
+  };
+  if (a >= 1e12) return unit(1e12, 'T');
+  if (a >= 1e9)  return unit(1e9, 'B');
+  if (a >= 1e6)  return unit(1e6, 'M');
+  if (a >= 1e3)  return unit(1e3, 'K');
+  return `${sign}${Math.round(a).toLocaleString('en-US')}`;
+};
+
+/** `$16.9B` / `€2.1B` / `1.2Bp` (pence suffix, like fmtNative). */
+export const fmtCompactNative = (v: number, currency: string): string =>
+  isPence(currency) ? `${fmtCompact(v)}p` : `${ccySymbol(currency)}${fmtCompact(v)}`;
+
 /** `+1.25%` / `-0.80%` (2 decimals, signed). */
 export const fmtPct = (v: number): string =>
   `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;

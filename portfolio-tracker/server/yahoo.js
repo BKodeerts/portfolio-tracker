@@ -289,6 +289,95 @@ async function fetchIntraday(yahooSymbol) {
   };
 }
 
+// ── Ticker reference stats (52w range, volumes, mkt cap, P/E) ────────────────
+
+// Generic GET that exposes status + response headers (fetchYahooRaw only
+// returns the body), needed for the cookie/crumb handshake below.
+function httpsGet(url, headers) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: { 'User-Agent': UA, ...headers }, timeout: 15000 }, res => {
+      let body = '';
+      res.on('data', chunk => (body += chunk));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }));
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+  });
+}
+
+// Yahoo's quote endpoints (marketCap / trailingPE / avg volume) require a
+// session cookie + crumb since 2023. Cache the pair per process; drop it on
+// 401 so the next call re-authenticates. Everything here is best-effort —
+// callers must treat a null result as "fields unavailable".
+let _yahooAuth = null;
+async function getYahooAuth() {
+  if (_yahooAuth) return _yahooAuth;
+  try {
+    // fc.yahoo.com 404s, but sets the session cookie we need.
+    const r1 = await httpsGet('https://fc.yahoo.com/');
+    const cookie = (r1.headers['set-cookie'] || [])
+      .map(c => c.split(';')[0])
+      .filter(Boolean)
+      .join('; ');
+    if (!cookie) return null;
+    const r2 = await httpsGet('https://query1.finance.yahoo.com/v1/test/getcrumb', { Cookie: cookie });
+    const crumb = (r2.body || '').trim();
+    if (r2.status !== 200 || !crumb || crumb.includes('{')) return null;
+    _yahooAuth = { cookie, crumb };
+    return _yahooAuth;
+  } catch (e) {
+    console.warn(`[Yahoo] crumb handshake failed: ${e.message}`);
+    return null;
+  }
+}
+
+// Best-effort v7 quote: marketCap, trailingPE, 3-month average volume.
+// Returns null when the crumb dance or the quote call fails.
+async function fetchQuoteStats(yahooSymbol) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const auth = await getYahooAuth();
+    if (!auth) return null;
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(yahooSymbol)}&crumb=${encodeURIComponent(auth.crumb)}`;
+    try {
+      const r = await httpsGet(url, { Cookie: auth.cookie });
+      if (r.status === 401 || r.status === 403) { _yahooAuth = null; continue; } // stale crumb — one retry
+      if (r.status !== 200) return null;
+      const q = JSON.parse(r.body)?.quoteResponse?.result?.[0];
+      if (!q) return null;
+      return {
+        marketCap:  q.marketCap ?? null,
+        trailingPE: q.trailingPE ?? null,
+        avgVolume:  q.averageDailyVolume3Month ?? null,
+        volume:     q.regularMarketVolume ?? null,
+      };
+    } catch (e) {
+      console.warn(`[Yahoo] quote stats failed for ${yahooSymbol}: ${e.message}`);
+      return null;
+    }
+  }
+  return null;
+}
+
+// Reference stats from the (unauthenticated) chart endpoint: 52-week range,
+// current price, last volume, and a 3-month average volume from the candles.
+// Fields missing from the response come back null.
+async function fetchChartStats(yahooSymbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=3mo&includePrePost=false`;
+  const text = await fetchYahoo(url);
+  const result = JSON.parse(text)?.chart?.result?.[0];
+  if (!result) return null;
+  const meta = result.meta || {};
+  const volumes = (result.indicators?.quote?.[0]?.volume || []).filter(v => v != null && v > 0);
+  const avgVolume = volumes.length ? Math.round(volumes.reduce((s, v) => s + v, 0) / volumes.length) : null;
+  return {
+    low52w:    meta.fiftyTwoWeekLow  ?? null,
+    high52w:   meta.fiftyTwoWeekHigh ?? null,
+    price:     meta.regularMarketPrice ?? null,
+    volume:    meta.regularMarketVolume ?? volumes[volumes.length - 1] ?? null,
+    avgVolume,
+  };
+}
+
 // Uses v1/finance/search — no auth required, returns sector/industry/quoteType.
 async function fetchQuoteSummary(yahooSymbol) {
   const url  = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(yahooSymbol)}&quotesCount=5&newsCount=0&enableFuzzyQuery=false`;
@@ -305,4 +394,4 @@ async function fetchQuoteSummary(yahooSymbol) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-module.exports = { fetchCandles, fetchDailyQuote, fetchIntraday, fetchQuoteSummary, fetchYahoo, sleep, FETCH_DELAY, deriveSession };
+module.exports = { fetchCandles, fetchDailyQuote, fetchIntraday, fetchQuoteSummary, fetchChartStats, fetchQuoteStats, fetchYahoo, sleep, FETCH_DELAY, deriveSession };
