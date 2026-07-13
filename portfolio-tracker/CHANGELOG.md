@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.2] — 2026-07-13
+
+### Fixed
+
+- **US sparklines no longer vanish mid-morning**: once US pre-market candles started arriving (~10:00 Brussels, while EU markets are open), the server's session fallback keyed "yesterday's session" on the last raw candle date — which by then was *today*, with no regular-hours data yet — so it returned an empty session and every US ticker's "prev session" graph disappeared until the US open. The fallback now targets the last calendar day that actually has regular-hours candles.
+
+## [0.12.1] — 2026-07-13
+
+### Fixed
+
+- **Stock detail page for watchlist tickers**: clicking a watchlist card no longer dead-ends on "Unknown ticker". The page now renders everything that doesn't depend on ownership — market price hero, 1D and history charts, 52-week range, key stats, and the Returns card — with the trading currency taken from the live quote instead of defaulting to €. The "Your position" card is replaced by an "On your watchlist" note, and "Your history" / transaction markers stay hidden. Owned tickers are unchanged, and unknown symbols still get the empty state. (Watchlist-only setups with zero positions render without live intraday — the intraday batch still requires at least one held position.)
+
 ## [0.12.0] — 2026-07-13
 
 ### Added

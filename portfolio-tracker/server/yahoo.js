@@ -205,12 +205,22 @@ function deriveSession(points, periods, lastDate, meta) {
     }
   }
 
-  // No regular-session data today — fall back to the last calendar day that has data,
-  // narrowed to that day's regular-hours window (by time-of-day). This excludes pre /
-  // post points so the dashboard shows the actual market move, not the extended move.
-  const stalePts = points.filter(p =>
+  // No regular-session data today — fall back to the last calendar day that has
+  // regular-hours data, narrowed to that day's regular-hours window (by time-of-day).
+  // This excludes pre/post points so the dashboard shows the actual market move, not
+  // the extended move. The day cannot come from lastDate: once today's pre-market
+  // candles arrive, lastDate IS today — which has no regular-hours data yet — and
+  // keying on it would leave the fallback empty until the regular open.
+  let staleDate = null;
+  for (let i = points.length - 1; i >= 0; i--) {
+    if (points[i].ts < regular.start && inRegularTod(points[i].ts)) {
+      staleDate = new Date(points[i].ts * 1000).toISOString().slice(0, 10);
+      break;
+    }
+  }
+  const stalePts = staleDate == null ? [] : points.filter(p =>
     p.ts < regular.start &&
-    new Date(p.ts * 1000).toISOString().slice(0, 10) === lastDate &&
+    new Date(p.ts * 1000).toISOString().slice(0, 10) === staleDate &&
     inRegularTod(p.ts),
   );
   const preStart  = periods?.pre?.start;
@@ -221,10 +231,10 @@ function deriveSession(points, periods, lastDate, meta) {
     return { sessionPoints: stalePts, previousClose: derivePreviousClose(points, periods, lastDate, meta) };
   }
 
-  // Fully closed — anchor previousClose to the last regular close BEFORE lastDate
-  // (not just before stalePts[0], which would pick up lastDate's own pre-market).
+  // Fully closed — anchor previousClose to the last regular close BEFORE the stale
+  // day (not just before stalePts[0], which would pick up that day's own pre-market).
   if (stalePts.length > 0) {
-    return { sessionPoints: stalePts, previousClose: closeBeforeDay(lastDate) };
+    return { sessionPoints: stalePts, previousClose: closeBeforeDay(staleDate) };
   }
 
   return { sessionPoints: stalePts, previousClose: derivePreviousClose(points, periods, lastDate, meta) };

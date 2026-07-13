@@ -63,8 +63,14 @@
 
   const ticker   = $derived(page.params['ticker'] ?? '');
   const meta     = $derived(portfolioStore.tickerMeta[ticker] ?? {});
-  const yahoo    = $derived(meta.yahoo ?? ticker);
-  const currency = $derived(meta.currency ?? 'EUR');
+  const watch    = $derived(portfolioStore.watchlistData.find((w) => w.ticker === ticker));
+  const yahoo    = $derived(meta.yahoo ?? watch?.yahoo ?? ticker);
+  // Watchlist tickers have no meta — take the trading currency from the live
+  // quote (same as buildWatchCards), never from the exchange suffix.
+  const currency = $derived.by(() => {
+    const raw = meta.currency ?? intradayStore.data[yahoo]?.currency ?? 'EUR';
+    return raw === 'GBp' ? 'GBX' : raw;
+  });
   const pos      = $derived(portfolioStore.positions.find((p) => p.ticker === ticker));
 
   const txs = $derived(
@@ -74,9 +80,11 @@
       .sort((a, b) => b.date.localeCompare(a.date)),
   );
 
-  const known = $derived(
+  // Held, sold-out, or meta-configured — anything with position panels to show.
+  const owned = $derived(
     pos != null || portfolioStore.tickerMeta[ticker] != null || txs.length > 0,
   );
+  const known = $derived(owned || watch != null);
 
   /* ── Position stats (sold-out fallback: latest chartData slice, like the old page) ── */
 
@@ -406,7 +414,7 @@
   <div class="page">
     <div class="empty-state">
       <div class="empty-title">Unknown ticker</div>
-      <div class="empty-sub">"{ticker}" isn't in your portfolio.</div>
+      <div class="empty-sub">"{ticker}" isn't in your portfolio or watchlist.</div>
       <a class="empty-back" href={resolve('/')}>&larr; Back to portfolio</a>
     </div>
   </div>
@@ -419,7 +427,7 @@
       </a>
       <div class="topbar-id">
         <div class="topbar-ticker">{ticker}</div>
-        <div class="topbar-sub">{meta.label ?? ticker} · {exchangeLabel(yahoo)}</div>
+        <div class="topbar-sub">{meta.label ?? iData?.shortName ?? watch?.label ?? ticker} · {exchangeLabel(yahoo)}</div>
       </div>
       <div class="market-chip mono" class:open={phase === 'live'}>
         <span class="market-dot"></span>
@@ -555,6 +563,7 @@
     <div class="columns">
 
     <!-- ── Your position ── -->
+    {#if owned}
     <div class="pos-card">
       <div class="pos-head">
         <div class="pos-title">Your position</div>
@@ -605,6 +614,9 @@
         </div>
       </div>
     </div>
+    {:else}
+      <div class="watch-note">On your watchlist — you don't own this position.</div>
+    {/if}
 
     <!-- ── Your history ── -->
     {#if historyItems.length > 0}
@@ -819,6 +831,15 @@
   }
   .pos-title { font-size: 13px; font-weight: 600; }
   .pos-hint { font-size: 11px; color: var(--fg-faint); }
+  .watch-note {
+    flex: 1 1 340px;
+    min-width: 0;
+    padding: 14px 18px;
+    font-size: 12.5px;
+    color: var(--fg-faint);
+    border: 1px dashed var(--card-border);
+    border-radius: var(--card-radius);
+  }
   .pos-value-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .pos-value {
     font-size: 26px;

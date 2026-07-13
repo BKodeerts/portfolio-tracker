@@ -63,6 +63,32 @@ describe('deriveSession on a weekend', () => {
   });
 });
 
+describe('deriveSession during pre-market', () => {
+  // Monday 2026-07-13 08:30 UTC (10:30 Brussels): EU markets are open, the US
+  // session isn't — but US pre-market candles have started arriving, so the
+  // last raw candle date is *today*. The fallback must still return Friday's
+  // regular session, not come back empty (which blanks every US sparkline
+  // between US pre-market open and the regular open).
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-13T08:30:00Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("keeps Friday's session once today's pre-market candles exist", () => {
+    const monPre = [
+      { ts: dayStart('2026-07-13') + 8 * 3600, close: 214 },
+      { ts: dayStart('2026-07-13') + 8.25 * 3600, close: 215 },
+    ];
+    const withMonPre = [...thu, ...fri, ...monPre];
+    const { sessionPoints, previousClose } = deriveSession(
+      withMonPre, periodsFor('2026-07-13'), '2026-07-13', meta,
+    );
+    expect(sessionPoints).toEqual(fri);
+    expect(previousClose).toBe(fri[fri.length - 1].close);
+  });
+});
+
 describe('deriveSession on a trading day', () => {
   beforeEach(() => {
     vi.useFakeTimers();
