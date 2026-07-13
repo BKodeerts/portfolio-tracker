@@ -13,7 +13,8 @@
   import { isExchangeOpen, normalizeMarketState, sessionBounds, fmtOpenAt, nextSessionOpen } from '$lib/market';
   import { toEurLiveOrFallback } from '$lib/fx';
   import PeriodPills from '$lib/components/shared/PeriodPills.svelte';
-  import PeriodChart from '$lib/components/shared/PeriodChart.svelte';
+  import PeriodChart, { type ChartTip, type ChartTipLine } from '$lib/components/shared/PeriodChart.svelte';
+  import { buildTxMarkers } from '$lib/utils/tx-markers';
   import ActivityList from '$lib/components/shared/ActivityList.svelte';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
   import type { Period } from '$lib/utils/period';
@@ -273,6 +274,41 @@
 
   const formatPrice = $derived((v: number) => fmtNative(v, currency));
 
+  /* ── Chart extras: tx markers, hi/lo, crosshair tooltips (same as dashboard) ── */
+
+  const txMarks = $derived(buildTxMarkers(historyData.map((d) => d.x), txs));
+
+  function tipHistory(i: number): ChartTip | null {
+    const c = visibleCandles[i];
+    const first = visibleCandles[0]?.close;
+    if (!c || first == null) return null;
+    const delta = c.close - first;
+    const pct = first > 0 ? (delta / first) * 100 : 0;
+    const lines: ChartTipLine[] = [
+      { text: fmtNative(c.close, currency), tone: 'main' },
+      { text: `${fmtNativeSigned(delta, currency)} (${fmtPct(pct)})`, tone: delta >= 0 ? 'pos' : 'neg' },
+    ];
+    for (const t of txMarks.at.get(i) ?? []) lines.push({ text: t, tone: 'muted' });
+    return {
+      title: new Date(c.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }),
+      lines,
+    };
+  }
+
+  function tip1d(i: number): ChartTip | null {
+    const p = intraPoints[i];
+    if (!p || prevClose == null) return null;
+    const delta = p.value - prevClose;
+    const pct = prevClose > 0 ? (delta / prevClose) * 100 : 0;
+    return {
+      title: fmtMin(p.min),
+      lines: [
+        { text: fmtNative(p.value, currency), tone: 'main' },
+        { text: `${fmtNativeSigned(delta, currency)} (${fmtPct(pct)})`, tone: delta >= 0 ? 'pos' : 'neg' },
+      ],
+    };
+  }
+
   /* ── Your history rows ── */
 
   function dateLabel(date: string): string {
@@ -365,6 +401,8 @@
             topCaption={phase === 'pre' ? `Previous session · opens ${openLabel}` : null}
             showNow={phase === 'live'}
             emptyLabel="Market opens at {openLabel}"
+            showHiLo
+            tooltip={phase === 'pre' ? null : tip1d}
           />
         {:else}
           <div class="chart-placeholder">No intraday data</div>
@@ -377,6 +415,9 @@
           formatY={formatPrice}
           data={historyData}
           xTicks={historyTicks}
+          markers={txMarks.markers}
+          showHiLo
+          tooltip={tipHistory}
         />
       {:else}
         <div class="chart-placeholder">{candlesLoading ? 'Loading…' : 'No data for this period'}</div>

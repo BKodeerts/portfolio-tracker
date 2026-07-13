@@ -21,6 +21,7 @@
   import { fmtEur, fmtEurSigned, fmtNative, fmtNativeSigned, fmtPct, fmtPct1 } from '$lib/utils/fmt';
   import { PERIOD_OPTIONS, periodDeltaLabel, filterChartData, type Period } from '$lib/utils/period';
   import { getColor } from '$lib/utils/color';
+  import { buildTxMarkers } from '$lib/utils/tx-markers';
   import type { Position } from '$lib/types/portfolio';
 
   // ── Responsive (design breakpoint: 900px) ───────────────────────────────────
@@ -185,35 +186,10 @@
   });
 
   // ── Transaction markers (nearest chart row; details in the tooltip) ─────────
-  const SNAP_MS = 4 * 864e5;
-  const txMarks = $derived.by(() => {
-    const rows = historyFiltered;
-    const markers: { i: number; color: string }[] = [];
-    const at = new Map<number, string[]>();
-    if (rows.length < 2) return { markers, at };
-    const times = rows.map((r) => new Date(r.date).getTime());
-    for (const tx of portfolioStore.rawTransactions) {
-      const tt = new Date(tx.date).getTime();
-      if (tt < times[0]! - SNAP_MS || tt > times[times.length - 1]! + SNAP_MS) continue;
-      let bi = 0;
-      let bd = Infinity;
-      for (let i = 0; i < times.length; i++) {
-        const d = Math.abs(times[i]! - tt);
-        if (d < bd) { bd = d; bi = i; }
-      }
-      const kind = tx.shares > 0 ? 'BUY' : tx.shares < 0 ? 'SELL' : 'DIV';
-      markers.push({
-        i: bi,
-        color: kind === 'BUY' ? 'var(--c-pos)' : kind === 'SELL' ? 'var(--c-neg)' : 'var(--c-div)',
-      });
-      const sh = Math.abs(tx.shares);
-      const shStr = sh === 0 ? '' : ` ${Number.isInteger(sh) ? sh : sh.toFixed(2)}`;
-      const list = at.get(bi) ?? [];
-      list.push(`${kind}${shStr} ${tx.ticker} · ${fmtEur(tx.costEur)}`);
-      at.set(bi, list);
-    }
-    return { markers, at };
-  });
+  const txMarks = $derived(buildTxMarkers(
+    historyFiltered.map((r) => new Date(r.date).getTime()),
+    portfolioStore.rawTransactions,
+  ));
 
   function tipHistory(i: number): ChartTip | null {
     const row = historyFiltered[i];
