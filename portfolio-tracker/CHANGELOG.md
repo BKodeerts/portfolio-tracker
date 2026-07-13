@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.1] — 2026-07-13
+
+### Changed
+
+- **Stock detail desktop header** (complete handoff bundle, late change 3): the stock detail page now shows the standard desktop top nav (wordmark, Portfolio/Analysis/Tax/Activity tabs with Portfolio active, settings gear) above its back-button header. The nav carries no live-status chip here — the page's own topbar already shows the per-ticker market-state chip — and no "← Portfolio" back link, since the page keeps its own circular back button. Mobile (<900px) is unchanged: back-button-only header plus the bottom tab bar.
+
 ## [0.13.0] — 2026-07-13
 
 ### Added
