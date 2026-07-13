@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.2] — 2026-07-13
+
+### Fixed
+
+- **US sparklines no longer vanish mid-morning**: once US pre-market candles started arriving (~10:00 Brussels, while EU markets are open), the server's session fallback keyed "yesterday's session" on the last raw candle date — which by then was *today*, with no regular-hours data yet — so it returned an empty session and every US ticker's "prev session" graph disappeared until the US open. The fallback now targets the last calendar day that actually has regular-hours candles.
+
 ## [0.12.1] — 2026-07-13
 
 ### Fixed
