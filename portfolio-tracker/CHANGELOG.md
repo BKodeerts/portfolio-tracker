@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.11.4] — 2026-07-13
+
+### Added
+
+- **Stock page chart feature parity**: the stock detail page's big graph now has the same features as the dashboard chart — high/low value tags, buy/sell/dividend transaction markers on the history chart, and a crosshair hover tooltip (date/time, native price, change over the period or vs prev close, and any transactions on that day). The transaction-marker snapping logic moved from the dashboard page into shared `$lib/utils/tx-markers.ts` so both pages use one implementation.
+
 ## [0.11.3] — 2026-07-11
 
 ### Fixed
