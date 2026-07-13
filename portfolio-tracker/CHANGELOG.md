@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.2] — 2026-07-13
+
+### Fixed
+
+- **Tax page mobile header**: the settings gear sat on a wrapped line because the long "meerwaardebelasting · 10% on realized gains" subtitle forced the header row to wrap. The gear now stays pinned top-right next to the title on mobile, with the subtitle and year chips wrapping onto their own lines below.
+
 ## [0.13.1] — 2026-07-13
 
 ### Changed

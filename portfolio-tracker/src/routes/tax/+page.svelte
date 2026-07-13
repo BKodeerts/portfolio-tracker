@@ -165,6 +165,7 @@
     <!-- ── Header ── -->
     <div class="head-row">
       <h1 class="page-title">Capital gains tax</h1>
+      <span class="mobile-gear"><SettingsGear /></span>
       <div class="subtitle">meerwaardebelasting · 10% on realized gains</div>
       <div class="year-chips">
         {#each yearChips() as c (c.year)}
@@ -177,7 +178,6 @@
           >{c.year}</button>
         {/each}
       </div>
-      <span class="mobile-gear"><SettingsGear /></span>
     </div>
     <div class="filing-line">
       Filed via aangifte {selYear + 1} · exemption {fmtEur(Y.exemption)}
@@ -353,6 +353,7 @@
   {:else if portfolioStore.loaded}
     <div class="head-row">
       <h1 class="page-title">Capital gains tax</h1>
+      <span class="mobile-gear"><SettingsGear /></span>
       <div class="subtitle">meerwaardebelasting · 10% on realized gains</div>
     </div>
     <div class="empty-row">Add transactions to see your tax overview.</div>
@@ -610,7 +611,14 @@
   .rule-text { font-size: 11.5px; color: var(--fg-muted); line-height: 1.55; }
 
   /* Settings gear lives in the mobile title row only — desktop has it in the global top nav */
-  .mobile-gear { display: flex; align-self: center; }
+  .mobile-gear { display: flex; align-self: center; margin-left: auto; }
+
+  /* ── Mobile (<900px): gear sits top-right next to the title; the long
+     subtitle and year chips wrap to their own lines below it ── */
+  @media (max-width: 899px) {
+    .subtitle { flex-basis: 100%; }
+    .year-chips { margin-left: 0; }
+  }
 
   /* ── Desktop (≥900px) ── */
   @media (min-width: 900px) {
