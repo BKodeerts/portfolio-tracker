@@ -870,11 +870,12 @@
   .history { flex: 1 1 340px; min-width: 0; }
   .history-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
 
-  /* ── Desktop (≥900px) — drill-in page: no top nav, back-button header stays ── */
+  /* ── Desktop (≥900px) — top nav (from the layout, Portfolio active) sits
+     above the back-button header; 28px between them per the design ── */
   @media (min-width: 900px) {
     .page {
       max-width: 1160px;
-      padding: 14px 24px 60px;
+      padding: 28px 24px 60px;
     }
     .hero-price { font-size: 42px; }
     .chart-bleed { margin: 8px -24px 0; }

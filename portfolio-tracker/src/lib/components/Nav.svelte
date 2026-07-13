@@ -11,29 +11,28 @@
 
   type TabPath = (typeof tabs)[number]['path'];
 
-  function isActive(path: TabPath): boolean {
-    const current = page.url.pathname;
-    const resolved = resolve(path);
-    if (path === '/') return current === resolved;
-    return current === resolved || current.startsWith(resolved + '/');
-  }
-
   // Build prefixes via a sentinel param, then strip it — empty params throw at runtime.
   const stockPrefix   = $derived(resolve('/stock/[ticker]', { ticker: '_' }).slice(0, -1));
   const bonusHome     = $derived(resolve('/bonus'));
   const bonusPrefix   = $derived(bonusHome + '/');
+  // Stock detail is a Portfolio drill-in: Portfolio tab active, no nav back
+  // button (the page carries its own back-button header).
   const isStockDetail = $derived(page.url.pathname.startsWith(stockPrefix));
   const isBonusDetail = $derived(
     page.url.pathname.startsWith(bonusPrefix) && page.url.pathname !== bonusHome,
   );
-  const isDetailPage  = $derived(isStockDetail || isBonusDetail);
-  const backHref      = $derived(isBonusDetail ? resolve('/bonus') : resolve('/'));
-  const backLabel     = $derived(isBonusDetail ? '← Bonus' : '← Portfolio');
+
+  function isActive(path: TabPath): boolean {
+    const current = page.url.pathname;
+    const resolved = resolve(path);
+    if (path === '/') return current === resolved || isStockDetail;
+    return current === resolved || current.startsWith(resolved + '/');
+  }
 </script>
 
 <nav class="app-nav" aria-label="Navigation">
-  {#if isDetailPage}
-    <a href={backHref} class="nav-btn back-btn">{backLabel}</a>
+  {#if isBonusDetail}
+    <a href={resolve('/bonus')} class="nav-btn back-btn">← Bonus</a>
   {/if}
   {#each tabs as tab}
     <a href={resolve(tab.path)} class="nav-btn" class:active={isActive(tab.path)}>
