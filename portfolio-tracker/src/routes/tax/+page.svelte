@@ -3,6 +3,7 @@
   import { fmtEur, fmtEurSigned } from '$lib/utils/fmt';
   import { getColor } from '$lib/utils/color';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
+  import SettingsGear from '$lib/components/shared/SettingsGear.svelte';
   import type { TaxSale, TaxYear } from '$lib/types/portfolio';
 
   const WITHHOLDING_START = '2026-06-01';
@@ -176,6 +177,7 @@
           >{c.year}</button>
         {/each}
       </div>
+      <span class="mobile-gear"><SettingsGear /></span>
     </div>
     <div class="filing-line">
       Filed via aangifte {selYear + 1} · exemption {fmtEur(Y.exemption)}
@@ -607,8 +609,12 @@
   }
   .rule-text { font-size: 11.5px; color: var(--fg-muted); line-height: 1.55; }
 
+  /* Settings gear lives in the mobile title row only — desktop has it in the global top nav */
+  .mobile-gear { display: flex; align-self: center; }
+
   /* ── Desktop (≥900px) ── */
   @media (min-width: 900px) {
+    .mobile-gear { display: none; }
     .tax-page {
       max-width: 1160px;
       padding: 14px 24px 96px;

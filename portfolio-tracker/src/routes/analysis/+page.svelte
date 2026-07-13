@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { resolve } from '$app/paths';
   import { browser } from '$app/environment';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { fmtPct1 } from '$lib/utils/fmt';
@@ -7,6 +6,7 @@
   import PeriodPills from '$lib/components/shared/PeriodPills.svelte';
   import AllocationBar from '$lib/components/shared/AllocationBar.svelte';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
+  import SettingsGear from '$lib/components/shared/SettingsGear.svelte';
 
   // ── Performance ──────────────────────────────────────────────────────────────
 
@@ -158,12 +158,7 @@
   <!-- ── Header (mobile only — desktop uses the global top nav) ── -->
   <div class="head-row">
     <h1 class="page-title">Analysis</h1>
-    <a href={resolve('/settings')} class="gear-btn" title="Settings" aria-label="Settings">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-      </svg>
-    </a>
+    <SettingsGear />
   </div>
 
   {#if portfolioStore.loaded && portfolioStore.positions.length > 0}
@@ -301,20 +296,6 @@
     letter-spacing: -0.02em;
     margin: 0;
   }
-  .gear-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--surface-hover);
-    color: var(--fg);
-    text-decoration: none;
-    transition: background 0.12s;
-  }
-  .gear-btn:hover { background: var(--surface-3); }
-
   /* ── Section headers ── */
   .sect-head {
     display: flex;

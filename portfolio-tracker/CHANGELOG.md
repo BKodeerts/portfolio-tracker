@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.13.0] — 2026-07-13
+
+### Added
+
+- **Activity screen** (design handoff 5): the Dashboard's "Activity → All" link now lands on a full transaction history instead of the old raw transactions editor. Year summary strip (net invested, realized P&L, and dividends for the current year — realized P&L and dividends from the server's per-year `annualPl`), All/Buys/Sells/Dividends filter chips, and a month-grouped list with cash-flow month nets, BUY/SELL/DIV kind chips, per-share sub-lines (`≈€` for non-EUR tickers, since stored costs are EUR-converted), and amounts colored by kind. Rows link to the stock detail page. Adding transactions still works via CSV import (`/import`).
+
+### Changed
+
+- **Global nav update** (ships with the Activity screen): the settings gear now appears on every screen — a shared 30×30 icon button at the right end of the desktop top nav (replacing the old boxed toggle) and in each mobile title bar (Portfolio, Analysis, Tax, Activity). Mobile bottom-tab items use 12px horizontal padding so 4 tabs fit a 360px viewport, and `scrollbar-gutter: stable` removes the layout shift when switching between short and long tabs.
+
+### Removed
+
+- The inline transaction editor (add/delete/save, search, Dutch UI) that previously lived at `/transactions` — replaced by the read-only Activity screen per the design handoff.
+
 ## [0.12.2] — 2026-07-13
 
 ### Fixed
