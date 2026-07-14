@@ -130,17 +130,27 @@ function derivePreviousClose(points, periods, lastDate, meta) {
   return meta.regularMarketPreviousClose ?? meta.chartPreviousClose ?? null;
 }
 
-// Returns { sessionPoints, previousClose } for the most relevant trading session.
+// Returns { sessionPoints, previousClose, sessionPreviousClose } for the most
+// relevant trading session.
 // When today's regular session has data, use it with the standard previousClose.
 // When it's pre-market (some today points exist but regular hasn't started), use
 // the fallback window with the standard previousClose (last close before today's pre/regular start).
 // When the market is fully closed with no today points at all (showing yesterday's stale
 // session), anchor previousClose to the last close BEFORE yesterday's session — otherwise
 // the baseline equals yesterday's close and every % reads 0.
+//
+// `sessionPreviousClose` is the baseline of the DRAWN session (the close before
+// the day sessionPoints belong to) — what charts must measure the drawn line
+// against. It equals previousClose in every state except pre-market, where
+// previousClose is the drawn (previous) session's own close: previousClose
+// stays the day-change/market-price anchor, while drawing yesterday's session
+// against its own close would pin the line's end onto the baseline and flip
+// how the day reads.
 function deriveSession(points, periods, lastDate, meta) {
   const regular = periods?.regular;
   if (!regular) {
-    return { sessionPoints: points, previousClose: derivePreviousClose(points, periods, lastDate, meta) };
+    const pc = derivePreviousClose(points, periods, lastDate, meta);
+    return { sessionPoints: points, previousClose: pc, sessionPreviousClose: pc };
   }
 
   const DAY_S = 86400;
@@ -170,10 +180,8 @@ function deriveSession(points, periods, lastDate, meta) {
     // Yahoo sometimes serves a stale currentTradingPeriod pointing to yesterday's
     // session window while today's candles are already in the data array.
     if (todayPts.some(p => new Date(p.ts * 1000).toISOString().slice(0, 10) === serverToday)) {
-      return {
-        sessionPoints: todayPts,
-        previousClose: derivePreviousClose(points, periods, lastDate, meta),
-      };
+      const pc = derivePreviousClose(points, periods, lastDate, meta);
+      return { sessionPoints: todayPts, previousClose: pc, sessionPreviousClose: pc };
     }
     // Weekend / holiday: currentTradingPeriod describes the last *completed*
     // session (e.g. Friday's when fetched on Saturday) and no newer candles
@@ -182,7 +190,8 @@ function deriveSession(points, periods, lastDate, meta) {
     // every fallback below (all `ts < regular.start`) misses them too, leaving
     // sessionPoints empty all weekend.
     if (Date.now() / 1000 >= regular.end && lastDate !== serverToday) {
-      return { sessionPoints: todayPts, previousClose: closeBeforeDay(lastDate) };
+      const pc = closeBeforeDay(lastDate);
+      return { sessionPoints: todayPts, previousClose: pc, sessionPreviousClose: pc };
     }
     // currentTradingPeriod.regular is stale — fall through to date-based heuristics
   }
@@ -198,10 +207,8 @@ function deriveSession(points, periods, lastDate, meta) {
       new Date(p.ts * 1000).toISOString().slice(0, 10) === serverToday && inRegularTod(p.ts),
     );
     if (todayByDatePts.length > 0) {
-      return {
-        sessionPoints: todayByDatePts,
-        previousClose: derivePreviousClose(points, periods, lastDate, meta),
-      };
+      const pc = derivePreviousClose(points, periods, lastDate, meta);
+      return { sessionPoints: todayByDatePts, previousClose: pc, sessionPreviousClose: pc };
     }
   }
 
@@ -227,17 +234,27 @@ function deriveSession(points, periods, lastDate, meta) {
   const inPreToday = preStart && points.some(p => p.ts >= preStart);
 
   if (inPreToday) {
-    // PRE state: standard previousClose (last close before today's pre/regular start)
-    return { sessionPoints: stalePts, previousClose: derivePreviousClose(points, periods, lastDate, meta) };
+    // PRE state: standard previousClose (last close before today's pre/regular
+    // start — i.e. the drawn session's own close), but charts drawing the stale
+    // session need the close before THAT day as their baseline.
+    return {
+      sessionPoints: stalePts,
+      previousClose: derivePreviousClose(points, periods, lastDate, meta),
+      sessionPreviousClose: staleDate != null
+        ? closeBeforeDay(staleDate)
+        : derivePreviousClose(points, periods, lastDate, meta),
+    };
   }
 
   // Fully closed — anchor previousClose to the last regular close BEFORE the stale
   // day (not just before stalePts[0], which would pick up that day's own pre-market).
   if (stalePts.length > 0) {
-    return { sessionPoints: stalePts, previousClose: closeBeforeDay(staleDate) };
+    const pc = closeBeforeDay(staleDate);
+    return { sessionPoints: stalePts, previousClose: pc, sessionPreviousClose: pc };
   }
 
-  return { sessionPoints: stalePts, previousClose: derivePreviousClose(points, periods, lastDate, meta) };
+  const pc = derivePreviousClose(points, periods, lastDate, meta);
+  return { sessionPoints: stalePts, previousClose: pc, sessionPreviousClose: pc };
 }
 
 function deriveExtendedPrices(points, pre, post) {
@@ -265,7 +282,7 @@ async function fetchIntraday(yahooSymbol) {
   const periods  = meta.currentTradingPeriod;
   const lastDate = new Date(points[points.length - 1].ts * 1000).toISOString().slice(0, 10);
 
-  const { sessionPoints, previousClose } = deriveSession(points, periods, lastDate, meta);
+  const { sessionPoints, previousClose, sessionPreviousClose } = deriveSession(points, periods, lastDate, meta);
 
   // Use the date of the session points themselves, not the last raw candle date.
   // lastDate may be today (due to pre-market candles) while sessionPoints are from
@@ -288,6 +305,7 @@ async function fetchIntraday(yahooSymbol) {
   return {
     date:          sessionDate,
     previousClose,
+    sessionPreviousClose,
     currency:      meta.currency || null,
     shortName:     meta.shortName || meta.longName || null,
     marketState:   deriveMarketState(periods),

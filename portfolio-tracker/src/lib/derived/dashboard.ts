@@ -39,20 +39,24 @@ export function getLiveData(): { value: number; dayPl: number } | null {
   for (const pos of portfolioStore.positions) {
     const yahoo = pos.yahoo ?? pos.ticker;
     const intra = intradayStore.data[yahoo];
-    // Day-change baseline: previousClose only when the ticker traded on the
-    // displayed day; a ticker whose exchange didn't trade is carried flat at
-    // its last close, so a previous session's move never counts as "today's"
-    // change (same rule as the 1D chart in derived/intraday.ts).
+    // Day-change baseline: the drawn session's previous close only when the
+    // ticker traded on the displayed day; a ticker whose exchange didn't trade
+    // is carried flat at its last close, so a previous session's move never
+    // counts as "today's" change (same rule as the 1D chart in
+    // derived/intraday.ts). sessionPreviousClose (not previousClose) so that
+    // pre-market — when the displayed day is the previous session and
+    // previousClose is that session's own close — still shows its move.
     const lastPt = (intra?.points ?? []).at(-1);
     const lastClose = lastPt?.close ?? intra?.previousClose ?? 0;
     const traded = lastPt != null && day.dayIdxOf(lastPt.ts) === day.displayIdx;
+    const baseline = intra?.sessionPreviousClose ?? intra?.previousClose ?? 0;
     // No intraday data or no live FX rate for this position's currency:
     // fall back to the server-computed static value.
     const liveEur = intra?.previousClose
       ? toEurLive(pos.currency, pos.shares * lastClose, rates)
       : null;
     const prevEur = intra?.previousClose
-      ? toEurLive(pos.currency, pos.shares * (traded ? intra.previousClose : lastClose), rates)
+      ? toEurLive(pos.currency, pos.shares * (traded ? baseline : lastClose), rates)
       : null;
     if (liveEur == null || prevEur == null) {
       liveValue += pos.value;
@@ -193,7 +197,10 @@ export function buildTickerSpark(yahoo: string): TickerSpark | null {
     ? periodOpen
     : nextSessionOpen(yahoo);
   return {
-    phase, points, prevClose,
+    // Pre-open the drawn points are the PREVIOUS session's, so the baseline is
+    // the close before that session — prevClose here is that session's own
+    // close, which would pin the drawn line's end onto the zero line.
+    phase, points, prevClose: intra.sessionPreviousClose ?? prevClose,
     sessionStart: session.start, sessionEnd: session.end,
     ghostPoints, ghostStart, ghostEnd,
     hint: nextOpenTs != null ? `prev session · opens ${fmtOpenAt(nextOpenTs)}` : 'prev session',
@@ -332,7 +339,7 @@ export function getDay1Pl(): { pl: number; pct: number } | null {
     if (!intra) continue;
     const pos     = portfolioStore.positions.find((p) => p.ticker === ticker);
     const shares  = pos?.shares ?? 0;
-    const prevClose = intra.previousClose ?? 0;
+    const prevClose = intra.sessionPreviousClose ?? intra.previousClose ?? 0;
     const pts     = intra.points ?? [];
     const lastPt  = pts[pts.length - 1];
     const lastPrice = lastPt?.close ?? prevClose;

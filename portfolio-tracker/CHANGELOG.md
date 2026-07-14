@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.4] — 2026-07-14
+
+### Fixed
+
+- **Prev-close line wrong during pre-market**: once a ticker's pre-market opened, the dashed prev-close baseline in the ticker sparklines, the stock detail 1D chart, and the dashboard 1D chart jumped to the *drawn* (previous) session's own close, so a clearly negative day (e.g. ASTS −4.58%) rendered as a line ending exactly on the baseline and read as positive. The server's pre-market `previousClose` is deliberately the last session's close (it anchors the pre-open market price and day change), but that made it the wrong baseline for drawing that same session. `/api/intraday` now also returns `sessionPreviousClose` — the close before the day the session points belong to (equal to `previousClose` in every other market state) — and all pre-open drawing paths (ticker sparkline incl. its ghost-tail anchor, stock detail 1D chart, dashboard 1D chart, hero day-change baseline) measure the drawn session against it. During pre-market the previous session now reads with its true sign and magnitude, consistent with weekend behaviour.
+
 ## [0.13.3] — 2026-07-14
 
 ### Fixed

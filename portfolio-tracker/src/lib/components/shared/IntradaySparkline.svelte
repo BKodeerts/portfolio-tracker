@@ -68,12 +68,13 @@
       ? ''
       : `${lineD} L${xs[xs.length - 1]!.toFixed(1)} ${H} L${xs[0]!.toFixed(1)} ${H} Z`;
 
-    // Ghost tail continues from prev close at the session/tail boundary.
+    // Ghost tail continues from the session's last close at the boundary (the
+    // baseline is the close before the drawn session, not the session's own).
     let ghostD = '';
     if (ghost.length) {
       const gSpan = ghostEnd! - ghostStart!;
       const gx = (ts: number) => mainW + Math.min(1, Math.max(0, (ts - ghostStart!) / gSpan)) * (W - mainW);
-      ghostD = `M${mainW} ${y(0).toFixed(1)} `
+      ghostD = `M${mainW} ${ys[ys.length - 1]!.toFixed(1)} `
         + ghost.map((p, i) => `L${gx(p.ts).toFixed(1)} ${y(gPcts[i]!).toFixed(1)}`).join(' ');
     }
 

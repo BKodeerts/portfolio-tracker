@@ -43,16 +43,18 @@ describe('deriveSession on a weekend', () => {
   afterEach(() => vi.useRealTimers());
 
   it("keeps Friday's session when currentTradingPeriod still describes Friday", () => {
-    const { sessionPoints, previousClose } = deriveSession(points, periodsFor('2026-07-10'), lastDate, meta);
+    const { sessionPoints, previousClose, sessionPreviousClose } = deriveSession(points, periodsFor('2026-07-10'), lastDate, meta);
     expect(sessionPoints).toEqual(fri);
     // Baseline anchored to Thursday's close, not Friday's own close (% would read 0).
     expect(previousClose).toBe(thu[thu.length - 1].close);
+    expect(sessionPreviousClose).toBe(thu[thu.length - 1].close);
   });
 
   it("keeps Friday's session when currentTradingPeriod points at Monday", () => {
-    const { sessionPoints, previousClose } = deriveSession(points, periodsFor('2026-07-13'), lastDate, meta);
+    const { sessionPoints, previousClose, sessionPreviousClose } = deriveSession(points, periodsFor('2026-07-13'), lastDate, meta);
     expect(sessionPoints).toEqual(fri);
     expect(previousClose).toBe(thu[thu.length - 1].close);
+    expect(sessionPreviousClose).toBe(thu[thu.length - 1].close);
   });
 
   it('excludes pre/post-market candles from the fallback session', () => {
@@ -81,11 +83,15 @@ describe('deriveSession during pre-market', () => {
       { ts: dayStart('2026-07-13') + 8.25 * 3600, close: 215 },
     ];
     const withMonPre = [...thu, ...fri, ...monPre];
-    const { sessionPoints, previousClose } = deriveSession(
+    const { sessionPoints, previousClose, sessionPreviousClose } = deriveSession(
       withMonPre, periodsFor('2026-07-13'), '2026-07-13', meta,
     );
     expect(sessionPoints).toEqual(fri);
     expect(previousClose).toBe(fri[fri.length - 1].close);
+    // The drawn session is Friday's, so charts must measure it against
+    // Thursday's close — measuring against previousClose (Friday's own close)
+    // pins the drawn line's end onto the baseline and flips how the day reads.
+    expect(sessionPreviousClose).toBe(thu[thu.length - 1].close);
   });
 });
 
@@ -98,9 +104,10 @@ describe('deriveSession on a trading day', () => {
   afterEach(() => vi.useRealTimers());
 
   it("uses today's regular-session candles with the standard previousClose", () => {
-    const { sessionPoints, previousClose } = deriveSession(points, periodsFor('2026-07-10'), lastDate, meta);
+    const { sessionPoints, previousClose, sessionPreviousClose } = deriveSession(points, periodsFor('2026-07-10'), lastDate, meta);
     expect(sessionPoints).toEqual(fri);
     expect(previousClose).toBe(thu[thu.length - 1].close);
+    expect(sessionPreviousClose).toBe(thu[thu.length - 1].close);
   });
 
   it("still rejects a stale currentTradingPeriod pointing at yesterday when today's candles exist", () => {

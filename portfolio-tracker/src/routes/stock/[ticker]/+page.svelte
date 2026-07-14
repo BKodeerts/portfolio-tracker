@@ -112,6 +112,11 @@
   const iData     = $derived(intradayStore.data[yahoo] as IntradayData | null | undefined);
   const iPts      = $derived(iData?.points ?? []);
   const prevClose = $derived(iData?.previousClose ?? null);
+  // 1D chart baseline: the drawn session's own previous close. Pre-open the
+  // drawn points are the PREVIOUS session's and `previousClose` is that
+  // session's own close (it feeds the hero price), which would pin the dashed
+  // line onto the session's end and flip how the day reads.
+  const chartPrevClose = $derived(iData?.sessionPreviousClose ?? prevClose);
 
   const rawState    = $derived(iData?.marketState ?? (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
   const marketState = $derived(normalizeMarketState(yahoo, rawState));
@@ -469,14 +474,14 @@
     <!-- ── Chart (full-bleed, market price only) ── -->
     <div class="chart-bleed">
       {#if period === '1d'}
-        {#if prevClose != null}
+        {#if chartPrevClose != null}
           <PeriodChart
             mode="intraday"
             height={desktop.current ? 260 : 190}
             padX={desktop.current ? 24 : 20}
             formatY={formatPrice}
             points={intraPoints}
-            {prevClose}
+            prevClose={chartPrevClose}
             sessionStart={intraSession.start}
             sessionEnd={intraSession.end}
             xTicks={phase === 'pre' ? [] : intraTicks}

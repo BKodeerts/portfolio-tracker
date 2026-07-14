@@ -148,8 +148,11 @@ export function buildPortfolioIntradaySession(): PortfolioIntradaySession | null
     // is carried flat at its last known close — not at previousClose, which
     // the server may anchor a session earlier and would shift the chart level
     // away from the hero's live total while adding nothing to the day change.
+    // A ticker that DID trade on the drawn day anchors to the close before
+    // that day (sessionPreviousClose): during pre-market previousClose is the
+    // drawn session's own close, which would flatten its move to zero.
     const anchorPrice = pts.length > 0
-      ? prevClose
+      ? (intra.sessionPreviousClose ?? prevClose)
       : ((intra.points ?? []).at(-1)?.close ?? prevClose);
 
     const prevCloseEur = toEur(pos.shares * anchorPrice);
