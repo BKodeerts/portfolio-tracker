@@ -20,7 +20,10 @@ import { toEurLive, toEurLiveOrFallback } from '$lib/fx';
 export interface PortfolioIntradaySession {
   /** 5-min grid from dayStart to now (clamped to dayEnd); empty before first open. */
   points: { min: number; value: number }[];
-  /** Yesterday's closing portfolio value in EUR (the dashed baseline). */
+  /**
+   * Day-change baseline in EUR (the dashed line): previous close for tickers
+   * that traded on the drawn day, last known close for tickers that didn't.
+   */
   prevCloseTotal: number;
   /** First market open, minutes-of-day CET. */
   dayStart: number;
@@ -50,12 +53,29 @@ function brusselsOffsetSecs(at: Date): number {
   return Math.round((asUtc - wholeSecs) / 1000);
 }
 
-export function buildPortfolioIntradaySession(): PortfolioIntradaySession | null {
-  if (!intradayStore.loaded) return null;
-  const held = portfolioStore.positions.filter((p) => p.shares > 0);
-  if (held.length === 0) return null;
+export interface DisplayDay {
+  /** Brussels day index of the day treated as "today" (latest traded day, capped at today). */
+  displayIdx: number;
+  /** True when displayIdx is an earlier day than the actual today. */
+  prevSession: boolean;
+  /** Current minutes-of-day CET. */
+  nowMin: number;
+  /** Today's date (Brussels), YYYY-MM-DD. */
+  todayStr: string;
+  minuteOf: (ts: number) => number;
+  dayIdxOf: (ts: number) => number;
+}
 
-  const rates = intradayStore.liveRates;
+/**
+ * The day the dashboard treats as "today": the most recent Brussels calendar
+ * day any held ticker traded, capped at the actual today (weekends/holidays
+ * fall back to the last session). A ticker's intraday move counts toward the
+ * day P&L only when its session points fall on this day; tickers whose
+ * exchange didn't trade are carried flat at their last close, so a previous
+ * session's move never counts as "today's" change. Shared by the 1D chart and
+ * the hero live value/day P&L so they can never disagree on the baseline.
+ */
+export function getDisplayDay(): DisplayDay {
   const now = new Date();
   const offset = brusselsOffsetSecs(now);
   const localNow = Math.floor(now.getTime() / 1000) + offset;
@@ -66,16 +86,24 @@ export function buildPortfolioIntradaySession(): PortfolioIntradaySession | null
   const minuteOf = (ts: number) => Math.floor(((ts + offset) % DAY_SECS) / 60);
   const dayIdxOf = (ts: number) => Math.floor((ts + offset) / DAY_SECS);
 
-  // Day to draw: today when any held ticker traded today, otherwise the most
-  // recent day with intraday points (weekends/holidays show the last session).
   let latestIdx = -Infinity;
-  for (const pos of held) {
+  for (const pos of portfolioStore.positions) {
+    if (pos.shares <= 0) continue;
     const yahoo = portfolioStore.tickerMeta[pos.ticker]?.yahoo ?? pos.ticker;
     const last = intradayStore.data[yahoo]?.points?.at(-1);
     if (last) latestIdx = Math.max(latestIdx, dayIdxOf(last.ts));
   }
   const displayIdx = Number.isFinite(latestIdx) ? Math.min(latestIdx, todayIdx) : todayIdx;
-  const prevSession = displayIdx < todayIdx;
+  return { displayIdx, prevSession: displayIdx < todayIdx, nowMin, todayStr, minuteOf, dayIdxOf };
+}
+
+export function buildPortfolioIntradaySession(): PortfolioIntradaySession | null {
+  if (!intradayStore.loaded) return null;
+  const held = portfolioStore.positions.filter((p) => p.shares > 0);
+  if (held.length === 0) return null;
+
+  const rates = intradayStore.liveRates;
+  const { displayIdx, prevSession, nowMin, todayStr, minuteOf, dayIdxOf } = getDisplayDay();
 
   interface Entry {
     /** Position value in EUR at minute m (last price at-or-before m, else prevClose). */
@@ -116,12 +144,20 @@ export function buildPortfolioIntradaySession(): PortfolioIntradaySession | null
     const toEur = (native: number) =>
       toEurLive(pos.currency, native, rates) ?? toEurLiveOrFallback(pos.currency, native, rates);
 
-    const prevCloseEur = toEur(pos.shares * prevClose);
+    // A ticker with no points on the drawn day (its exchange hasn't traded)
+    // is carried flat at its last known close — not at previousClose, which
+    // the server may anchor a session earlier and would shift the chart level
+    // away from the hero's live total while adding nothing to the day change.
+    const anchorPrice = pts.length > 0
+      ? prevClose
+      : ((intra.points ?? []).at(-1)?.close ?? prevClose);
+
+    const prevCloseEur = toEur(pos.shares * anchorPrice);
     entries.push({
       prevCloseEur,
       valueAt: (m: number) => {
-        // pts is time-ordered; last point at-or-before m, else prevClose.
-        let price = prevClose;
+        // pts is time-ordered; last point at-or-before m, else the anchor.
+        let price = anchorPrice;
         for (const p of pts) {
           if (p.min > m) break;
           price = p.close;
