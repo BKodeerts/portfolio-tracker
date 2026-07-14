@@ -14,6 +14,13 @@ export interface IntradayPoint {
 
 export interface IntradayData {
   previousClose: number | null;
+  /**
+   * Baseline of the drawn session (the close before the day `points` belong
+   * to) — what charts measure the session line against. Differs from
+   * `previousClose` only during pre-market, where `previousClose` is the drawn
+   * (previous) session's own close.
+   */
+  sessionPreviousClose?: number | null;
   points: IntradayPoint[];
   allPoints?: IntradayPoint[];
   date: string;
