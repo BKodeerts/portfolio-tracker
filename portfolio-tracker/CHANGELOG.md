@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.3] — 2026-07-14
+
+### Fixed
+
+- **Dashboard hero vs 1D chart mismatch**: the hero total/day-change and the 1D chart could disagree (e.g. hero "+€935 (+0.92%)" while the chart's latest point read "+€173 (+0.17%)"). Both sides valued tickers whose exchange hadn't traded on the drawn day differently: the hero used the ticker's last (stale-session) close against a `previousClose` the server may anchor a session earlier — silently counting a *previous* session's move as "today" — while the chart pinned those tickers at that older `previousClose`, deflating its level. The hero (`getLiveData`/`getDay1Pl`) and the 1D chart (`buildPortfolioIntradaySession`) now share one display-day rule (`getDisplayDay`): a ticker's move only counts toward the day change when its session points fall on the drawn day; otherwise the position is carried flat at its last known close in both the line and the baseline. Header value, day P&L, and the chart's latest point now always agree.
+
 ## [0.13.2] — 2026-07-13
 
 ### Fixed

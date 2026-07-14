@@ -1,5 +1,6 @@
 import { portfolioStore } from '$lib/stores/portfolio.svelte';
 import { intradayStore } from '$lib/stores/intraday.svelte';
+import { getDisplayDay } from '$lib/derived/intraday';
 import { getTradingMins, isExchangeOpen, normalizeMarketState, sessionBounds, fmtSessionTime, fmtOpenAt, nextSessionOpen } from '$lib/market';
 import { toEurLive, liveRateFor } from '$lib/fx';
 import type { ChartPoint } from '$lib/types/portfolio';
@@ -32,18 +33,26 @@ export interface Movers {
 export function getLiveData(): { value: number; dayPl: number } | null {
   if (!intradayStore.loaded || portfolioStore.positions.length === 0) return null;
   const rates = intradayStore.liveRates;
+  const day = getDisplayDay();
   let liveValue = 0;
   let prevValue = 0;
   for (const pos of portfolioStore.positions) {
     const yahoo = pos.yahoo ?? pos.ticker;
     const intra = intradayStore.data[yahoo];
+    // Day-change baseline: previousClose only when the ticker traded on the
+    // displayed day; a ticker whose exchange didn't trade is carried flat at
+    // its last close, so a previous session's move never counts as "today's"
+    // change (same rule as the 1D chart in derived/intraday.ts).
+    const lastPt = (intra?.points ?? []).at(-1);
+    const lastClose = lastPt?.close ?? intra?.previousClose ?? 0;
+    const traded = lastPt != null && day.dayIdxOf(lastPt.ts) === day.displayIdx;
     // No intraday data or no live FX rate for this position's currency:
     // fall back to the server-computed static value.
     const liveEur = intra?.previousClose
-      ? toEurLive(pos.currency, pos.shares * ((intra.points ?? []).at(-1)?.close ?? intra.previousClose), rates)
+      ? toEurLive(pos.currency, pos.shares * lastClose, rates)
       : null;
     const prevEur = intra?.previousClose
-      ? toEurLive(pos.currency, pos.shares * intra.previousClose, rates)
+      ? toEurLive(pos.currency, pos.shares * (traded ? intra.previousClose : lastClose), rates)
       : null;
     if (liveEur == null || prevEur == null) {
       liveValue += pos.value;
@@ -314,6 +323,7 @@ export function getDay1Pl(): { pl: number; pct: number } | null {
   // Require a live rate for every held non-EUR currency before showing a total.
   const held = portfolioStore.positions.map((p) => p.currency);
   if (held.some((c) => liveRateFor(c, rates) == null)) return null;
+  const day = getDisplayDay();
   let prevCloseTotal = 0;
   let currentTotal   = 0;
   for (const ticker of tickers) {
@@ -324,8 +334,12 @@ export function getDay1Pl(): { pl: number; pct: number } | null {
     const shares  = pos?.shares ?? 0;
     const prevClose = intra.previousClose ?? 0;
     const pts     = intra.points ?? [];
-    const lastPrice = pts[pts.length - 1]?.close ?? prevClose;
-    prevCloseTotal += toEurLive(pos?.currency, shares * prevClose, rates) ?? 0;
+    const lastPt  = pts[pts.length - 1];
+    const lastPrice = lastPt?.close ?? prevClose;
+    // Same baseline rule as getLiveData/the 1D chart: tickers that didn't
+    // trade on the displayed day sit flat at their last close (zero change).
+    const traded  = lastPt != null && day.dayIdxOf(lastPt.ts) === day.displayIdx;
+    prevCloseTotal += toEurLive(pos?.currency, shares * (traded ? prevClose : lastPrice), rates) ?? 0;
     currentTotal   += toEurLive(pos?.currency, shares * lastPrice, rates) ?? 0;
   }
   if (prevCloseTotal <= 0) return null;
