@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.6] — 2026-08-01
+
+### Fixed
+
+- **Pre-open card % disagreed with its own sparkline**: the day number on a pre-open holding/watchlist card came from `prevSessionMove`, which measured the drawn session's **open→close** move, while the sparkline beside it drew that session against its previous close. The two therefore reported different moves — a card could read −4.58% while its line sat flat against its baseline, which is the same card-vs-graph mismatch 0.13.4/0.13.5 addressed, just relocated. `prevSessionMove` now measures the session's close against `spark.prevClose` — the exact value `IntradaySparkline` draws its zero line at — so the card and its line agree by construction rather than by coincidence, and follow the standard close-to-close daily-change convention.
+
 ## [0.13.5] — 2026-08-01
 
 ### Fixed
