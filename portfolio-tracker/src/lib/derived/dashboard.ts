@@ -218,13 +218,19 @@ export function livePositionValueEur(pos: { ticker: string; yahoo?: string; curr
 
 /**
  * Previous session's move for a pre-open card (spark points are yesterday's
- * session): per-share native change and % from session open to prev close.
+ * session): per-share native change and % of that session's close against the
+ * close before it — the standard daily-change convention.
+ *
+ * The baseline is `spark.prevClose`, the very value IntradaySparkline draws its
+ * zero line at, so the card's number and the line's position against that line
+ * agree by construction. Measuring open-to-close here instead (as this did)
+ * makes the card and its own sparkline report different moves.
  */
 export function prevSessionMove(spark: TickerSpark): { pct: number; native: number } | null {
-  const first = spark.points[0]?.close;
+  const base = spark.prevClose;
   const last = spark.points[spark.points.length - 1]?.close;
-  if (!first || last == null) return null;
-  return { pct: ((last - first) / first) * 100, native: last - first };
+  if (!base || last == null) return null;
+  return { pct: ((last - base) / base) * 100, native: last - base };
 }
 
 /** Watchlist card data: tracked-but-not-held tickers from the intraday store. */
