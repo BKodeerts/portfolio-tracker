@@ -1,6 +1,14 @@
 # Changelog
 
-## [0.13.4] — 2026-07-14
+## [0.13.5] — 2026-08-01
+
+### Fixed
+
+Follow-up to 0.13.4, which fixed the pre-market baseline in the frontend but left two server-side causes in place — the line still read wrong against live data.
+
+- **Prev-close baseline used extended-hours prices instead of the actual previous close**: `derivePreviousClose` scanned backwards for the last candle before today's pre-market start without filtering to regular trading hours. Candles are fetched with `includePrePost=true`, so that scan landed on the *previous day's post-market* run — a price hours past the closing bell — and used it as the close. This was never pre-market-specific: during live sessions the day-change % was also measured against after-hours drift rather than the official close. All previous-close lookups now share one regular-hours time-of-day filter (`makeInRegularTod`), so a baseline can only come from a real regular-session close.
+
+- **Intraday fetch range widened 2d → 5d**: with `range=2d` the payload held exactly `[previous session, today]`. During pre-market the drawn session *is* the previous session, so its baseline — the close before it — was two sessions back and simply absent from the data. The lookup found nothing and fell through to Yahoo's `meta.regularMarketPreviousClose`, which during pre-market is the drawn session's own close, silently reproducing the flat/inverted line that 0.13.4 set out to fix. (Weekends looked correct only because a Saturday's 2-day window happens to span both Thursday and Friday.) 5d also covers long weekends and holidays. Where the lookup still can't be satisfied, the baseline now degrades to the drawn session's own open — showing that session's real move, matching the "prev session" card label — instead of collapsing onto its own close and reading 0%.
 
 ### Fixed
 

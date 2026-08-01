@@ -113,19 +113,49 @@ function deriveMarketState(periods) {
   return 'CLOSED';
 }
 
+const DAY_S = 86400;
+
+/**
+ * Predicate: does `ts` fall inside the exchange's regular trading window?
+ * Judged by time-of-day, so it applies to every day in the payload rather than
+ * only the one `periods` describes. Null when there is no regular period.
+ *
+ * Every "previous close" lookup must go through this. With includePrePost=true
+ * the payload interleaves pre/post ticks, and an extended-hours tick is NOT a
+ * close — scanning raw points backwards lands on the previous day's
+ * post-market price (post runs hours past the bell), not its closing price.
+ */
+function makeInRegularTod(regular) {
+  if (!regular) return null;
+  const startTod = ((regular.start % DAY_S) + DAY_S) % DAY_S;
+  const endTod   = ((regular.end   % DAY_S) + DAY_S) % DAY_S;
+  return (ts) => {
+    const tod = ((ts % DAY_S) + DAY_S) % DAY_S;
+    return endTod > startTod
+      ? (tod >= startTod && tod < endTod)
+      : (tod >= startTod || tod < endTod);
+  };
+}
+
 function derivePreviousClose(points, periods, lastDate, meta) {
-  // Find the last close of the prior regular session.
-  // With includePrePost=true, we must skip today's extended-hours points by looking
-  // before today's pre-market start (if available), else before regular start.
+  // Last close of the prior REGULAR session. Two sets of extended-hours points
+  // have to be skipped: today's (by looking before today's pre-market start)
+  // AND the previous day's post-market run (by requiring a regular-hours
+  // time-of-day). Without the second filter this returns yesterday's
+  // post-market price, so every day-change % is measured off after-hours drift
+  // instead of the official close.
+  const inRegularTod = makeInRegularTod(periods?.regular);
+  const isRegular = (ts) => !inRegularTod || inRegularTod(ts);
   const cutoff = periods?.pre?.start ?? periods?.regular?.start ?? null;
   if (cutoff) {
     for (let i = points.length - 1; i >= 0; i--) {
-      if (points[i].ts < cutoff) return points[i].close;
+      if (points[i].ts < cutoff && isRegular(points[i].ts)) return points[i].close;
     }
   }
-  // Fallback: last point on a different calendar date
+  // Fallback: last regular-hours point on a different calendar date.
   for (let i = points.length - 1; i >= 0; i--) {
-    if (new Date(points[i].ts * 1000).toISOString().slice(0, 10) !== lastDate) return points[i].close;
+    if (new Date(points[i].ts * 1000).toISOString().slice(0, 10) !== lastDate
+        && isRegular(points[i].ts)) return points[i].close;
   }
   return meta.regularMarketPreviousClose ?? meta.chartPreviousClose ?? null;
 }
@@ -153,25 +183,28 @@ function deriveSession(points, periods, lastDate, meta) {
     return { sessionPoints: points, previousClose: pc, sessionPreviousClose: pc };
   }
 
-  const DAY_S = 86400;
-  const regStartTod = ((regular.start % DAY_S) + DAY_S) % DAY_S;
-  const regEndTod   = ((regular.end   % DAY_S) + DAY_S) % DAY_S;
-  const inRegularTod = (ts) => {
-    const tod = ((ts % DAY_S) + DAY_S) % DAY_S;
-    return regEndTod > regStartTod
-      ? (tod >= regStartTod && tod < regEndTod)
-      : (tod >= regStartTod || tod < regEndTod);
-  };
+  const inRegularTod = makeInRegularTod(regular);
   // Last regular-hours close strictly before calendar day `dateStr` — the baseline
   // for a fully-closed session, so its move isn't measured against its own close
   // (which would make every % read 0).
+  //
+  // Returns null when the payload doesn't reach back that far. Callers must NOT
+  // fall back to meta.regularMarketPreviousClose here: when the drawn session is
+  // the previous session (pre-market, weekend), that field IS the drawn
+  // session's own close, which is the very thing this lookup exists to avoid.
   const closeBeforeDay = (dateStr) => {
+    if (dateStr == null) return null;
     const dayStartTs = Date.parse(dateStr + 'T00:00:00Z') / 1000;
     for (let i = points.length - 1; i >= 0; i--) {
       if (points[i].ts < dayStartTs && inRegularTod(points[i].ts)) return points[i].close;
     }
-    return meta.regularMarketPreviousClose ?? meta.chartPreviousClose ?? null;
+    return null;
   };
+  // Last-resort baseline for a drawn session whose prior close isn't in the
+  // payload: the session's own open, so the line still shows that session's
+  // real move (matching the "prev session" card label) instead of being pinned
+  // flat onto its own close.
+  const sessionOpenOr = (pts, fallback) => pts.length > 0 ? pts[0].close : fallback;
 
   const serverToday = new Date().toISOString().slice(0, 10);
   const todayPts = points.filter(p => p.ts >= regular.start && p.ts < regular.end);
@@ -190,7 +223,7 @@ function deriveSession(points, periods, lastDate, meta) {
     // every fallback below (all `ts < regular.start`) misses them too, leaving
     // sessionPoints empty all weekend.
     if (Date.now() / 1000 >= regular.end && lastDate !== serverToday) {
-      const pc = closeBeforeDay(lastDate);
+      const pc = closeBeforeDay(lastDate) ?? sessionOpenOr(todayPts, meta.regularMarketPreviousClose ?? null);
       return { sessionPoints: todayPts, previousClose: pc, sessionPreviousClose: pc };
     }
     // currentTradingPeriod.regular is stale — fall through to date-based heuristics
@@ -237,19 +270,19 @@ function deriveSession(points, periods, lastDate, meta) {
     // PRE state: standard previousClose (last close before today's pre/regular
     // start — i.e. the drawn session's own close), but charts drawing the stale
     // session need the close before THAT day as their baseline.
+    const pc = derivePreviousClose(points, periods, lastDate, meta);
     return {
       sessionPoints: stalePts,
-      previousClose: derivePreviousClose(points, periods, lastDate, meta),
-      sessionPreviousClose: staleDate != null
-        ? closeBeforeDay(staleDate)
-        : derivePreviousClose(points, periods, lastDate, meta),
+      previousClose: pc,
+      sessionPreviousClose: closeBeforeDay(staleDate) ?? sessionOpenOr(stalePts, pc),
     };
   }
 
   // Fully closed — anchor previousClose to the last regular close BEFORE the stale
   // day (not just before stalePts[0], which would pick up that day's own pre-market).
   if (stalePts.length > 0) {
-    const pc = closeBeforeDay(staleDate);
+    const pc = closeBeforeDay(staleDate)
+      ?? sessionOpenOr(stalePts, meta.regularMarketPreviousClose ?? null);
     return { sessionPoints: stalePts, previousClose: pc, sessionPreviousClose: pc };
   }
 
@@ -267,9 +300,15 @@ function deriveExtendedPrices(points, pre, post) {
 }
 
 async function fetchIntraday(yahooSymbol) {
-  // Use range=2d so we always have the previous session available when a market just
-  // opened and range=1d would only return the new (sparse) session.
-  const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=5m&range=2d&includePrePost=true`;
+  // range=5d, not 2d. We need the previous session available when a market just
+  // opened (range=1d returns only the new, sparse session) AND the session
+  // before THAT one, because during pre-market the drawn session is the
+  // previous session and its baseline is the close preceding it. With 2d the
+  // payload holds exactly [previous session, today], so that lookup found
+  // nothing and fell through to Yahoo's meta — whose previousClose during
+  // pre-market is the drawn session's own close, pinning the line onto its
+  // baseline. 5d also survives long weekends and holidays.
+  const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=5m&range=5d&includePrePost=true`;
   const text = await fetchYahoo(url);
   const result = JSON.parse(text)?.chart?.result?.[0];
   if (!result) return null;
