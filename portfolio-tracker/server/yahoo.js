@@ -157,7 +157,69 @@ function derivePreviousClose(points, periods, lastDate, meta) {
     if (new Date(points[i].ts * 1000).toISOString().slice(0, 10) !== lastDate
         && isRegular(points[i].ts)) return points[i].close;
   }
-  return meta.regularMarketPreviousClose ?? meta.chartPreviousClose ?? null;
+  return metaPrevClose(meta) ?? meta.chartPreviousClose ?? null;
+}
+
+/**
+ * Yahoo's chart meta calls this `previousClose`. An earlier version of this
+ * file read `regularMarketPreviousClose`, which is a *quote*-endpoint field and
+ * is absent here — so the fallback silently evaluated to undefined and dropped
+ * through to `chartPreviousClose`, the close before the whole fetched range
+ * (five sessions stale at range=5d). Read both, correct name first.
+ */
+function metaPrevClose(meta) {
+  return meta?.previousClose ?? meta?.regularMarketPreviousClose ?? null;
+}
+
+/**
+ * Replace bar-derived closes with the session's official ones.
+ *
+ * A 5-minute bar's close is not a closing price: the last regular bar spans
+ * 15:55–16:00 ET, while the official close is set by the closing cross that
+ * prints at 16:00:01 and lands in the 20:00 UTC (post-market) bar. Every day is
+ * affected — ASTS 2026-07-31 closed at 58.98 but its last bar read 58.93, and
+ * the day before, 58.44 vs 58.455. Those errors compound in a change %:
+ * 58.93/58.455 gives +0.81% where Yahoo and NASDAQ both report +0.92%.
+ *
+ * Chart meta carries the authoritative pair for the session it describes:
+ *   regularMarketPrice — that session's official close (or the live price)
+ *   previousClose      — the official close of the session before it
+ *
+ * `regularMarketTime` dates that pair, and it is only trusted when it matches
+ * the drawn session, so a meta that has already rolled over to the next session
+ * (or is stale) can never leak the wrong day's prices in.
+ *
+ * The drawn session's final point is pinned to the official close too: the card
+ * number and the sparkline must not disagree, which is the whole reason the
+ * baseline work in 0.13.4–0.13.6 existed.
+ */
+function applyOfficialCloses(session, meta, sessionDate, todayStr) {
+  const metaDate = meta?.regularMarketTime != null
+    ? new Date(meta.regularMarketTime * 1000).toISOString().slice(0, 10)
+    : null;
+  if (metaDate == null || metaDate !== sessionDate) return session;
+
+  const officialClose = meta.regularMarketPrice ?? null;
+  const officialPrev  = metaPrevClose(meta);
+  const { sessionPoints, previousClose, sessionPreviousClose } = session;
+
+  const points = (officialClose != null && sessionPoints.length > 0)
+    ? [...sessionPoints.slice(0, -1),
+       { ...sessionPoints[sessionPoints.length - 1], close: officialClose }]
+    : sessionPoints;
+
+  // When the drawn session is a past one (pre-market, weekend), `previousClose`
+  // is what the card renders as that session's price, so it takes the drawn
+  // session's official close. Once the drawn session is today, `previousClose`
+  // is the day-change baseline and takes the preceding session's close.
+  const drawnIsPastSession = sessionDate !== todayStr;
+  return {
+    sessionPoints: points,
+    previousClose: drawnIsPastSession
+      ? (officialClose ?? previousClose)
+      : (officialPrev ?? previousClose),
+    sessionPreviousClose: officialPrev ?? sessionPreviousClose,
+  };
 }
 
 // Returns { sessionPoints, previousClose, sessionPreviousClose } for the most
@@ -189,7 +251,7 @@ function deriveSession(points, periods, lastDate, meta) {
   // (which would make every % read 0).
   //
   // Returns null when the payload doesn't reach back that far. Callers must NOT
-  // fall back to meta.regularMarketPreviousClose here: when the drawn session is
+  // fall back to meta's previousClose here: when the drawn session is
   // the previous session (pre-market, weekend), that field IS the drawn
   // session's own close, which is the very thing this lookup exists to avoid.
   const closeBeforeDay = (dateStr) => {
@@ -223,7 +285,7 @@ function deriveSession(points, periods, lastDate, meta) {
     // every fallback below (all `ts < regular.start`) misses them too, leaving
     // sessionPoints empty all weekend.
     if (Date.now() / 1000 >= regular.end && lastDate !== serverToday) {
-      const pc = closeBeforeDay(lastDate) ?? sessionOpenOr(todayPts, meta.regularMarketPreviousClose ?? null);
+      const pc = closeBeforeDay(lastDate) ?? sessionOpenOr(todayPts, metaPrevClose(meta));
       return { sessionPoints: todayPts, previousClose: pc, sessionPreviousClose: pc };
     }
     // currentTradingPeriod.regular is stale — fall through to date-based heuristics
@@ -282,7 +344,7 @@ function deriveSession(points, periods, lastDate, meta) {
   // day (not just before stalePts[0], which would pick up that day's own pre-market).
   if (stalePts.length > 0) {
     const pc = closeBeforeDay(staleDate)
-      ?? sessionOpenOr(stalePts, meta.regularMarketPreviousClose ?? null);
+      ?? sessionOpenOr(stalePts, metaPrevClose(meta));
     return { sessionPoints: stalePts, previousClose: pc, sessionPreviousClose: pc };
   }
 
@@ -321,14 +383,20 @@ async function fetchIntraday(yahooSymbol) {
   const periods  = meta.currentTradingPeriod;
   const lastDate = new Date(points[points.length - 1].ts * 1000).toISOString().slice(0, 10);
 
-  const { sessionPoints, previousClose, sessionPreviousClose } = deriveSession(points, periods, lastDate, meta);
+  const derived = deriveSession(points, periods, lastDate, meta);
 
   // Use the date of the session points themselves, not the last raw candle date.
   // lastDate may be today (due to pre-market candles) while sessionPoints are from
   // yesterday, which would fool the frontend's freshness/stale-detection logic.
-  const sessionDate = sessionPoints.length > 0
-    ? new Date(sessionPoints[sessionPoints.length - 1].ts * 1000).toISOString().slice(0, 10)
+  const sessionDate = derived.sessionPoints.length > 0
+    ? new Date(derived.sessionPoints[derived.sessionPoints.length - 1].ts * 1000).toISOString().slice(0, 10)
     : lastDate;
+
+  // Bar closes are not closing prices — swap in the official ones where meta
+  // describes this very session.
+  const { sessionPoints, previousClose, sessionPreviousClose } = applyOfficialCloses(
+    derived, meta, sessionDate, new Date().toISOString().slice(0, 10),
+  );
 
   // All points spanning today's full extended session (pre + regular + post).
   // When currentTradingPeriod is a future session (market closed, data is stale),
@@ -461,4 +529,4 @@ async function fetchQuoteSummary(yahooSymbol) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-module.exports = { fetchCandles, fetchDailyQuote, fetchIntraday, fetchQuoteSummary, fetchChartStats, fetchQuoteStats, fetchYahoo, sleep, FETCH_DELAY, deriveSession };
+module.exports = { fetchCandles, fetchDailyQuote, fetchIntraday, fetchQuoteSummary, fetchChartStats, fetchQuoteStats, fetchYahoo, sleep, FETCH_DELAY, deriveSession, applyOfficialCloses, makeInRegularTod };
