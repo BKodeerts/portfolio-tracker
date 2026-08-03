@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.7] — 2026-08-03
+
+### Fixed
+
+- **Prices came from 5-minute bars instead of official closes**: a bar's close is not a closing price. The last regular bar spans 15:55–16:00 ET, so it excludes the closing cross that prints at 16:00:01 and lands in the following (post-market) bar. Every session was affected — ASTS on 2026-07-31 closed at **58.98** but its last bar read 58.93, and the day before, 58.44 vs 58.455. The two errors compound in a change %, so the app showed **+0.81%** where Yahoo Finance and NASDAQ both report **+0.92%**. Chart meta already carries the authoritative pair for the session it describes (`regularMarketPrice` = that session's official close, `previousClose` = the close before it); both are now used, guarded by `regularMarketTime` so a meta that has rolled over to the next session can never substitute the wrong day's prices. The drawn session's final chart point is pinned to the official close as well, so the card's number and the sparkline continue to agree by construction.
+
+- **Meta previous-close fallback read a field that never exists**: the fallback chain used `meta.regularMarketPreviousClose`, which is a *quote*-endpoint field and is absent from chart meta — the correct name there is simply `previousClose`. The lookup therefore evaluated to undefined and dropped through to `chartPreviousClose`, the close before the entire fetched range (five sessions stale at `range=5d`, e.g. 58.29 against an actual previous close of 58.44). Both names are now read, correct one first.
+
 ## [0.13.6] — 2026-08-01
 
 ### Fixed
