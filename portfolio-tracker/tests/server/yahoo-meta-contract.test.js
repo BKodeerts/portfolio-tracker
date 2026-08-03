@@ -135,6 +135,24 @@ describe('applyOfficialCloses across every captured instrument', () => {
     expect(out.previousClose).toBe(1.1527);
   });
 
+  it('keeps an index agreeing with Yahoo rather than with its last bar', () => {
+    // ^GSPC keeps printing past the equity bell (regularMarketTime is 21:22
+    // UTC, over an hour after the 20:00 close). Yahoo derives an index's shown
+    // price and change from regularMarketPrice/previousClose, so substituting
+    // matches Yahoo; preferring the last regular bar would diverge from it.
+    // Guards against someone "fixing" this into a discrepancy.
+    const m = samples['^GSPC'];
+    const sessionDate = dayOf(m.regularMarketTime);
+    const out = applyOfficialCloses(sessionFor(m), m, sessionDate, sessionDate);
+    expect(out.sessionPoints.at(-1).close).toBe(7489.72);
+    expect(((7489.72 - 7437.63) / 7437.63) * 100).toBeCloseTo(0.70, 2);
+    // currentTradingPeriod describes today's session while regularMarketTime is
+    // Friday's, so compare time-of-day: the index printed at 21:22 UTC, past
+    // the 20:00 bell.
+    const DAY = 86400;
+    expect(m.regularMarketTime % DAY).toBeGreaterThan(m.currentTradingPeriod.regular.end % DAY);
+  });
+
   it('leaves a past drawn session showing its own official close', () => {
     // ASTS pre-market: the card renders previousClose as Friday's price.
     const m = samples.ASTS;

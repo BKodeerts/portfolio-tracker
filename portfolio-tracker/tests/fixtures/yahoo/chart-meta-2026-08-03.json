@@ -121,7 +121,7 @@
         "post": { "timezone": "EDT", "start": 1785787200, "end": 1785801600, "gmtoffset": -14400 }
       },
       "_state": "PRE",
-      "_note": "Index quotes keep printing well past the equity close: regularMarketTime is 21:22 UTC on 2026-07-31, over an hour after that day's 20:00 regular.end. Do not treat an INDEX regularMarketPrice as an official close. Only used as a benchmark, and benchmark series come from daily candles, not this path."
+      "_note": "Index levels keep being calculated past the equity bell: regularMarketTime is 21:22 UTC on 2026-07-31, over an hour after that day's 20:00 regular.end. That is NOT a defect and must not be 'corrected' to the 20:00 bar. Yahoo derives an index's displayed price and change from regularMarketPrice and previousClose — the same pair substituted here — so substituting keeps us agreeing with Yahoo, while preferring the last regular bar would make us disagree. Note also that this symbol does not normally reach this code path at all: ^GSPC is the benchmark (server/domain/series.js SP500_SYM) and its series is built from daily candles via fetchCandles. It only arrives here if a user watchlists an index by hand."
     },
     "BP.L": {
       "symbol": "BP.L",
