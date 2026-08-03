@@ -1,0 +1,165 @@
+{
+  "_comment": [
+    "Real Yahoo chart-meta captured 2026-08-03 ~10:10 UTC, when EU exchanges were",
+    "open, US was pre-open, and the ASX had already closed. One instant, so the",
+    "samples are directly comparable.",
+    "",
+    "This is a SNAPSHOT: it proves what Yahoo returned on this date, not what it",
+    "returns today. It cannot detect Yahoo changing its API - it only stops us",
+    "re-breaking the parser against known-good input. Diagnosing a NEW live",
+    "discrepancy still needs a fresh capture (see CLAUDE.md - the API is not",
+    "reachable from the Claude Code environment; ask the user to run a curl).",
+    "",
+    "Endpoint: /v8/finance/chart/SYMBOL?interval=5m&range=5d&includePrePost=true",
+    "The ASTS entry was captured with a narrower jq projection than the rest, so",
+    "it carries no currentTradingPeriod; its regular window that day was",
+    "13:30-20:00 UTC and its official close 58.98 (cross-checked against both",
+    "Yahoo Finance and NASDAQ, which reported 58.98 +0.54 +0.92%)."
+  ],
+  "capturedAt": "2026-08-03T10:10:00Z",
+  "marketContext": "EU open, US pre-open, ASX closed",
+  "samples": {
+    "ASTS": {
+      "symbol": "ASTS",
+      "currency": "USD",
+      "regularMarketTime": 1785528001,
+      "hasPrePostMarketData": true,
+      "regularMarketPrice": 58.98,
+      "regularMarketDayHigh": 61.12,
+      "regularMarketDayLow": 56.24,
+      "regularMarketVolume": 9758435,
+      "chartPreviousClose": 58.29,
+      "previousClose": 58.44,
+      "priceHint": 2,
+      "_state": "PRE — drawn session is Friday 2026-07-31, a past day",
+      "_regularEndThatDay": 1785528000,
+      "_officialDailyCloses": {
+        "2026-07-27": 58.29,
+        "2026-07-28": 56.55,
+        "2026-07-29": 53.03,
+        "2026-07-30": 58.44,
+        "2026-07-31": 58.98
+      },
+      "_lastBarCloses": {
+        "2026-07-28": 56.560001373291016,
+        "2026-07-29": 53.0099983215332,
+        "2026-07-30": 58.45500183105469,
+        "2026-07-31": 58.93000030517578
+      }
+    },
+    "ASML.AS": {
+      "symbol": "ASML.AS",
+      "currency": "EUR",
+      "instrumentType": "EQUITY",
+      "exchangeTimezoneName": "Europe/Amsterdam",
+      "gmtoffset": 7200,
+      "regularMarketPrice": 1422.6,
+      "previousClose": 1434.2,
+      "chartPreviousClose": 1388.4,
+      "regularMarketTime": 1785750970,
+      "hasPrePostMarketData": false,
+      "currentTradingPeriod": {
+        "pre": { "timezone": "CEST", "start": 1785740400, "end": 1785740400, "gmtoffset": 7200 },
+        "regular": { "timezone": "CEST", "start": 1785740400, "end": 1785771000, "gmtoffset": 7200 },
+        "post": { "timezone": "CEST", "start": 1785771000, "end": 1785771000, "gmtoffset": 7200 }
+      },
+      "_state": "REGULAR — drawn session is today",
+      "_note": "Euronext: pre and post are ZERO-LENGTH (start === end)."
+    },
+    "VWCE.DE": {
+      "symbol": "VWCE.DE",
+      "currency": "EUR",
+      "instrumentType": "ETF",
+      "exchangeTimezoneName": "Europe/Berlin",
+      "gmtoffset": 7200,
+      "regularMarketPrice": 164.22,
+      "previousClose": 162.96,
+      "chartPreviousClose": 163.36,
+      "regularMarketTime": 1785750974,
+      "hasPrePostMarketData": false,
+      "currentTradingPeriod": {
+        "pre": { "timezone": "CEST", "start": 1785733200, "end": 1785740400, "gmtoffset": 7200 },
+        "regular": { "timezone": "CEST", "start": 1785740400, "end": 1785771000, "gmtoffset": 7200 },
+        "post": { "timezone": "CEST", "start": 1785771000, "end": 1785781800, "gmtoffset": 7200 }
+      },
+      "_state": "REGULAR — drawn session is today",
+      "_note": "Xetra declares NON-zero pre/post windows while hasPrePostMarketData is false: the periods exist but no extended-hours candles are returned."
+    },
+    "EURUSD=X": {
+      "symbol": "EURUSD=X",
+      "currency": "USD",
+      "instrumentType": "CURRENCY",
+      "exchangeTimezoneName": "Europe/London",
+      "gmtoffset": 3600,
+      "regularMarketPrice": 1.1526,
+      "previousClose": 1.1527,
+      "chartPreviousClose": 1.1369,
+      "regularMarketTime": 1785751856,
+      "hasPrePostMarketData": false,
+      "currentTradingPeriod": {
+        "pre": { "timezone": "BST", "start": 1785711600, "end": 1785711600, "gmtoffset": 3600 },
+        "regular": { "timezone": "BST", "start": 1785711600, "end": 1785797940, "gmtoffset": 3600 },
+        "post": { "timezone": "BST", "start": 1785797940, "end": 1785797940, "gmtoffset": 3600 }
+      },
+      "_state": "continuous",
+      "_note": "FX runs through the SAME intraday pipeline as equities and feeds liveRates, i.e. every EUR conversion. Its regular window is ~24h (23:00 -> 22:59 UTC) and therefore WRAPS past midnight, which makeInRegularTod must handle."
+    },
+    "^GSPC": {
+      "symbol": "^GSPC",
+      "currency": "USD",
+      "instrumentType": "INDEX",
+      "exchangeTimezoneName": "America/New_York",
+      "gmtoffset": -14400,
+      "regularMarketPrice": 7489.72,
+      "previousClose": 7437.63,
+      "chartPreviousClose": 7413.18,
+      "regularMarketTime": 1785532932,
+      "hasPrePostMarketData": false,
+      "currentTradingPeriod": {
+        "pre": { "timezone": "EDT", "start": 1785744000, "end": 1785763800, "gmtoffset": -14400 },
+        "regular": { "timezone": "EDT", "start": 1785763800, "end": 1785787200, "gmtoffset": -14400 },
+        "post": { "timezone": "EDT", "start": 1785787200, "end": 1785801600, "gmtoffset": -14400 }
+      },
+      "_state": "PRE",
+      "_note": "Index quotes keep printing well past the equity close: regularMarketTime is 21:22 UTC on 2026-07-31, over an hour after that day's 20:00 regular.end. Do not treat an INDEX regularMarketPrice as an official close. Only used as a benchmark, and benchmark series come from daily candles, not this path."
+    },
+    "BP.L": {
+      "symbol": "BP.L",
+      "currency": "GBp",
+      "instrumentType": "EQUITY",
+      "exchangeTimezoneName": "Europe/London",
+      "gmtoffset": 3600,
+      "regularMarketPrice": 544.0,
+      "previousClose": 552.5,
+      "chartPreviousClose": 534.3,
+      "regularMarketTime": 1785750978,
+      "hasPrePostMarketData": false,
+      "currentTradingPeriod": {
+        "pre": { "timezone": "BST", "start": 1785737700, "end": 1785740400, "gmtoffset": 3600 },
+        "regular": { "timezone": "BST", "start": 1785740400, "end": 1785771000, "gmtoffset": 3600 },
+        "post": { "timezone": "BST", "start": 1785771000, "end": 1785773700, "gmtoffset": 3600 }
+      },
+      "_state": "REGULAR — drawn session is today",
+      "_note": "Confirms the pence path: currency is the string 'GBp' exactly, which shared/fx-defs.json maps to GBX with scale 100."
+    },
+    "BHP.AX": {
+      "symbol": "BHP.AX",
+      "currency": "AUD",
+      "instrumentType": "EQUITY",
+      "exchangeTimezoneName": "Australia/Sydney",
+      "gmtoffset": 36000,
+      "regularMarketPrice": 60.72,
+      "previousClose": 60.31,
+      "chartPreviousClose": 60.1,
+      "regularMarketTime": 1785737824,
+      "hasPrePostMarketData": false,
+      "currentTradingPeriod": {
+        "pre": { "timezone": "AEST", "start": 1785704400, "end": 1785715200, "gmtoffset": 36000 },
+        "regular": { "timezone": "AEST", "start": 1785715200, "end": 1785737520, "gmtoffset": 36000 },
+        "post": { "timezone": "AEST", "start": 1785737520, "end": 1785737520, "gmtoffset": 36000 }
+      },
+      "_state": "CLOSED — today's session already finished",
+      "_note": "Second, independent confirmation of the closing-auction pattern: regularMarketTime is 304s AFTER regular.end. In AEST the session starts exactly at 00:00 UTC; under AEDT (+11, Oct-Apr) it becomes 23:00-05:12 UTC and WRAPS past UTC midnight — see the closeBeforeDay caveat in the tests."
+    }
+  }
+}

@@ -529,4 +529,4 @@ async function fetchQuoteSummary(yahooSymbol) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-module.exports = { fetchCandles, fetchDailyQuote, fetchIntraday, fetchQuoteSummary, fetchChartStats, fetchQuoteStats, fetchYahoo, sleep, FETCH_DELAY, deriveSession, applyOfficialCloses };
+module.exports = { fetchCandles, fetchDailyQuote, fetchIntraday, fetchQuoteSummary, fetchChartStats, fetchQuoteStats, fetchYahoo, sleep, FETCH_DELAY, deriveSession, applyOfficialCloses, makeInRegularTod };
