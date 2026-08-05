@@ -14,7 +14,6 @@ function spark(prevClose: number, closes: number[]): TickerSpark {
     prevClose,
     sessionStart: 1_700_000_000,
     sessionEnd: 1_700_020_000,
-    ghostPoints: [], ghostStart: null, ghostEnd: null,
     hint: null,
   };
 }

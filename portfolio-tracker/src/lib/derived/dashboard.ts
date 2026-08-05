@@ -109,10 +109,6 @@ export interface TickerSpark {
   /** Bounds (unix secs) of the session the points belong to. */
   sessionStart: number;
   sessionEnd: number;
-  /** Pre phase only: today's pre-market points for the dotted ghost tail. */
-  ghostPoints: IntradayPoint[];
-  ghostStart: number | null;
-  ghostEnd: number | null;
   /** Caption under the sparkline ("prev session · opens 15:30" / "closed 22:00"). */
   hint: string | null;
 }
@@ -166,29 +162,13 @@ export function buildTickerSpark(yahoo: string): TickerSpark | null {
     return {
       phase, points, prevClose,
       sessionStart: session.start, sessionEnd: session.end,
-      ghostPoints: [], ghostStart: null, ghostEnd: null,
       hint: phase === 'post' ? `closed ${fmtSessionTime(session.end)}` : null,
     };
   }
 
-  // Pre-open: dim yesterday's session; today's pre-market becomes a ghost tail.
-  // The ghost must belong to the NEXT session (its window starts after the
-  // drawn session ends) — on weekends tradingPeriods still describe the drawn
-  // (Friday) session itself, and its own pre-market is not a tail.
+  // Pre-open: dim yesterday's session. Today's pre-market ticks are not drawn —
+  // thin-volume quotes on a second time scale read as one continuous line.
   const periods = intra.tradingPeriods;
-  let ghostPoints: IntradayPoint[] = [];
-  let ghostStart: number | null = null;
-  let ghostEnd: number | null = null;
-  if (periods?.pre && periods.regular && periods.regular.start > periods.pre.start
-      && periods.pre.start >= session.end) {
-    const pre = periods.pre;
-    const tail = (intra.allPoints ?? []).filter((p) => p.ts >= pre.start && p.ts < periods.regular!.start);
-    if (tail.length >= 2) {
-      ghostPoints = tail;
-      ghostStart = pre.start;
-      ghostEnd = periods.regular.start;
-    }
-  }
 
   // tradingPeriods may describe an already-finished session (weekends) — roll
   // forward to the real next open so the hint never implies "opens today".
@@ -202,7 +182,6 @@ export function buildTickerSpark(yahoo: string): TickerSpark | null {
     // close, which would pin the drawn line's end onto the zero line.
     phase, points, prevClose: intra.sessionPreviousClose ?? prevClose,
     sessionStart: session.start, sessionEnd: session.end,
-    ghostPoints, ghostStart, ghostEnd,
     hint: nextOpenTs != null ? `prev session · opens ${fmtOpenAt(nextOpenTs)}` : 'prev session',
   };
 }

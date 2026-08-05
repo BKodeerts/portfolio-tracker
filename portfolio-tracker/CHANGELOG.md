@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.9] — 2026-08-05
+
+### Changed
+
+- **Dropped the extended-hours ghost tail from the dashboard card sparklines too**: completes 0.13.8 — pre-open, holding and watchlist sparklines reserved the last ~17% of their 120px width for a dotted grey pre-market tail, so the previous session was drawn on ~83% of the width at one time scale and the tail on the rest at another. At 34px tall the two were indistinguishable from a single line. Sparklines now draw regular trading hours only and the session spans the full width. With no consumers left, the ghost layer is gone from `buildTickerSpark` (`ghostPoints`/`ghostStart`/`ghostEnd` off `TickerSpark`) and the `--spark-ghost` token is retired; extended-hours ticks stay available server-side in the intraday payload's `allPoints`.
+
 ## [0.13.8] — 2026-08-05
 
 ### Changed

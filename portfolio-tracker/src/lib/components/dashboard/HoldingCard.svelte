@@ -61,9 +61,6 @@
         sessionStart={spark.sessionStart}
         sessionEnd={spark.sessionEnd}
         phase={spark.phase}
-        ghostPoints={spark.ghostPoints}
-        ghostStart={spark.ghostStart}
-        ghostEnd={spark.ghostEnd}
         hint={spark.hint}
         height={34}
       />
