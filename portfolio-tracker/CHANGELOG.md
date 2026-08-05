@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.13.8] — 2026-08-05
+
+### Changed
+
+- **Removed the dotted extended-hours tail from every graph**: pre-open, both the stock detail 1D chart and the dashboard holding/watchlist sparklines reserved the right ~15–17% of their width for today's pre-market ticks, drawn as a dotted grey tail, and squeezed the previous session into the width that was left. The two halves ran at different time scales — the session at real session speed, the tail compressed into a sliver — so a single line crossed the plot pretending to be continuous when it was really two sessions bolted together. At 34px tall on a card, that was impossible to see at all. The prices being shown that way are also thin-volume extended-hours quotes that mostly don't survive the open, so the ambiguity bought nothing. Both graphs now draw regular trading hours only, and the previous session spans the full width again.
+
+  The dashed horizontal prev-close baseline is unrelated and unchanged, as are the "Previous session · opens HH:MM" caption, the dimmed pre-open styling, and the live/post states.
+
+### Removed
+
+- Ghost-tail plumbing, now that nothing renders it: the `ghostPoints`/`ghostStart`/`ghostEnd` props on `PeriodChart` and `IntradaySparkline`, the same three fields on `TickerSpark` along with the `allPoints` filtering and weekend guard in `buildTickerSpark`, the 83/85% width split in both components, and the `--spark-ghost` color token in both themes. Extended-hours ticks are still fetched and still exposed server-side as `allPoints` on the intraday payload, so nothing is lost if they are ever wanted again.
+
 ## [0.13.7] — 2026-08-03
 
 ### Fixed

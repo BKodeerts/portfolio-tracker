@@ -33,7 +33,7 @@ Replaces the holdings list. Grid: `repeat(auto-fill, minmax(150px, 1fr))`, gap 1
 
 Anatomy, top to bottom:
 - **Header row**: 6px color dot (square, 2px radius) + ticker 13px/700 left; market price 10px mono `#8b929c` right (native currency).
-- **Sparkline**: full card width, 34px tall, margins 10px 0 8px. Same market-state rules as handoff 2 (pre = dimmed prev session `#b3b8c0` @ 0.75 + dotted ghost tail `#9aa0aa`; live = green/red partial session; post = full session + "closed 22:00" hint). Hint caption 9.5px `#b3b8c0` centered under the graph.
+- **Sparkline**: full card width, 34px tall, margins 10px 0 8px. Same market-state rules as handoff 2 (pre = dimmed prev session `#b3b8c0` @ 0.75, full width — the dotted ghost tail was dropped in 0.13.8; live = green/red partial session; post = full session + "closed 22:00" hint). Hint caption 9.5px `#b3b8c0` centered under the graph.
 - **Footer row**: your value 10.5px mono `#8b929c` left; **day change 15px mono 700 green `#047857`/red `#b91c1c` right** — the only loud number.
 
 **Day-change toggle (Apple Stocks-style)**: tapping the day number (or the "today · %" header label above the grid) flips **all** cards between day-% and day-€ (your position's € impact). Persist the choice.
