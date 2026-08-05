@@ -1,16 +1,16 @@
 # Changelog
 
-## [0.13.9] — 2026-08-05
-
-### Changed
-
-- **Dropped the extended-hours ghost tail from the dashboard card sparklines too**: completes 0.13.8 — pre-open, holding and watchlist sparklines reserved the last ~17% of their 120px width for a dotted grey pre-market tail, so the previous session was drawn on ~83% of the width at one time scale and the tail on the rest at another. At 34px tall the two were indistinguishable from a single line. Sparklines now draw regular trading hours only and the session spans the full width. With no consumers left, the ghost layer is gone from `buildTickerSpark` (`ghostPoints`/`ghostStart`/`ghostEnd` off `TickerSpark`) and the `--spark-ghost` token is retired; extended-hours ticks stay available server-side in the intraday payload's `allPoints`.
-
 ## [0.13.8] — 2026-08-05
 
 ### Changed
 
-- **Dropped the extended-hours line from the stock detail chart**: pre-open, the 1D chart squeezed the previous session into the left 85% of the width and drew today's pre-market ticks as a dashed grey tail in the remaining 15%, on a compressed x-scale of its own. Two sessions on one axis with two different time scales read as one continuous line, and the prices in the tail are thin-volume quotes that don't survive the open — more confusing than informative. The chart now shows regular trading hours only, and the previous session again spans the full plot width. The dashed prev-close baseline is unchanged; the dashboard holding-card sparklines keep their tail.
+- **Removed the dotted extended-hours tail from every graph**: pre-open, both the stock detail 1D chart and the dashboard holding/watchlist sparklines reserved the right ~15–17% of their width for today's pre-market ticks, drawn as a dotted grey tail, and squeezed the previous session into the width that was left. The two halves ran at different time scales — the session at real session speed, the tail compressed into a sliver — so a single line crossed the plot pretending to be continuous when it was really two sessions bolted together. At 34px tall on a card, that was impossible to see at all. The prices being shown that way are also thin-volume extended-hours quotes that mostly don't survive the open, so the ambiguity bought nothing. Both graphs now draw regular trading hours only, and the previous session spans the full width again.
+
+  The dashed horizontal prev-close baseline is unrelated and unchanged, as are the "Previous session · opens HH:MM" caption, the dimmed pre-open styling, and the live/post states.
+
+### Removed
+
+- Ghost-tail plumbing, now that nothing renders it: the `ghostPoints`/`ghostStart`/`ghostEnd` props on `PeriodChart` and `IntradaySparkline`, the same three fields on `TickerSpark` along with the `allPoints` filtering and weekend guard in `buildTickerSpark`, the 83/85% width split in both components, and the `--spark-ghost` color token in both themes. Extended-hours ticks are still fetched and still exposed server-side as `allPoints` on the intraday payload, so nothing is lost if they are ever wanted again.
 
 ## [0.13.7] — 2026-08-03
 

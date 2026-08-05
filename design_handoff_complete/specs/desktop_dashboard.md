@@ -52,7 +52,7 @@ Every holdings-row sparkline is state-driven by **that ticker's own exchange ses
 
 1. **Pre-open** (`now < open`):
    - Show **yesterday's full session, dimmed**: line color `#b3b8c0`, whole SVG at opacity 0.75, normalized to the previous session's own range, spanning the full sparkline width.
-   - *Superseded in 0.13.9*: the prototype drew the session in the first ~83% of the width (100 of 120 viewBox units) and put extended-hours data in the remaining ~17% as a dotted ghost tail (`#9aa0aa`, width 1.2, dasharray `2 3`). Both were dropped — at 34px tall, two time scales on one axis are indistinguishable from a single line. Do not reintroduce; see `stock_detail_and_analysis.md` for the same call on the detail chart.
+   - *Superseded in 0.13.8*: the prototype drew the session in the first ~83% of the width (100 of 120 viewBox units) and put extended-hours data in the remaining ~17% as a dotted ghost tail (`#9aa0aa`, width 1.2, dasharray `2 3`). Both were dropped — at 34px tall, two time scales on one axis are indistinguishable from a single line. **Extended-hours ticks are not drawn on any graph in this app**; the stock detail 1D chart lost its tail in the same release. Do not reintroduce either.
    - Hint caption centered under the sparkline: `prev session · opens 15:30` — 9.5px `#b3b8c0`, nowrap.
    - Numbers column: market price shows **prev close**; day-% shows `—` in `#b3b8c0` (never a currency-driven fake %). Position value + total P&L% (line 2) stay live as usual.
 2. **Live** (`open ≤ now ≤ close`): unchanged from previous handoff — intraday % vs prev close, session-normalized x-axis (partial fill grows through the day), green `#047857`/red `#b91c1c` by day direction, thin zero line.
@@ -78,7 +78,7 @@ Every holdings-row sparkline is state-driven by **that ticker's own exchange ses
 ## Design Tokens
 
 Unchanged from previous handoff, plus:
-- Dimmed sparkline: `#b3b8c0` line @ 0.75 opacity. (Ghost tail dropped in 0.13.9 — see above.)
+- Dimmed sparkline: `#b3b8c0` line @ 0.75 opacity. (Ghost tail dropped in 0.13.8 — see above.)
 - Desktop hero 42px; desktop chart height 260px; container max-width 1160px; column gap 56px; nav pill = period-pill styling at 12.5px.
 
 ## Assets
