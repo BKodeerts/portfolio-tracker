@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.8] — 2026-08-05
+
+### Changed
+
+- **Dropped the extended-hours line from the stock detail chart**: pre-open, the 1D chart squeezed the previous session into the left 85% of the width and drew today's pre-market ticks as a dashed grey tail in the remaining 15%, on a compressed x-scale of its own. Two sessions on one axis with two different time scales read as one continuous line, and the prices in the tail are thin-volume quotes that don't survive the open — more confusing than informative. The chart now shows regular trading hours only, and the previous session again spans the full plot width. The dashed prev-close baseline is unchanged; the dashboard holding-card sparklines keep their tail.
+
 ## [0.13.7] — 2026-08-03
 
 ### Fixed

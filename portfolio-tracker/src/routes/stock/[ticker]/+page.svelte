@@ -121,8 +121,8 @@
   const rawState    = $derived(iData?.marketState ?? (isExchangeOpen(yahoo) ? 'REGULAR' : 'CLOSED'));
   const marketState = $derived(normalizeMarketState(yahoo, rawState));
 
-  // Same state-driven render path as the dashboard sparklines: pre / live / post
-  // per this ticker's own exchange session (incl. the pre-open ghost tail).
+  // Same state-driven phase as the dashboard sparklines: pre / live / post per
+  // this ticker's own exchange session. Extended-hours ticks are never drawn.
   const spark = $derived(buildTickerSpark(yahoo));
   const phase = $derived.by((): SparkPhase => {
     if (spark) return spark.phase;
@@ -232,13 +232,6 @@
     for (let m = start; m <= end; m += step) ticks.push({ x: m, label: fmtMin(m) });
     return ticks;
   });
-
-  // Pre-open ghost tail (today's pre-market ticks) in minutes-of-day.
-  const ghostPoints = $derived(
-    (spark?.ghostPoints ?? []).map((p) => ({ min: brusselsMinuteOfDay(p.ts), value: p.close })),
-  );
-  const ghostStart = $derived(spark?.ghostStart != null ? brusselsMinuteOfDay(spark.ghostStart) : null);
-  const ghostEnd   = $derived(spark?.ghostEnd   != null ? brusselsMinuteOfDay(spark.ghostEnd)   : null);
 
   /* ── Market-state labels (chip, hero caption) ── */
 
@@ -486,9 +479,6 @@
             sessionEnd={intraSession.end}
             xTicks={phase === 'pre' ? [] : intraTicks}
             dimmed={phase === 'pre'}
-            ghostPoints={phase === 'pre' ? ghostPoints : []}
-            {ghostStart}
-            {ghostEnd}
             topCaption={phase === 'pre' ? `Previous session · opens ${openLabel}` : null}
             showNow={phase === 'live'}
             emptyLabel="Market opens at {openLabel}"

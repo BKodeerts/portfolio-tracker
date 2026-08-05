@@ -39,7 +39,8 @@ ASTS = NASDAQ, 15:30–22:00 CET. Three states driven by `{open, close, marketSt
 1. **Pre-open** (`now < open`):
    - **Header chip**: grey `#b3b8c0`, label `OPENS 15:30`.
    - **Price hero**: shows **prev close**; delta = `—` in `#b3b8c0`; caption "Prev close · market opens 15:30 CET".
-   - **1D chart**: yesterday's full session, dimmed — line `#b3b8c0` @ 0.85 opacity, **no gradient fill**, occupying the first ~85% of the chart width. Extended-hours/pre-market data continues as a **dotted ghost tail** (`#9aa0aa`, width 1.5, dasharray `2 4`) in the remaining ~15%. Dashed prev-close baseline as usual. Centered caption near the top: "Previous session · opens 15:30" (10px `#8b929c`). No now-dot, no x-tick labels.
+   - **1D chart**: yesterday's full session, dimmed — line `#b3b8c0` @ 0.85 opacity, **no gradient fill**, spanning the full chart width. Dashed prev-close baseline as usual. Centered caption near the top: "Previous session · opens 15:30" (10px `#8b929c`). No now-dot, no x-tick labels.
+     - *Superseded in 0.13.8*: this chart originally reserved the last ~15% of its width for a dotted extended-hours ghost tail (`#9aa0aa`, width 1.5, dasharray `2 4`). It was dropped — two sessions on one axis at two different time scales read as a single continuous line, and thin-volume pre-market quotes aren't worth that ambiguity. Do not reintroduce it here. The dashboard holding-card sparklines keep their tail.
    - **Position card "Today" cell**: `—` in `#b3b8c0` (never a currency-driven number).
 2. **Live** (`open ≤ now ≤ close`): chip green `OPEN`; series clipped to `now` (partial fill grows through the session); pulsing now-dot; caption "Market price · today".
 3. **Closed, post-session** (`now > close`): chip grey `CLOSED`; full session at normal color, **no** now-dot; caption "At close, 22:00 CET".
@@ -79,7 +80,7 @@ Identical to handoff 1: title, Performance pair, Return by position, Rolling ret
 ## Design Tokens
 
 Per previous handoffs, plus:
-- Detail pre-open chart: dimmed line `#b3b8c0` @ 0.85, ghost tail `#9aa0aa` dashed `2 4`, no area fill.
+- Detail pre-open chart: dimmed line `#b3b8c0` @ 0.85, no area fill. (Ghost tail dropped in 0.13.8 — see above.)
 - Desktop: price hero 42px; detail chart 260px; Analysis big numbers 30px; column gaps 56px.
 
 ## Assets

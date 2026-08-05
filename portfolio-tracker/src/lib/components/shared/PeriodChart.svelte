@@ -31,8 +31,8 @@
    * - mode 'history':  daily/weekly closes with optional dashed invested line.
    * - mode 'intraday': session-bounded line vs a dashed prev-close baseline,
    *   drawn only up to the latest point, with a pulsing "now" dot. Pre-open
-   *   (`dimmed`) renders the previous session grey without fill, with the
-   *   extended-hours ghost tail dotted in the last ~15% of the width.
+   *   (`dimmed`) renders the previous session grey without fill. Extended-hours
+   *   ticks are never drawn — only regular sessions appear on this chart.
    *
    * Optional v3 features (dashboard portfolio chart; all off by default):
    * session bands, gain/loss fill vs invested, benchmark overlay, transaction
@@ -65,11 +65,6 @@
     showNow?: boolean;
     /** Pre-open: dim the line (no gradient fill, no now-dot). */
     dimmed?: boolean;
-    /** Pre-open ghost tail (extended-hours data) in minutes-of-day. */
-    ghostPoints?: { min: number; value: number }[];
-    /** Ghost tail x-window (pre-market start → regular open), minutes-of-day. */
-    ghostStart?: number | null;
-    ghostEnd?: number | null;
     /** Caption centered near the top of the plot ("Previous session · opens 15:30"). */
     topCaption?: string | null;
     /* v3 features */
@@ -91,7 +86,7 @@
     data = [], invested = [],
     points = [], prevClose, sessionStart, sessionEnd, emptyLabel,
     padX = 20, showNow = true,
-    dimmed = false, ghostPoints = [], ghostStart = null, ghostEnd = null, topCaption = null,
+    dimmed = false, topCaption = null,
     bands = [], benchmark = [], gainFill = false, markers = [], showHiLo = false, tooltip = null,
   }: Props = $props();
 
@@ -110,7 +105,6 @@
     lineD: string;
     areaD: string;
     investedD: string;
-    ghostD: string;
     lineColor: string;
     baselineY: number | null;
     now: { x: number; y: number } | null;
@@ -215,7 +209,6 @@
         // Gain-fill mode replaces the plain gradient area (design §4.2).
         areaD: fillOn ? '' : `${lineD} L${last[0].toFixed(1)} ${bottom} L${first[0].toFixed(1)} ${bottom} Z`,
         investedD: invs.length >= 2 ? pathD(invested.map((d) => [sx(d.x), sy(d.value)])) : '',
-        ghostD: '',
         lineColor: vals[vals.length - 1]! >= vals[0]! ? 'var(--c-pos)' : 'var(--c-neg)',
         baselineY: null,
         now: null,
@@ -233,19 +226,12 @@
 
     // intraday mode
     if (prevClose == null || sessionStart == null || sessionEnd == null || sessionEnd <= sessionStart) return null;
-    // Pre-open: the session line occupies the first ~85% of the width and the
-    // extended-hours ghost tail the rest.
-    const ghost = dimmed && ghostPoints.length >= 2
-      && ghostStart != null && ghostEnd != null && ghostEnd > ghostStart
-      ? ghostPoints : [];
-    const mainR = ghost.length ? L + (R - L) * 0.85 : R;
     const vals = points.map((p) => p.value);
-    const gVals = ghost.map((p) => p.value);
-    let lo = Math.min(prevClose, ...vals, ...gVals);
-    let hi = Math.max(prevClose, ...vals, ...gVals);
+    let lo = Math.min(prevClose, ...vals);
+    let hi = Math.max(prevClose, ...vals);
     const pad = (hi - lo) * 0.15 || Math.abs(prevClose) * 0.005 || 1;
     lo -= pad; hi += pad;
-    const sx = (m: number) => L + ((m - sessionStart) / (sessionEnd - sessionStart)) * (mainR - L);
+    const sx = (m: number) => L + ((m - sessionStart) / (sessionEnd - sessionStart)) * (R - L);
     const sy = (v: number) => T + (1 - (v - lo) / (hi - lo)) * (bottom - T);
     const grid = [0, 0.5, 1].map((f) => {
       const v = hi - f * (hi - lo);
@@ -256,13 +242,13 @@
       .filter((b) => b.end > b.start)
       .map((b) => {
         const xA = Math.max(L, sx(b.start));
-        const xB = Math.min(mainR, sx(b.end));
+        const xB = Math.min(R, sx(b.end));
         return { x: xA, w: xB - xA, labelX: (xA + xB) / 2, label: b.label, strong: b.strong ?? false };
       })
       .filter((b) => b.w > 0);
     if (points.length < 2) {
       return {
-        grid, ticks, lineD: '', areaD: '', investedD: '', ghostD: '',
+        grid, ticks, lineD: '', areaD: '', investedD: '',
         lineColor: 'var(--c-pos)', baselineY: sy(prevClose), now: null, empty: true,
         ...none, bandRects,
       };
@@ -271,18 +257,11 @@
     const lineD = pathD(pts);
     const last = pts[pts.length - 1]!;
     const first = pts[0]!;
-    let ghostD = '';
-    if (ghost.length) {
-      const gSpan = ghostEnd! - ghostStart!;
-      const gx = (m: number) => mainR + Math.min(1, Math.max(0, (m - ghostStart!) / gSpan)) * (R - mainR);
-      ghostD = pathD(ghost.map((p) => [gx(p.min), sy(p.value)]));
-    }
     return {
       grid, ticks,
       lineD,
       areaD: dimmed ? '' : `${lineD} L${last[0].toFixed(1)} ${bottom} L${first[0].toFixed(1)} ${bottom} Z`,
       investedD: '',
-      ghostD,
       lineColor: dimmed
         ? 'var(--spark-dim)'
         : vals[vals.length - 1]! >= prevClose ? 'var(--c-pos)' : 'var(--c-neg)',
@@ -379,9 +358,6 @@
     {/if}
     {#if geom.lineD}
       <path d={geom.lineD} fill="none" stroke={geom.lineColor} stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity={dimmed ? 0.85 : 1} />
-    {/if}
-    {#if geom.ghostD}
-      <path d={geom.ghostD} fill="none" stroke="var(--spark-ghost)" stroke-width="1.5" stroke-dasharray="2 4" stroke-linecap="round" />
     {/if}
     {#each geom.markerPts as m}
       <circle cx={m.x} cy={m.y} r="3" fill={m.color} stroke="var(--bg)" stroke-width="1.5" />
