@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="./mock.js"></script>
+  <style>
+    html { scrollbar-gutter: stable; }
+    body { margin: 0; background: #fafaf8; }
+    a { color: #6366f1; text-decoration: none; }
+    a:hover { color: #4f46e5; }
+  </style>
+</helmet>
+
+<div style="width:100%; background:#fafaf8; color:#101216; font-family:Inter,ui-sans-serif,system-ui,sans-serif; letter-spacing:-0.005em; display:flex; flex-direction:column; align-items:center; gap:44px; padding:28px 0 80px">
+
+  <div data-screen-label="Dashboard — earnings" style="width:100%; max-width:1160px">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:#b3b8c0; padding:0 24px 10px">Dashboard · earnings section + holdings badges</div>
+    <div style="background:#fafaf8; border:1px solid rgba(16,18,22,0.07); border-radius:20px; padding:0 0 26px; overflow:hidden">
+
+      <div style="display:flex; align-items:center; gap:28px; padding:18px 24px 14px">
+        <div style="font-size:15px; font-weight:700; letter-spacing:-0.02em">Portfolio</div>
+        <div style="display:flex; gap:4px">
+          <div style="font-size:12.5px; font-weight:700; color:#101216; padding:6px 12px; border-radius:8px; background:#eceae3; cursor:pointer">Portfolio</div>
+          <div style="font-size:12.5px; font-weight:500; color:#8b929c; padding:6px 12px; border-radius:8px; cursor:pointer" style-hover="color:#101216">Analysis</div>
+          <div style="font-size:12.5px; font-weight:500; color:#8b929c; padding:6px 12px; border-radius:8px; cursor:pointer" style-hover="color:#101216">Tax</div>
+          <div style="font-size:12.5px; font-weight:500; color:#8b929c; padding:6px 12px; border-radius:8px; cursor:pointer" style-hover="color:#101216">Activity</div>
+        </div>
+        <div style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600; color:#047857; display:flex; align-items:center; gap:5px">
+          <span style="width:6px; height:6px; border-radius:50%; background:#047857"></span>OPEN
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:baseline; gap:12px; padding:0 24px 4px">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:34px; font-weight:700; letter-spacing:-0.02em">€25,240</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; color:#047857">+€168 (+0.67%)</div>
+        <div style="font-size:11px; color:#8b929c; margin-left:2px">today · Mon 10 Aug</div>
+      </div>
+
+      <div style="position:relative; margin:10px 0 0">
+        <svg viewBox="0 0 1112 210" style="display:block; width:100%; height:auto">
+          <defs>
+            <linearGradient id="pfgrad" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#047857" stop-opacity="0.16"></stop>
+              <stop offset="100%" stop-color="#047857" stop-opacity="0"></stop>
+            </linearGradient>
+          </defs>
+          <sc-for list="{{ pfGrid }}" as="g" hint-placeholder-count="3">
+            <line x1="24" x2="1088" y1="{{ g.y }}" y2="{{ g.y }}" stroke="rgba(16,18,22,0.05)" stroke-width="1"></line>
+          </sc-for>
+          <path d="{{ pfArea }}" fill="url(#pfgrad)"></path>
+          <path d="{{ pfInvested }}" fill="none" stroke="#b3b8c0" stroke-width="1.5" stroke-dasharray="3 4" stroke-linecap="round"></path>
+          <path d="{{ pfLine }}" fill="none" stroke="#047857" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+          <circle cx="{{ pfNowX }}" cy="{{ pfNowY }}" r="3.5" fill="#047857"></circle>
+          <circle cx="{{ pfNowX }}" cy="{{ pfNowY }}" r="7" fill="#047857" opacity="0.18"></circle>
+        </svg>
+        <sc-for list="{{ pfGrid }}" as="g" hint-placeholder-count="3">
+          <div style="position:absolute; right:2.4%; top:{{ g.labelTop }}; transform:translateY(-100%); font-family:'JetBrains Mono',monospace; font-size:9px; color:#b3b8c0; pointer-events:none">{{ g.label }}</div>
+        </sc-for>
+        <sc-for list="{{ pfTicks }}" as="t" hint-placeholder-count="4">
+          <div style="position:absolute; left:{{ t.left }}; bottom:0; transform:{{ t.shift }}; font-family:'JetBrains Mono',monospace; font-size:9px; color:#b3b8c0; white-space:nowrap; pointer-events:none">{{ t.label }}</div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:18px; margin:4px 24px 0">
+        <div style="display:flex; justify-content:space-between; gap:2px; max-width:440px; flex:1 1 440px">
+          <sc-for list="{{ dashPeriods }}" as="p" hint-placeholder-count="7">
+            <div onClick="{{ p.select }}" style="flex:1; height:30px; min-width:44px; display:flex; align-items:center; justify-content:center; font-size:12px; border-radius:8px; cursor:pointer; font-weight:{{ p.weight }}; color:{{ p.color }}; background:{{ p.bg }}">{{ p.label }}</div>
+          </sc-for>
+        </div>
+        <div style="display:flex; align-items:center; gap:14px; font-size:10.5px; color:#8b929c">
+          <span style="display:flex; align-items:center; gap:5px"><span style="width:14px; height:0; border-top:1px dashed #b3b8c0"></span>invested</span>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:{{ splitColumns }}; gap:12px 20px; padding:26px 24px 0; align-items:start">
+
+        <div style="display:flex; flex-direction:column; gap:10px">
+          <div style="display:flex; align-items:baseline; justify-content:space-between">
+            <div style="font-size:13px; font-weight:600">Holdings</div>
+            <div style="font-size:11px; color:#8b929c; cursor:pointer" style-hover="color:#101216">today · %</div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px">
+            <sc-for list="{{ holdings }}" as="h" hint-placeholder-count="6">
+              <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.07); border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.03); padding:12px 14px; cursor:pointer" style-hover="border-color:rgba(16,18,22,0.18)">
+                <div style="display:flex; align-items:center; gap:6px">
+                  <span style="width:6px; height:6px; border-radius:2px; background:{{ h.color }}"></span>
+                  <span style="font-size:13px; font-weight:700">{{ h.ticker }}</span>
+                  <span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10px; color:#8b929c">{{ h.priceStr }}</span>
+                </div>
+                <svg width="100%" height="34" viewBox="0 0 100 34" preserveAspectRatio="none" style="display:block; margin:10px 0 8px">
+                  <path d="{{ h.spark }}" fill="none" stroke="{{ h.sparkColor }}" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"></path>
+                </svg>
+                <div style="display:flex; align-items:baseline; gap:8px">
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#8b929c">{{ h.valueStr }}</span>
+                  <span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:{{ h.dayColor }}">{{ h.dayStr }}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:5px; margin-top:9px; padding-top:8px; border-top:1px solid rgba(16,18,22,0.06)">
+                  <span style="font-size:9.5px; letter-spacing:0.06em; text-transform:uppercase; color:#b3b8c0">Earnings</span>
+                  <span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600; color:{{ h.earnColor }}; border-bottom:1px {{ h.earnUnderline }} {{ h.earnUnderlineColor }}">{{ h.earnStr }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:{{ earningsDisplay }}; flex-direction:column; gap:10px; order:{{ earningsOrder }}" hidden="{{ earningsHidden }}">
+          <div style="display:flex; align-items:baseline; justify-content:space-between">
+            <div style="font-size:13px; font-weight:600">Earnings</div>
+            <div style="font-size:11px; color:#8b929c">{{ horizonLabel }} · {{ nextUpNote }}</div>
+          </div>
+          <div style="background:#ffffff; border:1px solid rgba(16,18,22,0.07); border-radius:16px; box-shadow:0 1px 2px rgba(16,18,22,0.03); padding:12px 16px 6px">
+          <sc-for list="{{ nextUp }}" as="e" hint-placeholder-count="6">
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid rgba(16,18,22,0.06); cursor:pointer" style-hover="background:rgba(16,18,22,0.015)">
+              <span style="width:6px; height:6px; border-radius:1px; background:{{ e.dotBg }}; border:1.5px solid {{ e.color }}; box-sizing:border-box; flex-shrink:0"></span>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; width:46px; color:{{ e.inkColor }}">{{ e.ticker }}</span>
+              <span style="display:flex; flex-direction:column; gap:2px; min-width:0">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:{{ e.inkColor }}">{{ e.dateStr }}</span>
+                <span style="font-size:10px; color:#8b929c; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">{{ e.statusStr }}</span>
+              </span>
+              <span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:{{ e.relColor }}; white-space:nowrap">{{ e.rel }}</span>
+            </div>
+          </sc-for>
+          <div style="display:flex; align-items:center; gap:14px; padding:10px 0 6px; font-size:10px; color:#8b929c">
+            <span style="display:flex; align-items:center; gap:5px"><span style="width:6px; height:6px; border-radius:1px; background:#8b929c"></span>held</span>
+            <span style="display:flex; align-items:center; gap:5px"><span style="width:6px; height:6px; border-radius:1px; border:1.5px solid #8b929c; box-sizing:border-box"></span>watchlist</span>
+            <span style="margin-left:auto">estimated dates shown as a range</span>
+          </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div data-screen-label="Stock detail — ASTS earnings" style="width:100%; max-width:1160px">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:#b3b8c0; padding:0 24px 10px">Stock detail · countdown banner + report markers on chart</div>
+    <div style="background:#fafaf8; border:1px solid rgba(16,18,22,0.07); border-radius:20px; padding:0 0 26px; overflow:hidden">
+
+      <div style="display:flex; align-items:center; gap:12px; padding:18px 24px 14px">
+        <div style="width:36px; height:36px; border-radius:50%; background:rgba(16,18,22,0.05); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0" style-hover="background:rgba(16,18,22,0.09)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+        </div>
+        <div>
+          <div style="font-size:15px; font-weight:700; line-height:1.1">ASTS</div>
+          <div style="font-size:11px; color:#8b929c">AST SpaceMobile · NASDAQ</div>
+        </div>
+        <div style="margin-left:auto; display:flex; align-items:center; gap:5px; font-size:10px; font-weight:600; color:#047857; font-family:'JetBrains Mono',monospace">
+          <span style="width:6px; height:6px; border-radius:50%; background:#047857"></span>OPEN
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; flex-wrap:wrap; gap:14px 28px; margin:0 24px 4px">
+      <div>
+        <div style="display:flex; align-items:baseline; gap:10px">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:42px; font-weight:700; letter-spacing:-0.02em; line-height:1.05">$53.42</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:600; color:#047857">+$1.64 (+3.17%)</div>
+        </div>
+        <div style="font-size:11px; color:#8b929c; margin-top:4px">Market price · today</div>
+      </div>
+
+      <div style="margin-left:auto; flex:{{ bannerFlex }}; max-width:400px; background:#ffffff; border:1px {{ bannerBorderStyle }} {{ bannerBorderColor }}; border-radius:14px; box-shadow:0 1px 2px rgba(16,18,22,0.03); padding:12px 16px; display:{{ bannerDisplay }}; align-items:center; gap:14px">
+        <span style="width:7px; height:7px; border-radius:2px; background:{{ bannerDot }}; flex-shrink:0"></span>
+        <span style="display:flex; flex-direction:column; gap:3px">
+          <span style="font-size:13.5px; font-weight:700; letter-spacing:-0.01em">{{ bannerTitle }}</span>
+          <span style="font-size:11px; color:#8b929c">{{ bannerSub }}</span>
+        </span>
+        <span style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:3px">
+          <span style="font-family:'JetBrains Mono',monospace; font-size:12.5px; font-weight:600; letter-spacing:0.04em">{{ bannerDate }}</span>
+          <span style="font-size:10px; color:#8b929c">{{ bannerFlag }}</span>
+        </span>
+      </div>
+      </div>
+
+      <div style="position:relative; margin:10px 0 0">
+        <svg viewBox="0 0 1112 260" style="display:block; width:100%; height:auto">
+          <defs>
+            <linearGradient id="egrad" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#047857" stop-opacity="0.16"></stop>
+              <stop offset="100%" stop-color="#047857" stop-opacity="0"></stop>
+            </linearGradient>
+          </defs>
+          <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="3">
+            <line x1="24" x2="1088" y1="{{ g.y }}" y2="{{ g.y }}" stroke="rgba(16,18,22,0.05)" stroke-width="1"></line>
+          </sc-for>
+          <sc-for list="{{ marks }}" as="m" hint-placeholder-count="4">
+            <line x1="{{ m.x }}" x2="{{ m.x }}" y1="12" y2="238" stroke="rgba(16,18,22,0.16)" stroke-width="1" stroke-dasharray="2 4"></line>
+          </sc-for>
+          <path d="{{ areaPath }}" fill="url(#egrad)"></path>
+          <path d="{{ linePath }}" fill="none" stroke="#047857" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+          <sc-for list="{{ marks }}" as="m" hint-placeholder-count="4">
+            <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3" fill="#101216" stroke="#fafaf8" stroke-width="1.5"></circle>
+          </sc-for>
+          <circle cx="{{ nowX }}" cy="{{ nowY }}" r="3.5" fill="#047857"></circle>
+          <circle cx="{{ nowX }}" cy="{{ nowY }}" r="7" fill="#047857" opacity="0.18"></circle>
+        </svg>
+        <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="3">
+          <div style="position:absolute; right:2.4%; top:{{ g.labelTop }}; transform:translateY(-100%); font-family:'JetBrains Mono',monospace; font-size:9px; color:#b3b8c0; pointer-events:none">{{ g.label }}</div>
+        </sc-for>
+        <sc-for list="{{ marks }}" as="m" hint-placeholder-count="1">
+          <div style="position:absolute; left:{{ m.left }}; bottom:0; transform:translateX(-50%); font-family:'JetBrains Mono',monospace; font-size:9px; color:#8b929c; pointer-events:none">{{ m.label }}</div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex; align-items:center; flex-wrap:wrap; gap:10px 18px; margin:2px 24px 0">
+        <div style="display:flex; justify-content:space-between; gap:2px; max-width:440px; flex:1 1 440px">
+          <sc-for list="{{ periods }}" as="p" hint-placeholder-count="7">
+            <div onClick="{{ p.select }}" style="flex:1; height:30px; min-width:44px; display:flex; align-items:center; justify-content:center; font-size:12px; border-radius:8px; cursor:pointer; font-weight:{{ p.weight }}; color:{{ p.color }}; background:{{ p.bg }}">{{ p.label }}</div>
+          </sc-for>
+        </div>
+        <div style="display:{{ legendReported }}; align-items:center; gap:5px; font-size:10.5px; color:#8b929c">
+          <span style="width:7px; height:7px; border-radius:50%; background:#101216"></span>last reported
+        </div>
+      </div>
+
+      <div style="display:flex; flex-wrap:wrap; align-items:center; gap:14px 32px; margin:16px 24px 0; padding:12px 0; border-top:1px solid rgba(16,18,22,0.06); border-bottom:1px solid rgba(16,18,22,0.06)">
+        <div style="flex:1 1 260px; min-width:220px">
+          <div style="display:flex; justify-content:space-between; font-size:10px; color:#8b929c; margin-bottom:5px">
+            <span style="font-family:'JetBrains Mono',monospace">$17.44</span>
+            <span style="font-weight:600; letter-spacing:0.06em; text-transform:uppercase">52w range</span>
+            <span style="font-family:'JetBrains Mono',monospace">$58.10</span>
+          </div>
+          <div style="position:relative; height:4px; border-radius:2px; background:rgba(16,18,22,0.08)">
+            <div style="position:absolute; left:0; top:0; bottom:0; width:88.4%; border-radius:2px; background:rgba(16,18,22,0.25)"></div>
+            <div style="position:absolute; left:88.4%; top:50%; width:10px; height:10px; border-radius:50%; background:#101216; transform:translate(-50%,-50%); border:2px solid #fafaf8"></div>
+          </div>
+        </div>
+        <div style="display:flex; gap:6px 22px; flex-wrap:wrap; font-size:11px; color:#8b929c">
+          <span>Mkt cap <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:#3c414a">$16.9B</span></span>
+          <span>Volume <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:#3c414a">4.2M</span></span>
+          <span>Avg vol <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:#3c414a">6.1M</span></span>
+          <span>P/E <span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:#3c414a">—</span></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1240, &quot;height&quot;: 1500}, &quot;horizon&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;4 weeks&quot;, &quot;options&quot;: [&quot;2 weeks&quot;, &quot;4 weeks&quot;, &quot;6 weeks&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Earnings&quot;}, &quot;showWatchlist&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Earnings&quot;}, &quot;earningsState&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;upcoming — confirmed&quot;, &quot;options&quot;: [&quot;upcoming — confirmed&quot;, &quot;upcoming — estimated window&quot;, &quot;already reported&quot;, &quot;no date (ETF)&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Stock detail&quot;}}">
+const POS = '#047857', NEG = '#b91c1c', INK = '#101216', MUT = '#8b929c', FAINT = '#b3b8c0';
+
+// Shape mirrors server/domain/earnings.js: {date, endDate, estimated, upcoming}
+const EARNINGS = {
+  ASTS: { date: '2026-08-11', endDate: null, estimated: false, upcoming: true },
+  RKLB: { date: '2026-08-13', endDate: null, estimated: false, upcoming: true },
+  LUNR: { date: '2026-08-14', endDate: '2026-08-18', estimated: true, upcoming: true },
+  SMR:  { date: '2026-08-25', endDate: null, estimated: false, upcoming: true },
+  SXRT: { date: null, endDate: null, estimated: false, upcoming: false },
+  EUDF: { date: null, endDate: null, estimated: false, upcoming: false },
+  RDW:  { date: '2026-08-12', endDate: null, estimated: false, upcoming: true },
+  OKLO: { date: '2026-08-19', endDate: '2026-08-24', estimated: true, upcoming: true },
+  RHM:  { date: '2026-08-06', endDate: null, estimated: false, upcoming: false },
+  RBW:  { date: null, endDate: null, estimated: false, upcoming: false },
+};
+const TODAY = '2026-08-10';
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+class Component extends DCLogic {
+  state = { ready: false, period: '1y', dashPeriod: '1y', vw: 1240 };
+
+  // Single breakpoint: below this the split stacks and the earnings list leads.
+  get narrow() { return this.state.vw < 760; }
+
+  portfolioChart() {
+    const M = window.PT_MOCK;
+    const empty = { pfLine: '', pfArea: '', pfInvested: '', pfGrid: [], pfTicks: [], pfNowX: 0, pfNowY: 0 };
+    if (!M) return empty;
+    const spans = { '1m': 5, '3m': 13, ytd: 27, '1y': 52, '3y': 156, total: M.chartData.length };
+    const rows = M.chartData.slice(Math.max(0, M.chartData.length - (spans[this.state.dashPeriod] || 52)));
+    const L = 24, R = 1088, T = 12, B = 186;
+    let lo = Math.min(...rows.map((r) => Math.min(r.value, r.invested)));
+    let hi = Math.max(...rows.map((r) => Math.max(r.value, r.invested)));
+    const pad = (hi - lo) * 0.12 || 1; lo -= pad; hi += pad;
+    const sx = (i) => L + (i / (rows.length - 1)) * (R - L);
+    const sy = (v) => T + (1 - (v - lo) / (hi - lo)) * (B - T);
+    const line = this.path(rows.map((r, i) => [sx(i), sy(r.value)]));
+    const step = Math.max(1, Math.floor((rows.length - 1) / 3));
+    return {
+      pfLine: line,
+      pfArea: line + ' L' + R + ' ' + B + ' L' + L + ' ' + B + ' Z',
+      pfInvested: this.path(rows.map((r, i) => [sx(i), sy(r.invested)])),
+      pfGrid: [0, 0.5, 1].map((f) => {
+        const v = hi - f * (hi - lo);
+        return { y: sy(v), labelTop: ((sy(v) - 3) / 210 * 100).toFixed(2) + '%', label: '€' + (v / 1000).toFixed(1) + 'k' };
+      }),
+      pfTicks: rows.filter((r, i) => i % step === 0).map((r, k) => {
+        const d = this.d(r.date);
+        const pct = sx(k * step) / 1112 * 100;
+        return {
+          left: pct.toFixed(2) + '%',
+          shift: pct < 6 ? 'translateX(0)' : pct > 94 ? 'translateX(-100%)' : 'translateX(-50%)',
+          label: MONTHS[d.getUTCMonth()] + " '" + String(d.getUTCFullYear()).slice(2),
+        };
+      }),
+      pfNowX: sx(rows.length - 1).toFixed(1),
+      pfNowY: sy(rows[rows.length - 1].value).toFixed(1),
+    };
+  }
+
+  componentDidMount() {
+    const check = () => { if (window.PT_MOCK) this.setState({ ready: true }); else setTimeout(check, 60); };
+    check();
+    // Measure the container, not the window — the design is also embedded.
+    const el = document.querySelector('[data-screen-label]');
+    this._onResize = () => {
+      const w = el ? el.getBoundingClientRect().width : window.innerWidth;
+      if (Math.abs(w - this.state.vw) > 1) this.setState({ vw: w });
+    };
+    window.addEventListener('resize', this._onResize);
+    if (el && window.ResizeObserver) {
+      this._ro = new ResizeObserver(this._onResize);
+      this._ro.observe(el);
+    }
+    this._onResize();
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._onResize);
+    if (this._ro) this._ro.disconnect();
+  }
+
+  d(iso) { return new Date(iso + 'T00:00:00Z'); }
+  daysBetween(a, b) { return Math.round((this.d(b) - this.d(a)) / 864e5); }
+  dayMonth(iso) { const d = this.d(iso); return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()]; }
+  monoDate(iso) { const d = this.d(iso); return (DOW[d.getUTCDay()] + ' ' + String(d.getUTCDate()).padStart(2, '0') + ' ' + MONTHS[d.getUTCMonth()]).toUpperCase(); }
+
+  rel(iso) {
+    const n = this.daysBetween(TODAY, iso);
+    if (n < 0) return n === -1 ? 'yesterday' : Math.abs(n) + 'd ago';
+    if (n === 0) return 'today';
+    if (n === 1) return 'tomorrow';
+    return 'in ' + n + 'd';
+  }
+
+  candles(n) {
+    let a = 7;
+    const rng = () => { a = (a * 16807) % 2147483647; return (a % 1000) / 1000; };
+    const out = [];
+    let price = 18;
+    for (let i = 0; i < n; i++) { price = Math.max(6, price * (1 + (rng() - 0.47) * 0.09)); out.push(price); }
+    const k = 53.42 / out[out.length - 1];
+    return out.map((v) => v * k);
+  }
+
+  path(pts) { return pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' '); }
+
+  spark(ticker) {
+    const M = window.PT_MOCK;
+    if (!M || !M.intraday[ticker]) return '';
+    const pts = M.intraday[ticker].points;
+    const vals = pts.map((p) => p.close);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const pad = (hi - lo) * 0.12 || 0.5; lo -= pad; hi += pad;
+    return this.path(vals.map((v, i) => [ (i / (vals.length - 1)) * 100, 3 + (1 - (v - lo) / (hi - lo)) * 28 ]));
+  }
+
+  tickerColor(t) { return (window.PT_MOCK ? window.PT_MOCK.COLORS[t] : null) || '#64748b'; }
+
+  heldSet() {
+    const M = window.PT_MOCK;
+    return new Set(M ? M.POSITIONS.map((p) => p.ticker) : []);
+  }
+
+  earningsLabel(t) {
+    const e = EARNINGS[t];
+    if (!e || !e.date) return { str: '—', color: FAINT, dashed: false };
+    const n = this.daysBetween(TODAY, e.date);
+    if (!e.upcoming) return { str: 'reported ' + this.dayMonth(e.date), color: FAINT, dashed: false };
+    const str = e.endDate ? this.d(e.date).getUTCDate() + '–' + this.dayMonth(e.endDate) : this.dayMonth(e.date);
+    return { str, color: n <= 7 ? INK : MUT, dashed: e.estimated };
+  }
+
+  renderVals() {
+    const M = window.PT_MOCK;
+    const showWatch = this.props.showWatchlist ?? true;
+    const held = this.heldSet();
+
+    // ── Next up list ─────────────────────────────────────────────
+    const rows = Object.keys(EARNINGS)
+      .filter((t) => EARNINGS[t].date && (showWatch || held.has(t)))
+      .sort((a, b) => (EARNINGS[a].date < EARNINGS[b].date ? -1 : 1))
+      .map((t) => {
+        const e = EARNINGS[t];
+        const color = this.tickerColor(t);
+        const soon = e.upcoming && this.daysBetween(TODAY, e.date) <= 3;
+        return {
+          ticker: t,
+          color,
+          dotBg: held.has(t) ? color : 'transparent',
+          inkColor: e.upcoming ? INK : FAINT,
+          dateStr: e.endDate
+            ? (this.d(e.date).getUTCDate() + '–' + this.dayMonth(e.endDate)).toUpperCase()
+            : this.monoDate(e.date),
+          statusStr: (e.upcoming ? (e.estimated ? 'Estimated window' : 'Confirmed date') : 'Already reported')
+            + (held.has(t) ? '' : ' · watchlist'),
+          rel: this.rel(e.date),
+          relColor: e.upcoming ? (soon ? INK : MUT) : FAINT,
+        };
+      });
+    const horizonDays = ({ '2 weeks': 14, '4 weeks': 28, '6 weeks': 42 }[this.props.horizon ?? '4 weeks']) || 28;
+    const upcoming = rows.filter((r) => !r.statusStr.startsWith('Already') && this.daysBetween(TODAY, EARNINGS[r.ticker].date) <= horizonDays);
+    const reported = rows.filter((r) => r.statusStr.startsWith('Already'));
+    const nextUp = upcoming.slice(0, 5).concat(reported.slice(0, 1));
+
+    // ── Holdings cards ───────────────────────────────────────────
+    const holdings = (M ? M.POSITIONS : []).map((p) => {
+      const cur = p.currency === 'USD' ? '$' : '€';
+      const lbl = this.earningsLabel(p.ticker);
+      return {
+        ticker: p.ticker,
+        color: this.tickerColor(p.ticker),
+        priceStr: cur + p.price.toFixed(2),
+        valueStr: '€' + Math.round(p.value).toLocaleString('en-US'),
+        dayStr: (p.dayPlPct >= 0 ? '+' : '−') + Math.abs(p.dayPlPct).toFixed(2) + '%',
+        dayColor: p.dayPlPct >= 0 ? POS : NEG,
+        sparkColor: p.dayPlPct >= 0 ? POS : NEG,
+        spark: this.spark(p.ticker),
+        earnStr: lbl.str,
+        earnColor: lbl.color,
+        earnUnderline: lbl.dashed ? 'dashed' : 'solid',
+        earnUnderlineColor: lbl.dashed ? 'rgba(16,18,22,0.30)' : 'transparent',
+      };
+    });
+
+    // ── Detail chart ─────────────────────────────────────────────
+    const counts = { '1m': 22, '3m': 64, ytd: 128, '1y': 253, '3y': 500, total: 700 };
+    const period = this.state.period;
+    const vals = this.candles(counts[period] || 253);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const pad = (hi - lo) * 0.1 || 1; lo -= pad; hi += pad;
+    const L = 24, R = 1088, T = 12, B = 238;
+    const sx = (i) => L + (i / (vals.length - 1)) * (R - L);
+    const sy = (v) => T + (1 - (v - lo) / (hi - lo)) * (B - T);
+    const pts = vals.map((v, i) => [sx(i), sy(v)]);
+    const line = this.path(pts);
+    // The service returns ONE date — the next *or* most recent report — so the
+    // chart carries at most one marker, never a quarterly history.
+    const STATES = {
+      'upcoming — confirmed': { date: '2026-08-11', endDate: null, estimated: false, upcoming: true },
+      'upcoming — estimated window': { date: '2026-08-14', endDate: '2026-08-18', estimated: true, upcoming: true },
+      'already reported': { date: '2026-08-06', endDate: null, estimated: false, upcoming: false },
+      'no date (ETF)': { date: null, endDate: null, estimated: false, upcoming: false },
+    };
+    const asts = STATES[this.props.earningsState ?? 'upcoming — confirmed'] || STATES['upcoming — confirmed'];
+    const marks = [];
+    if (asts.date && !asts.upcoming) {
+      const back = Math.max(1, Math.round(Math.abs(this.daysBetween(TODAY, asts.date)) * 0.7));
+      const idx = Math.max(1, vals.length - 1 - back);
+      marks.push({ x: sx(idx).toFixed(1), y: sy(vals[idx]).toFixed(1), left: (sx(idx) / 1112 * 100).toFixed(2) + '%', label: this.dayMonth(asts.date) });
+    }
+    const n = asts.date ? this.daysBetween(TODAY, asts.date) : null;
+    const bannerHorizon = ({ '2 weeks': 14, '4 weeks': 28, '6 weeks': 42 }[this.props.horizon ?? '4 weeks']) || 28;
+    const bannerTitle = !asts.date
+      ? 'No earnings date'
+      : !asts.upcoming
+        ? 'Last reported ' + this.rel(asts.date)
+        : n === 0 ? 'Reports today' : n === 1 ? 'Reports tomorrow' : 'Reports in ' + n + ' days';
+
+    return {
+      ...this.portfolioChart(),
+      dashPeriods: [['1m', '1M'], ['3m', '3M'], ['ytd', 'YTD'], ['1y', '1Y'], ['3y', '3Y'], ['total', 'Max']].map(([key, label]) => ({
+        label,
+        select: () => this.setState({ dashPeriod: key }),
+        bg: this.state.dashPeriod === key ? '#eceae3' : 'transparent',
+        color: this.state.dashPeriod === key ? INK : MUT,
+        weight: this.state.dashPeriod === key ? '700' : '500',
+      })),
+      horizonLabel: 'next ' + (this.props.horizon ?? '4 weeks'),
+      nextUp,
+      earningsDisplay: upcoming.length ? 'flex' : 'none',
+      earningsHidden: !upcoming.length,
+      earningsOrder: this.narrow ? '-1' : '0',
+      splitColumns: this.narrow || !upcoming.length ? '1fr' : '1.65fr 1fr',
+      bannerFlex: this.narrow ? '1 1 100%' : '0 0 auto',
+      nextUpNote: showWatch ? 'holdings + watchlist' : 'holdings only',
+      holdings,
+
+      gridLines: [0, 0.5, 1].map((f) => { const v = hi - f * (hi - lo); return { y: sy(v), labelTop: ((sy(v) - 3) / 260 * 100).toFixed(2) + '%', label: '$' + v.toFixed(0) }; }),
+      linePath: line,
+      areaPath: line + ' L' + R + ' ' + B + ' L' + L + ' ' + B + ' Z',
+      marks,
+      nowX: sx(vals.length - 1).toFixed(1),
+      nowY: sy(vals[vals.length - 1]).toFixed(1),
+      legendReported: marks.length ? 'flex' : 'none',
+      periods: [['1m', '1M'], ['3m', '3M'], ['ytd', 'YTD'], ['1y', '1Y'], ['3y', '3Y'], ['total', 'Max']].map(([key, label]) => ({
+        label,
+        select: () => this.setState({ period: key }),
+        bg: period === key ? '#eceae3' : 'transparent',
+        color: period === key ? INK : MUT,
+        weight: period === key ? '700' : '500',
+      })),
+
+      // Only surface the banner inside its useful window: an upcoming date within
+      // the horizon, or a reported date up to a week old (after that the service
+      // has usually rolled over to the next quarter anyway).
+      bannerDisplay: !asts.date ? 'none'
+        : asts.upcoming ? (n <= bannerHorizon ? 'flex' : 'none')
+        : (n >= -7 ? 'flex' : 'none'),
+      bannerTitle,
+      bannerSub: !asts.date
+        ? 'Yahoo publishes no earnings date for this listing'
+        : asts.estimated
+          ? 'Estimated window · ' + this.dayMonth(asts.date) + ' – ' + this.dayMonth(asts.endDate) + ' · not confirmed by the company'
+          : !asts.upcoming
+            ? this.monoDate(asts.date).toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) + ' · next date not published yet'
+            : this.monoDate(asts.date).toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) + ' · no time of day published',
+      bannerDate: !asts.date ? '—' : asts.endDate ? (this.d(asts.date).getUTCDate() + '–' + this.dayMonth(asts.endDate)).toUpperCase() : this.monoDate(asts.date),
+      bannerFlag: !asts.date ? 'no date' : asts.estimated ? 'estimated' : 'confirmed',
+      bannerBorderStyle: asts.estimated ? 'dashed' : 'solid',
+      bannerBorderColor: asts.estimated ? 'rgba(16,18,22,0.22)' : 'rgba(16,18,22,0.07)',
+      bannerDot: asts.date && asts.upcoming ? INK : FAINT,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
