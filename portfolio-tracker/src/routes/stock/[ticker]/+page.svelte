@@ -387,11 +387,36 @@
     return Math.min(1, Math.max(0, (livePrice - stats.low52w) / span));
   });
 
+  /** `YYYY-MM-DD` → `11 Aug`, adding the year only when it isn't the current one. */
+  function fmtEarningsDay(iso: string): string {
+    const y = Number(iso.slice(0, 4));
+    const m = Number(iso.slice(5, 7));
+    const d = Number(iso.slice(8, 10));
+    const opts: Intl.DateTimeFormatOptions = { timeZone: 'UTC', day: 'numeric', month: 'short' };
+    if (y !== new Date().getUTCFullYear()) opts.year = 'numeric';
+    return new Intl.DateTimeFormat('en-GB', opts).format(new Date(Date.UTC(y, m - 1, d)));
+  }
+
+  // An unconfirmed date is marked with a leading ~ and, when Yahoo gives a
+  // multi-day window, rendered as a range — showing an estimate as a hard date
+  // would be exactly the false precision the close-price fixes removed.
+  const earningsCell = $derived.by(() => {
+    const e = stats?.earnings;
+    if (e?.date == null || !e.upcoming) {
+      return { value: '—', title: 'Geen aangekondigde datum' };
+    }
+    const span = e.endDate ? `${fmtEarningsDay(e.date)}–${fmtEarningsDay(e.endDate)}` : fmtEarningsDay(e.date);
+    return e.estimated
+      ? { value: `~${span}`, title: 'Geschatte datum — nog niet bevestigd door het bedrijf' }
+      : { value: span, title: 'Bevestigde datum' };
+  });
+
   const keyStats = $derived([
-    { label: 'Mkt cap', value: stats?.mktCap != null ? fmtCompactNative(stats.mktCap, currency) : '—' },
-    { label: 'Volume',  value: stats?.volume != null ? fmtCompact(stats.volume) : '—' },
-    { label: 'Avg vol', value: stats?.avgVolume != null ? fmtCompact(stats.avgVolume) : '—' },
-    { label: 'P/E',     value: stats?.pe != null ? stats.pe.toFixed(1) : '—' },
+    { label: 'Mkt cap',  value: stats?.mktCap != null ? fmtCompactNative(stats.mktCap, currency) : '—', title: 'Marktkapitalisatie' },
+    { label: 'Volume',   value: stats?.volume != null ? fmtCompact(stats.volume) : '—', title: 'Volume vandaag' },
+    { label: 'Avg vol',  value: stats?.avgVolume != null ? fmtCompact(stats.avgVolume) : '—', title: 'Gemiddeld volume over 3 maanden' },
+    { label: 'P/E',      value: stats?.pe != null ? stats.pe.toFixed(1) : '—', title: 'Koers-winstverhouding (trailing)' },
+    { label: 'Earnings', value: earningsCell.value, title: earningsCell.title },
   ]);
 
   /* ── Returns card (Delta 3, handoff 4): price returns of the stock ── */
@@ -528,7 +553,7 @@
         {/if}
         <div class="key-stats">
           {#each keyStats as s (s.label)}
-            <span>{s.label} <span class="key-val mono">{s.value}</span></span>
+            <span title={s.title}>{s.label} <span class="key-val mono">{s.value}</span></span>
           {/each}
         </div>
       </div>

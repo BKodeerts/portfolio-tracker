@@ -3,13 +3,14 @@ const router  = express.Router();
 const { readCache, readStaleCache, writeCache, QUOTES_CACHE_TTL } = require('../cache.js');
 const { fetchCandles, fetchChartStats, fetchQuoteStats, sleep, FETCH_DELAY } = require('../yahoo.js');
 const { computePriceReturns } = require('../domain/stats.js');
+const { normalizeEarnings } = require('../domain/earnings.js');
 
 const SYMBOL_RE = /^[A-Za-z0-9.\-^=]{1,30}$/;
 
 // Per-ticker reference stats for the stock detail page: 52-week range,
-// market cap, volumes, P/E, and the stock's own price returns.
-// mktCap / pe come from Yahoo's authenticated quote endpoint and may be null
-// when that call fails — the frontend renders those as "—".
+// market cap, volumes, P/E, next earnings date, and the stock's own price returns.
+// mktCap / pe / earnings come from Yahoo's authenticated quote endpoint and may
+// be null when that call fails — the frontend renders those as "—".
 router.get('/stats/:symbol', async (req, res) => {
   const { symbol } = req.params;
   if (typeof symbol !== 'string' || !SYMBOL_RE.test(symbol)) {
@@ -49,6 +50,7 @@ router.get('/stats/:symbol', async (req, res) => {
       volume:    quote?.volume ?? chart.volume,
       avgVolume: quote?.avgVolume ?? chart.avgVolume,
       pe:        quote?.trailingPE ?? null,
+      earnings:  normalizeEarnings(quote, today),
       returns:   computePriceReturns(candles || [], price, today),
     };
     writeCache(cacheKey, data);

@@ -31,13 +31,15 @@ CI (`.github/workflows/ci.yml`) runs on every PR: `npm test`, `npm run check`, `
 
 **Never try to call the Yahoo Finance API yourself.** There is no network egress to `query1.finance.yahoo.com` from the Claude Code environment — attempts fail with `403 Host not in allowlist`. Do not try to verify a market-data assumption by fetching it.
 
-When you need real data, **ask the user to run a curl and paste the output.** Give one self-contained command, piped through `jq` so it prints only the fields in question rather than a raw dump:
+When you need real data, **ask the user to run a script and paste the output — and hand them Node, never curl.**
+
+**Yahoo blocks curl.** Every `query1.finance.yahoo.com` endpoint returns `429 Too Many Requests` on the very first curl request, auth-free ones included, from the same machine whose add-on is fetching happily over Node's `https`. It is a TLS/HTTP2 fingerprint block, not rate limiting — the 429 body is simply Yahoo's generic rejection. Do not read it as throttling, a cookie problem, or an EU consent gate: an entire session was spent testing those three hypotheses in turn, each disproved, before the HTTP client turned out to be the only variable that mattered. Retrying, backing off, or changing IP will not help; changing client will.
 
 ```bash
-curl -s -A 'Mozilla/5.0' \
-  'https://query1.finance.yahoo.com/v8/finance/chart/SYMBOL?interval=5m&range=5d&includePrePost=true' \
-| jq '.chart.result[0].meta'
+node -e "require('https').get('https://query1.finance.yahoo.com/v8/finance/chart/SYMBOL?interval=5m&range=5d&includePrePost=true',{headers:{'User-Agent':'Mozilla/5.0'}},r=>{let b='';r.on('data',c=>b+=c);r.on('end',()=>console.log(r.statusCode,b.slice(0,600)))})"
 ```
+
+Two practical constraints on asking. The deployment runs on a separate Home Assistant box, so the user's laptop is not the environment that matters. And the HA terminal has no `node` and no access to the add-on container, so a Node script may need `docker exec` on the host — or may be unrunnable. Prefer changes that ship safely without live verification: anything riding on an API call the server already makes, degrading to `—` when a field is absent, needs no verification at all.
 
 Ask early. Reasoning from the code alone once shipped a release (0.13.4) whose fix could not work, because the assumed data simply wasn't in the payload.
 
@@ -46,6 +48,8 @@ Payload facts that took several release cycles to establish:
 - **A 5-minute bar's close is not a closing price.** The last regular bar ends at 15:55 ET; the official close prints at 16:00:01, inside the following (post-market) bar. Use `meta.regularMarketPrice` (the session's official close, or the live price) and `meta.previousClose` (the close before it), trusting them only when `meta.regularMarketTime` dates them to the session you mean.
 - **`meta.regularMarketPreviousClose` does not exist in chart meta** — it is a quote-endpoint field. The chart-meta name is plain `previousClose`.
 - **`includePrePost=true` interleaves extended-hours candles.** Any "previous close" scan must filter to regular trading hours, or it lands on the prior day's post-market price.
+- **Earnings dates live on the v7 quote, not on chart meta.** `earningsTimestamp`, `earningsTimestampStart`, `earningsTimestampEnd` and `isEarningsDateEstimate` ride along on the authenticated `v7/finance/quote` response `fetchQuoteStats` already fetches, so reading them costs no extra request. Three traps: `earningsTimestamp` is the next *or most recent* report (a past date is normal — derive "upcoming", never assume it); an unconfirmed date arrives as a multi-day `Start`/`End` window, which is proof of an estimate even when the flag is missing; and the clock component is a placeholder, so only the calendar date in `exchangeTimezoneName` is meaningful. ETFs and many non-US listings carry none of these fields.
+
 - **`range` must span more than the sessions you need.** At `range=2d` the payload holds only `[previous session, today]`, which is too short to find the close *before* the previous session during pre-market.
 
 ## Architecture
@@ -63,8 +67,9 @@ Payload facts that took several release cycles to establish:
   - `performance.js` — TWR, XIRR, risk metrics, rolling returns
   - `series.js` — chart/benchmark series building
   - `stats.js` — per-ticker price returns (1M/6M/1Y/3Y/all) for the stock detail Returns card
+  - `earnings.js` — normalizes Yahoo's next-earnings fields: confirmed date vs multi-day estimate window, upcoming vs already-reported, dated in the exchange's timezone
 - **`server/portfolio.js`**: thin orchestrator over `domain/` (`computeFullPortfolio` / `computeCurrentSnapshot`), shared by API routes, HA integration, and scheduler
-- **Routes** (`server/routes/`): thin HTTP layer, each file mounts on `/api` — candles (`/candles/:symbol`, `/batch`, `/quotes`, `/intraday`, `/lookup`), transactions, portfolio, settings, ha, bonus, cache-routes, ticker-meta, stats (`/stats/:symbol` — 52w range, mkt cap, volumes, P/E, price returns)
+- **Routes** (`server/routes/`): thin HTTP layer, each file mounts on `/api` — candles (`/candles/:symbol`, `/batch`, `/quotes`, `/intraday`, `/lookup`), transactions, portfolio, settings, ha, bonus, cache-routes, ticker-meta, stats (`/stats/:symbol` — 52w range, mkt cap, volumes, P/E, next earnings date, price returns)
 - **`server/routes/portfolio.js`**: 5-min in-memory response cache with generation-based invalidation on transaction writes; concurrent requests share one in-flight computation (60s timeout)
 - **`server/yahoo.js`**: Yahoo Finance v8 API client (`query1.finance.yahoo.com`), native `https`, 100ms delay between requests, 3 retries with 2s/4s/8s backoff
 - **`server/cache.js`**: disk-based JSON cache in `cache/` — 24h TTL historical candles, 15min quotes, 5min intraday
@@ -88,7 +93,7 @@ Payload facts that took several release cycles to establish:
 
 ### Tests (`portfolio-tracker/tests/`)
 
-- **`tests/domain/`** — pure domain modules (fx, positions, performance, series, stats, tax) with fixture transactions covering multi-currency (incl. GBX), splits, partial sales, dividends, and sold-out positions. These define correct money-math behaviour; extend them when touching anything in `server/domain/`.
+- **`tests/domain/`** — pure domain modules (fx, positions, performance, series, stats, earnings, tax) with fixture transactions covering multi-currency (incl. GBX), splits, partial sales, dividends, and sold-out positions. These define correct money-math behaviour; extend them when touching anything in `server/domain/`.
 - **`tests/server/`** — session and price derivation in `server/yahoo.js`: which session gets drawn, and which close it is measured against. Built from real captured payloads. Extend when touching `deriveSession` / `applyOfficialCloses`.
 - **`tests/frontend/`** — pure helpers only (market hours, `prevSessionMove`). No component rendering.
 
