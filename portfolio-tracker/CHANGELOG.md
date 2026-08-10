@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.13.9] — 2026-08-10
+
+### Added
+
+- **Next earnings date on the stock detail page**: the key-stats strip gains an `Earnings` cell showing when the company is next expected to report. The date rides along on the authenticated v7 quote the server already fetches for market cap and P/E, so it costs no extra Yahoo request and degrades identically — when the quote call fails, or the listing simply has no earnings (ETFs, many non-US listings), the cell reads `—` instead of erroring.
+
+  Yahoo's raw fields are not safe to render directly, so `server/domain/earnings.js` normalizes them first. `earningsTimestamp` is the next *or most recent* report, so a past date is normal and `upcoming` has to be derived rather than assumed. An unconfirmed date arrives as a multi-day `earningsTimestampStart`/`End` window, which is itself proof of an estimate even when `isEarningsDateEstimate` is missing. And the timestamp's clock component is a placeholder, so the calendar date is resolved in the exchange's own timezone — an after-hours US report at 21:00 ET is already the next day in UTC, and dating it in UTC would show the wrong day.
+
+  Estimated dates therefore render with a leading `~`, and multi-day windows as a range (`~11–15 Aug`). Showing an estimate as a hard date would be the same false precision the 0.13.7 close-price fixes removed.
+
+- Hover titles on all five key stats, naming each metric in full (Dutch), so the abbreviated labels are unambiguous.
+
+### Note
+
+Stats entries served from a cache written before this version carry no `earnings` block; the page treats that as "no date" and the entry expires within 15 minutes.
+
 ## [0.13.8] — 2026-08-05
 
 ### Changed

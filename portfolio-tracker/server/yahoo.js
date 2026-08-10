@@ -484,6 +484,14 @@ async function fetchQuoteStats(yahooSymbol) {
         trailingPE: q.trailingPE ?? null,
         avgVolume:  q.averageDailyVolume3Month ?? null,
         volume:     q.regularMarketVolume ?? null,
+        // Raw earnings fields, passed through for domain/earnings.js to
+        // normalize. Absent for ETFs and many non-US listings — that is a
+        // normal payload, not a failure.
+        earningsTimestamp:      q.earningsTimestamp ?? null,
+        earningsTimestampStart: q.earningsTimestampStart ?? null,
+        earningsTimestampEnd:   q.earningsTimestampEnd ?? null,
+        isEarningsDateEstimate: q.isEarningsDateEstimate ?? null,
+        exchangeTimezoneName:   q.exchangeTimezoneName ?? null,
       };
     } catch (e) {
       console.warn(`[Yahoo] quote stats failed for ${yahooSymbol}: ${e.message}`);
