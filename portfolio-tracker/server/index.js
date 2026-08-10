@@ -62,6 +62,7 @@ if (API_TOKEN) {
 
 app.use('/api', require('./routes/bonus.js'));
 app.use('/api', require('./routes/candles.js'));
+app.use('/api', require('./routes/earnings.js'));
 app.use('/api', require('./routes/transactions.js'));
 app.use('/api', require('./routes/cache-routes.js'));
 app.use('/api', require('./routes/ha.js'));

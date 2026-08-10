@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.13.10] — 2026-08-10
+
+### Added
+
+- **Earnings dates on the dashboard**: a new Earnings column beside Holdings lists who reports next — up to five upcoming reports inside a four-week horizon, across holdings and watchlist, plus at most one recently reported ticker. Each row carries the ticker's color as a square (filled when held, hollow when only watched), the date, whether it is confirmed or an estimated window, and how far away it is. With nothing upcoming inside the horizon the whole column is dropped rather than hidden, so the holdings reflow full width instead of sitting beside a dead track. Below 900px the column moves above the holdings: the timely information leads on mobile.
+
+- **An earnings line on every holding card**: `11 Aug` in full ink within a week, muted further out, `14–18 Aug` with a dashed underline when the date is an unconfirmed window, `reported 6 Aug` once it has passed, and `—` when there is none. The dash is the same degradation as the empty P/E cell, and it has to be: a listing with no earnings and a failed quote produce an identical payload, so the copy cannot claim which of the two it is.
+
+- **A countdown banner on the stock detail price row**: "Reports in 4 days" / "tomorrow" / "today", or "Last reported 4d ago" once the date has passed, with the date and a confirmed/estimated flag alongside. An estimated date puts a dashed border on the banner and shows the window as a range. The sub-line says "no time of day published" outright — Yahoo's timestamp carries a placeholder clock, and leaving that unsaid invites reading it as a before/after-bell indicator. The banner renders only inside its useful window (an upcoming date within the horizon, or a report at most a week old); outside it, and whenever there is no date, the price row renders without it.
+
+- **A marker for the last reported date** on the stock detail price chart: a dashed rule, a dot at that day's close, the date under the axis, and a "last reported" legend item beside the period pills — only when a marker is actually drawn. There is only ever one, because the service returns a single date; a future date gets no line, since the banner already covers it.
+
+- `GET /api/earnings?symbols=…`, serving the same normalized block for a set of tickers. `/api/stats/:symbol` already carried this for one ticker, but it also fetches the chart and the full candle history, which is far too much for one field across a dozen tickers. The disk cache holds the raw quote fields rather than the normalized result, so `upcoming` — which is derived against today's date — cannot go stale across midnight.
+
+### Changed
+
+- The `Earnings` cell is gone from the stock detail key-stats strip. The banner says the same thing louder a few centimetres above it, and the second copy read as noise.
+
 ## [0.13.9] — 2026-08-10
 
 ### Added

@@ -70,6 +70,7 @@
   --chart-band-strong: rgba(16, 18, 22, 0.045);
   --chart-band-label:  #c6cad1;
   --chart-crosshair:   rgba(16, 18, 22, 0.25);
+  --chart-event-line:  rgba(16, 18, 22, 0.16);
   --chart-hilo-dot:    #101216;
   --chart-hilo-label:  #6a6f78;
   --tip-bg:     rgba(255, 255, 255, 0.97);
@@ -181,6 +182,7 @@
   --chart-band-strong: rgba(255, 255, 255, 0.055);
   --chart-band-label:  #555b66;
   --chart-crosshair:   rgba(255, 255, 255, 0.28);
+  --chart-event-line:  rgba(255, 255, 255, 0.20);
   --chart-hilo-dot:    #f2f4f7;
   --chart-hilo-label:  #8b929c;
   --tip-bg:     rgba(21, 24, 28, 0.97);

@@ -13,6 +13,15 @@
     i: number;
     color: string;
   }
+  /**
+   * Dated event on the value line (history mode): a dashed vertical rule, a dot
+   * at the price of that day, and a label under the axis. Used for the last
+   * reported earnings date — there is only ever one.
+   */
+  export interface ChartEvent {
+    i: number;
+    label: string;
+  }
   /** Session-shading band (intraday mode), in the minute-of-day x-domain. */
   export interface ChartBand {
     start: number;
@@ -76,6 +85,8 @@
     gainFill?: boolean;
     /** Transaction dots on the value line at data indices. */
     markers?: ChartMarker[];
+    /** Dated events (history mode): rule + dot + axis label at a data index. */
+    events?: ChartEvent[];
     /** Tag the period max/min values (omitted when flat). */
     showHiLo?: boolean;
     /** Crosshair + tooltip content for a data index; enables hover handling. */
@@ -87,7 +98,8 @@
     points = [], prevClose, sessionStart, sessionEnd, emptyLabel,
     padX = 20, showNow = true,
     dimmed = false, topCaption = null,
-    bands = [], benchmark = [], gainFill = false, markers = [], showHiLo = false, tooltip = null,
+    bands = [], benchmark = [], gainFill = false, markers = [], events = [],
+    showHiLo = false, tooltip = null,
   }: Props = $props();
 
   const uid = $props.id();
@@ -115,6 +127,7 @@
     benchD: string;
     gainSegs: { d: string; pos: boolean }[];
     markerPts: { x: number; y: number; color: string }[];
+    eventPts: { x: number; y: number; label: string }[];
     hiLos: { cx: number; cy: number; lx: number; ly: number; label: string }[];
   }
 
@@ -177,8 +190,8 @@
     const bottom = B;
     // Transient layouts can measure a degenerate width — draw nothing.
     if (R - L < 10) return null;
-    const none: Pick<Geom, 'pts' | 'bandRects' | 'benchD' | 'gainSegs' | 'markerPts' | 'hiLos'> = {
-      pts: [], bandRects: [], benchD: '', gainSegs: [], markerPts: [], hiLos: [],
+    const none: Pick<Geom, 'pts' | 'bandRects' | 'benchD' | 'gainSegs' | 'markerPts' | 'eventPts' | 'hiLos'> = {
+      pts: [], bandRects: [], benchD: '', gainSegs: [], markerPts: [], eventPts: [], hiLos: [],
     };
     if (mode === 'history') {
       if (data.length < 2) return null;
@@ -220,6 +233,9 @@
         markerPts: markers
           .filter((m) => m.i >= 0 && m.i < pts.length)
           .map((m) => ({ x: pts[m.i]![0], y: pts[m.i]![1], color: m.color })),
+        eventPts: events
+          .filter((e) => e.i >= 0 && e.i < pts.length)
+          .map((e) => ({ x: pts[e.i]![0], y: pts[e.i]![1], label: e.label })),
         hiLos: hiLoTags(pts, vals),
       };
     }
@@ -341,6 +357,10 @@
     <!-- Prev-close baseline: the dashed line is the established idiom and the
          tooltip carries the delta, so no text label — it only ever collided
          with hi/lo tags and the line itself near the open. -->
+    <!-- Event rule sits under the series: it dates the line, it isn't the subject. -->
+    {#each geom.eventPts as e}
+      <line x1={e.x} x2={e.x} y1={T} y2={B} stroke="var(--chart-event-line)" stroke-width="1" stroke-dasharray="2 4" />
+    {/each}
     {#if geom.baselineY != null}
       <line x1={L} x2={R} y1={geom.baselineY} y2={geom.baselineY} stroke="var(--chart-axis-label)" stroke-width="1" stroke-dasharray="3 4" />
     {/if}
@@ -361,6 +381,10 @@
     {/if}
     {#each geom.markerPts as m}
       <circle cx={m.x} cy={m.y} r="3" fill={m.color} stroke="var(--bg)" stroke-width="1.5" />
+    {/each}
+    {#each geom.eventPts as e}
+      <circle cx={e.x} cy={e.y} r="3" fill="var(--fg)" stroke="var(--bg)" stroke-width="1.5" />
+      <text class="event-label" x={Math.max(L + 14, Math.min(R - 14, e.x))} y={height - 4} text-anchor="middle">{e.label}</text>
     {/each}
     {#each geom.hiLos as h}
       <circle cx={h.cx} cy={h.cy} r="2" fill="var(--chart-hilo-dot)" />
@@ -411,6 +435,11 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     fill: var(--chart-band-label);
+  }
+  .event-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9px;
+    fill: var(--fg-faint);
   }
   .hilo-label {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
