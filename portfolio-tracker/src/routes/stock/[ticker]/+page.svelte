@@ -13,8 +13,10 @@
   import { PERIOD_OPTIONS, periodCutoff } from '$lib/utils/period';
   import { isExchangeOpen, normalizeMarketState, sessionBounds, fmtOpenAt, nextSessionOpen } from '$lib/market';
   import { toEurLiveOrFallback } from '$lib/fx';
+  import { earningsBanner, dayMonth, todayIso } from '$lib/derived/earnings';
   import PeriodPills from '$lib/components/shared/PeriodPills.svelte';
   import PeriodChart, { type ChartTip, type ChartTipLine } from '$lib/components/shared/PeriodChart.svelte';
+  import EarningsBanner from '$lib/components/shared/EarningsBanner.svelte';
   import { buildTxMarkers } from '$lib/utils/tx-markers';
   import ActivityList from '$lib/components/shared/ActivityList.svelte';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
@@ -358,6 +360,30 @@
     };
   }
 
+  /* ── Earnings: countdown banner + one marker at the last reported date ── */
+
+  const today = todayIso();
+
+  // Null outside the useful window (no date, too far out, or reported long
+  // enough ago that Yahoo has usually rolled over) — the price row then simply
+  // renders without it.
+  const banner = $derived(earningsBanner(stats?.earnings, today));
+
+  // At most one marker, and only for a date that has already passed: the
+  // service returns a single date, and a future one is the banner's job. The
+  // anchor is the last candle at or before the report; a report older than the
+  // drawn window gets no marker.
+  const earningsEvents = $derived.by(() => {
+    const e = stats?.earnings;
+    if (period === '1d' || !e?.date || e.upcoming) return [];
+    let idx = -1;
+    for (let i = 0; i < displayCandles.length; i++) {
+      if (displayCandles[i]!.date > e.date) break;
+      idx = i;
+    }
+    return idx < 0 ? [] : [{ i: idx, label: dayMonth(e.date) }];
+  });
+
   /* ── Your history rows ── */
 
   function dateLabel(date: string): string {
@@ -387,36 +413,13 @@
     return Math.min(1, Math.max(0, (livePrice - stats.low52w) / span));
   });
 
-  /** `YYYY-MM-DD` → `11 Aug`, adding the year only when it isn't the current one. */
-  function fmtEarningsDay(iso: string): string {
-    const y = Number(iso.slice(0, 4));
-    const m = Number(iso.slice(5, 7));
-    const d = Number(iso.slice(8, 10));
-    const opts: Intl.DateTimeFormatOptions = { timeZone: 'UTC', day: 'numeric', month: 'short' };
-    if (y !== new Date().getUTCFullYear()) opts.year = 'numeric';
-    return new Intl.DateTimeFormat('en-GB', opts).format(new Date(Date.UTC(y, m - 1, d)));
-  }
-
-  // An unconfirmed date is marked with a leading ~ and, when Yahoo gives a
-  // multi-day window, rendered as a range — showing an estimate as a hard date
-  // would be exactly the false precision the close-price fixes removed.
-  const earningsCell = $derived.by(() => {
-    const e = stats?.earnings;
-    if (e?.date == null || !e.upcoming) {
-      return { value: '—', title: 'Geen aangekondigde datum' };
-    }
-    const span = e.endDate ? `${fmtEarningsDay(e.date)}–${fmtEarningsDay(e.endDate)}` : fmtEarningsDay(e.date);
-    return e.estimated
-      ? { value: `~${span}`, title: 'Geschatte datum — nog niet bevestigd door het bedrijf' }
-      : { value: span, title: 'Bevestigde datum' };
-  });
-
+  // No earnings entry in the strip: the countdown banner on the price row says
+  // the same thing louder, and a second copy read as noise next to it.
   const keyStats = $derived([
     { label: 'Mkt cap',  value: stats?.mktCap != null ? fmtCompactNative(stats.mktCap, currency) : '—', title: 'Marktkapitalisatie' },
     { label: 'Volume',   value: stats?.volume != null ? fmtCompact(stats.volume) : '—', title: 'Volume vandaag' },
     { label: 'Avg vol',  value: stats?.avgVolume != null ? fmtCompact(stats.avgVolume) : '—', title: 'Gemiddeld volume over 3 maanden' },
     { label: 'P/E',      value: stats?.pe != null ? stats.pe.toFixed(1) : '—', title: 'Koers-winstverhouding (trailing)' },
-    { label: 'Earnings', value: earningsCell.value, title: earningsCell.title },
   ]);
 
   /* ── Returns card (Delta 3, handoff 4): price returns of the stock ── */
@@ -458,8 +461,9 @@
       </div>
     </div>
 
-    <!-- ── Market hero: THE market price, native currency ── -->
+    <!-- ── Market hero: THE market price, native currency (+ earnings banner) ── -->
     <div class="hero">
+      <div class="hero-main">
       <div class="hero-row">
         {#if livePrice != null}
           <div class="hero-price mono">{fmtNative(livePrice, currency)}</div>
@@ -487,6 +491,10 @@
           {heroCaption}
         {/if}
       </div>
+      </div>
+      {#if banner}
+        <EarningsBanner info={banner} />
+      {/if}
     </div>
 
     <!-- ── Chart (full-bleed, market price only) ── -->
@@ -522,6 +530,7 @@
           data={historyData}
           xTicks={historyTicks}
           markers={txMarks.markers}
+          events={earningsEvents}
           showHiLo
           tooltip={tipHistory}
         />
@@ -530,9 +539,16 @@
       {/if}
     </div>
 
-    <!-- ── Period pills ── -->
+    <!-- ── Period pills (+ marker legend, only when a marker is drawn) ── -->
     <div class="pills-row">
-      <PeriodPills options={PERIOD_OPTIONS} selected={period} onselect={selectPeriod} />
+      <div class="pills-flex">
+        <PeriodPills options={PERIOD_OPTIONS} selected={period} onselect={selectPeriod} />
+      </div>
+      {#if earningsEvents.length > 0}
+        <div class="chart-legend">
+          <span class="legend-dot"></span> last reported
+        </div>
+      {/if}
     </div>
 
     <!-- ── Key stats + 52-week range bar ── -->
@@ -712,8 +728,15 @@
     background: currentColor;
   }
 
-  /* ── Market hero ── */
-  .hero { margin-bottom: 4px; }
+  /* ── Market hero (price block + earnings banner share the row) ── */
+  .hero {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px 28px;
+    margin-bottom: 4px;
+  }
+  .hero-main { min-width: 0; }
   .hero-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .hero-price {
     font-size: 34px;
@@ -734,7 +757,31 @@
     font-size: 11px;
     color: var(--fg-faint);
   }
-  .pills-row { margin-top: 8px; }
+  .pills-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin-top: 8px;
+  }
+  .pills-flex {
+    flex: 1 1 300px;
+    min-width: 0;
+  }
+  .chart-legend {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10.5px;
+    color: var(--fg-faint);
+  }
+  .legend-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--fg);
+    flex-shrink: 0;
+  }
 
   /* ── Key stats + 52w range bar strip ── */
   .stats-strip {
@@ -900,7 +947,7 @@
     .hero-price { font-size: 42px; }
     .chart-bleed { margin: 8px -24px 0; }
     .chart-placeholder { height: 260px; }
-    .pills-row { max-width: 440px; }
+    .pills-flex { max-width: 440px; }
   }
 
   /* ── Unknown ticker ── */

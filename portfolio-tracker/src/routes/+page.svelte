@@ -4,6 +4,7 @@
   import { MediaQuery } from 'svelte/reactivity';
   import { portfolioStore } from '$lib/stores/portfolio.svelte';
   import { intradayStore } from '$lib/stores/intraday.svelte';
+  import { earningsStore } from '$lib/stores/earnings.svelte';
   import { themeStore } from '$lib/stores/theme.svelte';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
   import PeriodChart, { type ChartTip, type ChartTipLine } from '$lib/components/shared/PeriodChart.svelte';
@@ -12,6 +13,7 @@
   import ActivityList from '$lib/components/shared/ActivityList.svelte';
   import SettingsGear from '$lib/components/shared/SettingsGear.svelte';
   import HoldingCard, { type DayTone } from '$lib/components/dashboard/HoldingCard.svelte';
+  import EarningsCard from '$lib/components/dashboard/EarningsCard.svelte';
   import { buildPortfolioIntradaySession } from '$lib/derived/intraday';
   import {
     getLiveData, getDay1Pl, getPeriodPl, buildCards, buildTickerSpark,
@@ -19,6 +21,11 @@
     livePositionValueEur, prevSessionMove,
     type TickerSpark, type WatchCard,
   } from '$lib/derived/dashboard';
+  import {
+    buildEarningsList, earningsBadge, todayIso,
+    EARNINGS_HORIZON_LABEL, SHOW_WATCHLIST_EARNINGS,
+    type EarningsEntry,
+  } from '$lib/derived/earnings';
   import { fmtEur, fmtEurSigned, fmtNative, fmtNativeSigned, fmtPct, fmtPct1 } from '$lib/utils/fmt';
   import { PERIOD_OPTIONS, periodDeltaLabel, filterChartData, type Period } from '$lib/utils/period';
   import { getColor } from '$lib/utils/color';
@@ -286,6 +293,47 @@
     };
   }
 
+  // ── Earnings (holdings + watchlist, next few weeks) ─────────────────────────
+
+  /** Yahoo symbols the earnings list covers — the same set the cards show. */
+  const earningsSymbols = $derived([
+    ...holdings.map((p) => p.yahoo ?? p.ticker),
+    ...(SHOW_WATCHLIST_EARNINGS ? watchCards.map((w) => w.yahoo) : []),
+  ].filter(Boolean));
+
+  // One fetch per ticker set; the store ignores a repeat of the same set.
+  $effect(() => {
+    if (earningsSymbols.length > 0) earningsStore.load(earningsSymbols);
+  });
+
+  const today = todayIso();
+
+  const earningsEntries = $derived<EarningsEntry[]>([
+    ...holdings.map((p) => ({
+      ticker: p.ticker,
+      color: getColor(p.ticker),
+      held: true,
+      href: resolve('/stock/[ticker]', { ticker: p.ticker }),
+      info: earningsStore.data[p.yahoo ?? p.ticker],
+    })),
+    ...watchCards.map((w) => ({
+      ticker: w.ticker,
+      color: getColor(w.ticker),
+      held: false,
+      href: resolve('/stock/[ticker]', { ticker: w.ticker }),
+      info: earningsStore.data[w.yahoo],
+    })),
+  ]);
+
+  const earningsList = $derived(buildEarningsList(earningsEntries, today));
+  const earningsRows = $derived(
+    earningsList.reported ? [...earningsList.upcoming, earningsList.reported] : earningsList.upcoming,
+  );
+  // Nothing upcoming inside the horizon: the whole track goes, so the holdings
+  // reflow full width instead of sitting beside a dead column. A lone reported
+  // row is not reason enough to keep it.
+  const showEarnings = $derived(earningsList.upcoming.length > 0);
+
   // ── Allocation ──────────────────────────────────────────────────────────────
   const allocItems = $derived(
     holdings
@@ -405,8 +453,8 @@
     {/if}
   </div>
 
-  <!-- ── Columns: holdings + watchlist + sidebar (single column on mobile) ── -->
-  <div class="columns">
+  <!-- ── Columns: holdings + earnings + sidebar (single column on mobile) ── -->
+  <div class="columns" class:has-earnings={showEarnings}>
 
     <!-- ── Holdings cards ── -->
     <div class="col-main">
@@ -432,6 +480,7 @@
               dayStr={bits.dayStr}
               dayTone={bits.dayTone}
               {spark}
+              earnings={earningsBadge(earningsStore.data[pos.yahoo ?? pos.ticker], today)}
               ontoggleday={toggleDayMode}
             />
           {/each}
@@ -465,6 +514,19 @@
         </div>
       {/if}
     </div>
+
+    <!-- ── Earnings: who reports next (leads on mobile — it's the timely bit) ── -->
+    {#if showEarnings}
+      <div class="col-earnings">
+        <div class="section-header">
+          <div class="section-title">Earnings</div>
+          <div class="section-hint">
+            {EARNINGS_HORIZON_LABEL} · {SHOW_WATCHLIST_EARNINGS ? 'holdings + watchlist' : 'holdings only'}
+          </div>
+        </div>
+        <EarningsCard rows={earningsRows} />
+      </div>
+    {/if}
 
     <!-- ── Sidebar: allocation + activity ── -->
     <div class="col-side">
@@ -645,16 +707,28 @@
   }
 
   /* ── Columns ── */
+  /* Named areas rather than source order: the earnings track has to lead on
+     mobile (it's the timely information) while sitting in the right-hand
+     column on desktop, and it must disappear without leaving an empty row. */
   .columns {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 26px 56px;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas: 'main' 'side';
+    align-items: start;
+    gap: 26px;
     margin-top: 26px;
   }
-  .col-main { flex: 2 1 520px; min-width: 0; }
+  .columns.has-earnings { grid-template-areas: 'earnings' 'main' 'side'; }
+  .col-main { grid-area: main; min-width: 0; }
+  .col-earnings {
+    grid-area: earnings;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
   .col-side {
-    flex: 1 1 300px;
+    grid-area: side;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -694,6 +768,7 @@
     text-decoration: none;
   }
   .section-link:hover { color: var(--fg); }
+  .col-earnings .section-header { margin-bottom: 0; }
   .activity-header { margin-bottom: 2px; }
   .alloc-header    { margin-bottom: 10px; }
   .watch-header    { margin-top: 28px; }
@@ -728,5 +803,12 @@
     .hero { margin-top: 0; }
     .hero-value { font-size: 42px; }
     .chart-bleed { margin: 10px -24px 0; }
+    .columns {
+      grid-template-columns: 2fr 1fr;
+      grid-template-areas: 'main side';
+      gap: 26px 56px;
+    }
+    /* Earnings tops the right-hand column; holdings span both its rows. */
+    .columns.has-earnings { grid-template-areas: 'main earnings' 'main side'; }
   }
 </style>
