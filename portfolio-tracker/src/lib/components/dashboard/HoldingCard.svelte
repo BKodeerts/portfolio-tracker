@@ -88,7 +88,12 @@
   }
 
   .card {
-    display: block;
+    /* Column with the footer pinned to the bottom: the sparkline's "closed
+       HH:MM" caption is optional, so anchoring the footer to the card instead
+       of to the plot keeps the value + day change on the same line across
+       cards, captioned or not. */
+    display: flex;
+    flex-direction: column;
     background: var(--surface);
     border: 1px solid var(--card-border);
     border-radius: 14px;
@@ -153,6 +158,7 @@
   }
 
   .foot {
+    margin-top: auto;
     display: flex;
     align-items: baseline;
     justify-content: space-between;
