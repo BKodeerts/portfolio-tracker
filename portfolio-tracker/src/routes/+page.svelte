@@ -778,6 +778,10 @@
   .card-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    /* Every row as tall as the tallest card in the section, not just the
+       tallest in its own row: a "closed HH:MM" caption anywhere then lands
+       every card's footer on the same line. */
+    grid-auto-rows: 1fr;
     gap: 10px;
     margin-top: 8px;
   }

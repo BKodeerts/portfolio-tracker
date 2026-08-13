@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.13] — 2026-08-13
+
+### Changed
+
+- **The holding-card footer is pinned to the bottom of the card.** The cards already stretched to a common height, but their contents were top-aligned, so the optional sparkline caption ("closed 22:00", "prev session · opens 15:30") pushed the value and the day change down on the cards that had one and left the rest sitting a caption's height higher. The card is now a column with the footer anchored to its bottom edge, and the grid sizes every row to the tallest card in the section rather than the tallest in its own row — so the day number lands on the same line on every card, captioned or not, in the first row or the last. Where a card has no caption the slack falls between the sparkline and the footer, which is the only place it can go without detaching the caption from the plot it describes.
+
 ## [0.13.12] — 2026-08-13
 
 ### Removed
