@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   relLabel, monoDate, dayMonth, rangeLabel, sentenceDate,
-  earningsBadge, buildEarningsList, earningsBanner,
+  buildEarningsList, earningsBanner,
   type EarningsEntry,
 } from '../../src/lib/derived/earnings';
 import type { EarningsInfo } from '../../src/lib/types/stats';
@@ -40,31 +40,6 @@ describe('date labels', () => {
     expect(relLabel(TODAY, '2026-08-14')).toBe('in 4d');
     expect(relLabel(TODAY, '2026-08-09')).toBe('yesterday');
     expect(relLabel(TODAY, '2026-08-07')).toBe('3d ago');
-  });
-});
-
-describe('earningsBadge', () => {
-  it('degrades to an em dash without a date', () => {
-    expect(earningsBadge(info(), TODAY)).toMatchObject({ text: '—', tone: 'faint', dashed: false });
-    // A failed fetch arrives as the same empty block — same rendering.
-    expect(earningsBadge(null, TODAY)).toMatchObject({ text: '—', tone: 'faint' });
-  });
-
-  it('inks a date within the week and mutes one further out', () => {
-    expect(earningsBadge(confirmed('2026-08-11'), TODAY)).toMatchObject({ text: '11 Aug', tone: 'ink' });
-    expect(earningsBadge(confirmed('2026-08-25'), TODAY)).toMatchObject({ text: '25 Aug', tone: 'muted' });
-  });
-
-  it('shows an unconfirmed window as a dashed range, never a single day', () => {
-    const badge = earningsBadge(window_('2026-08-14', '2026-08-18'), TODAY);
-    expect(badge.text).toBe('14–18 Aug');
-    expect(badge.dashed).toBe(true);
-  });
-
-  it('marks an already-reported date as past', () => {
-    expect(earningsBadge(reported('2026-08-06'), TODAY)).toMatchObject({
-      text: 'reported 6 Aug', tone: 'faint', dashed: false,
-    });
   });
 });
 

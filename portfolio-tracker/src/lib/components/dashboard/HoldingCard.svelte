@@ -6,7 +6,6 @@
   import IntradaySparkline from '$lib/components/shared/IntradaySparkline.svelte';
   import PrivacyValue from '$lib/components/PrivacyValue.svelte';
   import type { TickerSpark } from '$lib/derived/dashboard';
-  import type { EarningsBadge } from '$lib/derived/earnings';
 
   /**
    * Holdings/watchlist card (dashboard v3): color dot + ticker + native price,
@@ -27,15 +26,13 @@
     dayStr: string;
     dayTone: DayTone;
     spark: TickerSpark | null;
-    /** Next earnings date, appended below the footer. Omitted = no earnings line. */
-    earnings?: EarningsBadge | null;
     /** Tapping the day number flips all cards between day-% and day-€. */
     ontoggleday: () => void;
   }
   const {
     ticker, color, href, variant = 'held',
     priceStr, footLeft, privacy = false,
-    dayStr, dayTone, spark, earnings = null, ontoggleday,
+    dayStr, dayTone, spark, ontoggleday,
   }: Props = $props();
 
   function toggle(e: Event) {
@@ -81,12 +78,6 @@
       onkeydown={toggleKey}
     >{dayStr}</span>
   </div>
-  {#if earnings}
-    <div class="earnings" title={earnings.title}>
-      <span class="earnings-label">Earnings</span>
-      <span class="earnings-val mono {earnings.tone}" class:dashed={earnings.dashed}>{earnings.text}</span>
-    </div>
-  {/if}
 </a>
 
 <style>
@@ -185,32 +176,4 @@
   .day.washed-pos { color: var(--c-pos-washed); }
   .day.washed-neg { color: var(--c-neg-washed); }
   .day.muted { color: var(--fg-faint); }
-
-  /* ── Earnings line: one date, or the same `—` the empty P/E cell uses ── */
-  .earnings {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin-top: 9px;
-    padding-top: 8px;
-    border-top: 1px solid var(--hairline);
-  }
-  .earnings-label {
-    font-size: 9.5px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--spark-dim);
-  }
-  .earnings-val {
-    margin-left: auto;
-    font-size: 10px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  .earnings-val.ink   { color: var(--fg); }
-  .earnings-val.muted { color: var(--fg-faint); }
-  .earnings-val.faint { color: var(--spark-dim); }
-  /* Unconfirmed window — the dashed rule is the same "not a hard date" cue the
-     banner's dashed border carries. */
-  .earnings-val.dashed { border-bottom: 1px dashed var(--border-strong); }
 </style>

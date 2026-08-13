@@ -8,8 +8,8 @@ import type { EarningsInfo } from '$lib/types/stats';
  * Three properties of the data shape every rule here:
  *
  *   * There is exactly one date per ticker — the next report *or* the most
- *     recent one — so there is no history, and never more than one row, badge
- *     or chart marker per ticker.
+ *     recent one — so there is no history, and never more than one row or
+ *     chart marker per ticker.
  *   * `endDate` is set only for an unconfirmed multi-day window. Rendering that
  *     as a hard date would be false precision, so it always shows as a range.
  *   * `date: null` covers both "this listing has no earnings" (ETFs, many
@@ -28,8 +28,6 @@ export const SHOW_WATCHLIST_EARNINGS = true;
 export const MAX_UPCOMING_ROWS = 5;
 /** Dates this close read as urgent (loud relative label on the list). */
 const SOON_DAYS = 3;
-/** A holding-card badge is inked rather than muted inside this many days. */
-const BADGE_INK_DAYS = 7;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -79,49 +77,6 @@ export function relLabel(today: string, iso: string): string {
   if (n === 0) return 'today';
   if (n === 1) return 'tomorrow';
   return `in ${n}d`;
-}
-
-/** The date as shown, range when the window is estimated. */
-function dateLabel(e: EarningsInfo): string {
-  return e.endDate && e.date ? rangeLabel(e.date, e.endDate) : dayMonth(e.date ?? '');
-}
-
-/* ── Holding-card badge ─────────────────────────────────────────────────── */
-
-/** `ink` = worth noticing now, `muted` = further out, `faint` = past or absent. */
-export type EarningsTone = 'ink' | 'muted' | 'faint';
-
-export interface EarningsBadge {
-  text: string;
-  tone: EarningsTone;
-  /** Dashed underline: the date is an unconfirmed estimate. */
-  dashed: boolean;
-  title: string;
-}
-
-/**
- * The one-line earnings state on a holding card. Degrades to `—` exactly like
- * the empty P/E cell — for a listing without earnings and for a failed fetch
- * alike, because the two are indistinguishable here.
- */
-export function earningsBadge(e: EarningsInfo | null | undefined, today: string): EarningsBadge {
-  if (!e?.date) return { text: '—', tone: 'faint', dashed: false, title: 'No published earnings date' };
-  if (!e.upcoming) {
-    return {
-      text: `reported ${dayMonth(e.date)}`,
-      tone: 'faint',
-      dashed: false,
-      title: 'Already reported · next date not published yet',
-    };
-  }
-  return {
-    text: dateLabel(e),
-    tone: daysBetween(today, e.date) <= BADGE_INK_DAYS ? 'ink' : 'muted',
-    dashed: e.estimated,
-    title: e.estimated
-      ? 'Estimated window · not confirmed by the company'
-      : 'Confirmed date',
-  };
 }
 
 /* ── Dashboard list ─────────────────────────────────────────────────────── */

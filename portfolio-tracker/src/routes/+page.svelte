@@ -22,7 +22,7 @@
     type TickerSpark, type WatchCard,
   } from '$lib/derived/dashboard';
   import {
-    buildEarningsList, earningsBadge, todayIso,
+    buildEarningsList, todayIso,
     EARNINGS_HORIZON_LABEL, SHOW_WATCHLIST_EARNINGS,
     type EarningsEntry,
   } from '$lib/derived/earnings';
@@ -482,7 +482,6 @@
               dayStr={bits.dayStr}
               dayTone={bits.dayTone}
               {spark}
-              earnings={earningsBadge(earningsStore.data[pos.yahoo ?? pos.ticker], today)}
               ontoggleday={toggleDayMode}
             />
           {/each}
