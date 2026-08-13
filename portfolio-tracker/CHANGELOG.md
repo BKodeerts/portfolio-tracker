@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.12] — 2026-08-13
+
+### Removed
+
+- **The earnings line is gone from the holding cards.** The Earnings column added in 0.13.10 already lists who reports next, so the per-card date was a second copy of the same fact — and unlike the list it appeared on every card, including the ones with nothing to say, where it took a hairline rule and a row of height to render `—`. The list keeps the dates; the cards go back to price, sparkline and day change. The dashboard still fetches earnings for the same set of tickers (holdings + watchlist) to build the list, so nothing changes server-side. The stock detail countdown banner and its chart marker are unaffected.
+
+  `earningsBadge` and its types went with it rather than staying behind as unused presentation code.
+
 ## [0.13.11] — 2026-08-13
 
 ### Changed
