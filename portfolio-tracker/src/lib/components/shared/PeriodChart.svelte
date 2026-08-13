@@ -32,6 +32,8 @@
 </script>
 
 <script lang="ts">
+  import { intradayBounds } from '$lib/utils/scale';
+
   /**
    * Hero SVG chart (dashboard, stock detail).
    * The SVG is sized to the measured container width — geometry recomputes
@@ -68,6 +70,12 @@
     sessionEnd?: number;
     /** Caption shown centered when intraday `points` is empty. */
     emptyLabel?: string;
+    /**
+     * Intraday: minimum y-axis span in the y-unit of `points`, so a near-flat
+     * session is not blown up to full height. Defaults to a fraction of
+     * `prevClose`; pass it explicitly when the y-unit is % (prevClose is 0).
+     */
+    minSpan?: number | null;
     /** Inner horizontal padding in px (desktop dashboard: 24). */
     padX?: number;
     /** Hide the pulsing "now" dot (after the last market close). */
@@ -95,7 +103,7 @@
   const {
     mode, height = 200, formatY, xTicks = [],
     data = [], invested = [],
-    points = [], prevClose, sessionStart, sessionEnd, emptyLabel,
+    points = [], prevClose, sessionStart, sessionEnd, emptyLabel, minSpan = null,
     padX = 20, showNow = true,
     dimmed = false, topCaption = null,
     bands = [], benchmark = [], gainFill = false, markers = [], events = [],
@@ -179,6 +187,9 @@
       if (v > vals[iMax]!) iMax = i;
     });
     if (iMin === iMax || vals[iMax]! === vals[iMin]!) return [];
+    // On a floored axis the two tags can land within a few pixels of each other
+    // and collide; a session that flat has no high or low worth labelling.
+    if (Math.abs(pts[iMax]![1] - pts[iMin]![1]) < 20) return [];
     const clampX = (x: number) => Math.max(L + 26, Math.min(R - 26, x));
     return [
       { cx: pts[iMax]![0], cy: pts[iMax]![1], lx: clampX(pts[iMax]![0]), ly: pts[iMax]![1] - 7, label: formatY(vals[iMax]!) },
@@ -243,10 +254,9 @@
     // intraday mode
     if (prevClose == null || sessionStart == null || sessionEnd == null || sessionEnd <= sessionStart) return null;
     const vals = points.map((p) => p.value);
-    let lo = Math.min(prevClose, ...vals);
-    let hi = Math.max(prevClose, ...vals);
-    const pad = (hi - lo) * 0.15 || Math.abs(prevClose) * 0.005 || 1;
-    lo -= pad; hi += pad;
+    // Floored: early in the session a 0,02% move is genuinely flat and must
+    // look flat, instead of autoscaling into a full-height swing.
+    const { lo, hi } = intradayBounds(vals, prevClose, minSpan);
     const sx = (m: number) => L + ((m - sessionStart) / (sessionEnd - sessionStart)) * (R - L);
     const sy = (v: number) => T + (1 - (v - lo) / (hi - lo)) * (bottom - T);
     const grid = [0, 0.5, 1].map((f) => {
