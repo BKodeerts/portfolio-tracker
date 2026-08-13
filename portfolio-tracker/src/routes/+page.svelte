@@ -30,6 +30,7 @@
   import { PERIOD_OPTIONS, periodDeltaLabel, filterChartData, type Period } from '$lib/utils/period';
   import { getColor } from '$lib/utils/color';
   import { buildTxMarkers } from '$lib/utils/tx-markers';
+  import { MIN_SPAN_PCT } from '$lib/utils/scale';
   import type { Position } from '$lib/types/portfolio';
 
   // ── Responsive (design breakpoint: 900px) ───────────────────────────────────
@@ -392,6 +393,7 @@
         formatY={isPct ? fmtPct : fmtEur}
         points={intradayDisplay}
         prevClose={isPct ? 0 : session?.prevCloseTotal}
+        minSpan={isPct ? MIN_SPAN_PCT : null}
         sessionStart={session?.dayStart}
         sessionEnd={session?.dayEnd}
         xTicks={INTRADAY_TICKS}

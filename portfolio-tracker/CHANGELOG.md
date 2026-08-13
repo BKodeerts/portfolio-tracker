@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.11] — 2026-08-13
+
+### Changed
+
+- **A quiet session now looks quiet.** Intraday plots autoscale to the session's own range, which early in the day is a few basis points wide — a portfolio up 0,02% at 09:32 was drawn corner to corner, at full height, reading as a big move. Both the dashboard 1D chart and the holding-card sparklines now hold a minimum axis span: 0,5% of the prev close for value plots, 0,5 percentage points for the ones already drawn in %. Under that floor a move fills only the fraction of the height it is actually worth (0,02% draws as a flat line just off the baseline); at or above it nothing changes, so a normal day still fills the plot exactly as before.
+
+- The 1D chart's high/low tags are dropped when the two would land within 20px of each other. On a floored axis they otherwise stack on top of each other to label a high and a low that are a cent apart.
+
 ## [0.13.10] — 2026-08-10
 
 ### Added

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { IntradayPoint } from '$lib/types/candle';
+  import { MIN_SPAN_PCT, withMinSpan } from '$lib/utils/scale';
 
   /**
    * THE single ticker mini-graph (design decision #4): % vs prev close,
@@ -40,8 +41,13 @@
     if (!points || points.length < 2 || !prevClose || sessionEnd <= sessionStart) return null;
     const H = height;
     const pcts = points.map((p) => ((p.close - prevClose) / prevClose) * 100);
-    const min = Math.min(0, ...pcts);
-    const max = Math.max(0, ...pcts);
+    // Floored so a 0,02% session draws as the flat line it is, not a full-height
+    // swing; anything past the floor still fills the sparkline as before.
+    const { lo: min, hi: max } = withMinSpan(
+      Math.min(0, ...pcts),
+      Math.max(0, ...pcts),
+      MIN_SPAN_PCT,
+    );
     const range = max - min || 0.1;
     const y = (v: number) => H - PAD_Y - ((v - min) / range) * (H - 2 * PAD_Y);
 
